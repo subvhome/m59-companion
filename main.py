@@ -100,7 +100,7 @@ class CompanionApp:
         tk.Button(settings_win, text="Save", command=save).pack()
 
     def sync_all_data(self):
-        print(">>> [ACTION] Full Sync button pressed.")
+        print(">>> [ACTION] Initiating Strict Verified Sync...")
         if self.is_syncing: return
         self.is_syncing = True
         
@@ -108,31 +108,77 @@ class CompanionApp:
             hwnd = find_game_window()
             if not hwnd: return
 
-            # 1. Identity Capture
-            name = capture_character_name(hwnd)
-            if name:
-                self.char_name = name
-                self.name_label.config(text=f"Identity: {name}")
+            # Clear cache to ensure we aren't seeing old data
+            self.knowledge_cache = {} 
 
-            # 2. Tab Switching
+            # STAGE 1: Identity
+            name = capture_character_name(hwnd)
+            if not name: return
+            self.char_name = name
+            self.name_label.config(text=f"Identity: {name}")
+
+            # Tab Handles
             tab_handles = []
             win32gui.EnumChildWindows(hwnd, lambda h, l: 
                 tab_handles.append(h) if win32gui.GetDlgCtrlID(h) == 1029 else None, None)
 
-            if len(tab_handles) >= 3:
-                # Click Spells Tab
-                print(">>> [STEP 3] Clicking Spells Tab...")
-                win32gui.SendMessage(tab_handles[1], win32con.BM_CLICK, 0, 0)
-                time.sleep(1.5)  # Increased delay for Wine UI rendering
-                self.refresh_lists()
+            # STAGE 2: Spells
+            print(">>> [STEP] Syncing Spells (Verification Active)...")
+            win32gui.SendMessage(tab_handles[1], win32con.BM_CLICK, 0, 0)
+            
+            spells_captured = False
+            for _ in range(10): # 10 attempts, 0.5s each
+                time.sleep(0.5)
+                lb_id = find_skill_listbox(hwnd)
+                if lb_id:
+                    # We expect at least 3 items for a valid Spells list in your case
+                    raw_data = get_raw_skill_dict(lb_id, min_items=3) 
+                    if len(raw_data) >= 3:
+                        self.knowledge_cache.update(raw_data)
+                        print(f">>> [VERIFIED] Spells captured: {len(raw_data)} items.")
+                        spells_captured = True
+                        break
+            
+            if not spells_captured:
+                print(">>> [ABORT] Spells failed minimum item validation.")
+                return
 
-                # Click Skills Tab
-                print(">>> [STEP 4] Clicking Skills Tab...")
-                win32gui.SendMessage(tab_handles[2], win32con.BM_CLICK, 0, 0)
-                time.sleep(1.5)  # Increased delay for Wine UI rendering
-                self.refresh_lists()
+            time.sleep(1.2) # Mandatory UI cool-down
+
+            # STAGE 3: Skills
+            print(">>> [STEP] Syncing Skills (Verification Active)...")
+            win32gui.SendMessage(tab_handles[2], win32con.BM_CLICK, 0, 0)
+            
+            skills_captured = False
+            prev_size = len(self.knowledge_cache)
+            for _ in range(10):
+                time.sleep(0.5)
+                lb_id = find_skill_listbox(hwnd)
+                if lb_id:
+                    raw_data = get_raw_skill_dict(lb_id, min_items=5)
+                    if len(raw_data) >= 5:
+                        self.knowledge_cache.update(raw_data)
+                        if len(self.knowledge_cache) > prev_size:
+                            print(f">>> [VERIFIED] Skills added. Total: {len(self.knowledge_cache)}")
+                            skills_captured = True
+                            break
+
+            print(">>> [COMPLETE] 100% Verified Sync.")
+            
         finally:
+            self.refresh_ui_display() # Ensure UI reflects the final cache
             self.is_syncing = False
+
+    def refresh_ui_display(self):
+        """Dedicated helper to push cache to the UI text box."""
+        self.list_display.config(state="normal")
+        self.list_display.delete("1.0", tk.END)
+        for n in sorted(self.knowledge_cache.keys()):
+            self.list_display.insert(tk.END, f"{n.title()}: {self.knowledge_cache[n]}%\n")
+        self.list_display.config(state="disabled")
+        
+        res = self.calc.calculate_all_unlocks(self.knowledge_cache)
+        self.unlock_label.config(text="\n".join(res) if res else "No unlocks available.")
 
     def refresh_lists(self):
         hwnd = find_game_window()

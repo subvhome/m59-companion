@@ -6,19 +6,25 @@ from m59_memory import MemoryReader
 
 mem = MemoryReader()
 
-def get_raw_skill_dict(hwnd):
-    # Short internal delay to ensure list items are ready
-    time.sleep(0.2) 
-    print(f">>> [MODULE] Reading skills for HWND {hwnd}")
+def get_raw_skill_dict(hwnd, min_items=1):
+    print(f">>> [MODULE] Stabilizing listbox for HWND {hwnd} (Expecting min: {min_items})")
     
     skill_map = {}
-    count = win32gui.SendMessage(hwnd, win32con.LB_GETCOUNT, 0, 0)
+    start_time = time.time()
     
-    if count <= 0:
-        print(">>> [WARN] Listbox is empty or not ready.")
-        return {}
+    # Loop for up to 4 seconds to reach stabilization AND minimum threshold
+    while time.time() - start_time < 4.0:
+        current_count = win32gui.SendMessage(hwnd, win32con.LB_GETCOUNT, 0, 0)
+        
+        # If we have at least min_items and the count is stable, proceed
+        if current_count >= min_items:
+            time.sleep(0.3) # Final settling breath
+            if win32gui.SendMessage(hwnd, win32con.LB_GETCOUNT, 0, 0) == current_count:
+                break
+        time.sleep(0.3)
 
-    for i in range(count):
+    final_count = win32gui.SendMessage(hwnd, win32con.LB_GETCOUNT, 0, 0)
+    for i in range(final_count):
         length = win32gui.SendMessage(hwnd, win32con.LB_GETTEXTLEN, i, 0)
         if length > 0:
             buffer = array.array('u', '\x00' * (length + 1))
@@ -29,5 +35,4 @@ def get_raw_skill_dict(hwnd):
             percent = mem.read_skill_percent(base_addr)
             skill_map[label] = int(percent)
             
-    print(f">>> [SUCCESS] Grabbed {len(skill_map)} items from listbox.")
     return skill_map
