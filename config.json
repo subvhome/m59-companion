@@ -1,0 +1,10 @@
+{
+    "server": {
+        "points_slope": 7.0,
+        "max_points": 16.0,
+        "min_needed_floor": 225
+    },
+    "character": {
+        "intellect": 25
+    }
+}
