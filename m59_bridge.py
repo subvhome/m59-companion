@@ -3,6 +3,7 @@ import win32con
 import win32api
 import array
 import logging
+import os
 from m59_memory import MemoryReader
 # Setup module-level logger
 logger = logging.getLogger("m59.bridge")
@@ -79,6 +80,32 @@ def find_skill_listbox(game_hwnd):
         logger.debug("No visible ListBox found in current window state.")
         
     return found_id[0]
+    
+import os
+
+def get_log_fingerprint(file_path, window_size=20):
+    """Extracts a clean 20-line fingerprint from the last log file."""
+    if not file_path or not os.path.exists(file_path):
+        return []
+    
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        
+        clean_history = []
+        for l in lines:
+            text = l.strip()
+            if not text or text.startswith("---"): 
+                continue
+            # Strip the [HH:MM:SS]
+            if text.startswith("[") and "]" in text:
+                text = text.split("]", 1)[1].strip()
+            if text:
+                clean_history.append(text)
+            
+        return clean_history[-window_size:]
+    except:
+        return []
 # Initialize the global memory object
 # Note: The MemoryReader handles its own internal attachment logging
 logger.info("Initializing global MemoryReader instance 'mem' in bridge.")

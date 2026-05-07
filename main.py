@@ -93,24 +93,57 @@ class CompanionApp:
                 if current_text:
                     all_lines = [l.strip() for l in current_text.splitlines() if l.strip()]
                     
-                    # If game buffer wrapped or cleared, reset our pointer
+                    if not hasattr(self, 'chat_sync_done'):
+                        import m59_bridge
+                        log_dir = os.path.dirname(self.current_log_path)
+                        all_logs = sorted([os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".log")], 
+                                         key=os.path.getmtime)
+                        
+                        # Identify the previous log file
+                        history_file = None
+                        history_candidates = [f for f in all_logs if os.path.normpath(f) != os.path.normpath(self.current_log_path)]
+                        if history_candidates:
+                            history_file = history_candidates[-1]
+
+                        fingerprint = m59_bridge.get_log_fingerprint(history_file)
+                        found_at = -1
+                        
+                        if fingerprint and len(fingerprint) >= 10:
+                            # Search the game buffer for the 20-line fingerprint
+                            for i in range(len(all_lines) - len(fingerprint) + 1):
+                                if all_lines[i:i+len(fingerprint)] == fingerprint:
+                                    found_at = i + len(fingerprint)
+                                    break
+                        
+                        with open(self.current_log_path, "a", encoding="utf-8") as f:
+                            if found_at != -1:
+                                self.last_line_count = found_at
+                                f.write(f"--- Found match: continuing log from {os.path.basename(history_file)} ---\n")
+                                logger.info("Sync Success: Found fingerprint match.")
+                            else:
+                                self.last_line_count = len(all_lines)
+                                f.write("--- No match found / fresh log session ---\n")
+                                logger.info("Sync Failed: Starting from live text.")
+                            f.flush()
+
+                        self.chat_sync_done = True
+
+                    # --- NORMAL RECORDING ---
                     if len(all_lines) < self.last_line_count:
                         self.last_line_count = 0
                     
                     new_lines = all_lines[self.last_line_count:]
                     
                     if new_lines:
-                        # Update the pointer by how many lines we just processed
                         self.last_line_count = len(all_lines)
-                        
                         try:
                             with open(self.current_log_path, "a", encoding="utf-8") as f:
                                 for line in new_lines:
-                                    log_ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                                    f.write(f"{log_ts} {line}\n")
-                                f.flush() 
+                                    ts = datetime.now().strftime("[%H:%M:%S]")
+                                    f.write(f"{ts} {line}\n")
+                                f.flush()
                         except Exception as e:
-                            logger.error(f"Error writing to chat log: {e}")
+                            logger.error(f"Write failed: {e}")
         
         self.root.after(1000, self.update_loop)
 
@@ -364,33 +397,40 @@ class CompanionApp:
             os.makedirs("logs")
 
         ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.current_log_path = os.path.abspath(os.path.join("logs", f"session_{ts}.log"))
+        # Use a very simple path to avoid Wine path issues
+        self.current_log_path = os.path.join("logs", f"session_{ts}.log")
         
+        # 1. Create the file
+        with open(self.current_log_path, "w", encoding="utf-8") as f:
+            f.write(f"--- Session Started: {datetime.now()} ---\n")
+        
+        # 2. START THE MONITOR
         try:
-            # 1. Physically create the file first
-            with open(self.current_log_path, "w", encoding="utf-8") as f:
-                f.write(f"--- Session Started: {datetime.now()} ---\n")
-            
-            logger.info(f"Log file created: {self.current_log_path}")
-
-            # 2. Start the monitor with the ABSOLUTE path to avoid confusion
+            print(f"DEBUG: Attempting to start monitor thread for {self.current_log_path}")
             self.monitor = LogMonitor(self.current_log_path)
-            monitor_thread = threading.Thread(
-                target=self.monitor.watch, 
-                args=(self.handle_detected_improve,), 
-                daemon=True
-            )
+            
+            # We use a wrapper function to make sure we catch thread crashes
+            def thread_wrapper():
+                try:
+                    self.monitor.watch(self.handle_detected_improve)
+                except Exception as e:
+                    print(f"CRITICAL: Monitor Thread Crashed: {e}")
+
+            monitor_thread = threading.Thread(target=thread_wrapper, daemon=True)
             monitor_thread.start()
             
+            # Log to the App UI so we know it worked
+            logger.info(f"Monitor Active: {os.path.basename(self.current_log_path)}")
+            
         except Exception as e:
-            logger.error(f"Failed to initialize log session/monitor: {e}")
+            print(f"DEBUG: Failed to launch monitor: {e}")
     
     def handle_detected_improve(self, skill_name):
-        """Updates the UI grid whenever a new improve is detected in the logs."""
+        """Updates the Live Improves grid when a gain is detected."""
         name = skill_name.title()
         now = datetime.now()
         
-        # 1. Update the internal data
+        # 1. Update/Initialize internal tracking data
         if name not in self.session_improves:
             self.session_improves[name] = {
                 "count": 0,
@@ -401,25 +441,32 @@ class CompanionApp:
         stats = self.session_improves[name]
         stats["count"] += 1
         
-        # Calculate Delta (Time since last improve)
+        # Calculate Delta
         diff = now - stats["last_time"]
         delta_str = f"{int(diff.total_seconds() // 60)}m {int(diff.total_seconds() % 60)}s"
         
-        # Update timestamp for next time
+        # Update timestamp for the NEXT improve
         stats["last_time"] = now
         latest_str = now.strftime("%H:%M:%S")
 
-        # 2. Update the UI Grid (Thread-safe)
         def update_ui():
-            # If the skill is already in the list, update it. Otherwise, add new row.
-            if self.imp_tree.exists(name):
-                self.imp_tree.item(name, values=(stats["count"], latest_str, delta_str))
-            else:
-                self.imp_tree.insert("", "end", iid=name, text=name, 
-                                     values=(stats["count"], latest_str, "---"))
+            try:
+                # We use the skill name as the ID. 
+                # If it exists, update it. If not, insert it.
+                if self.imp_tree.exists(name):
+                    self.imp_tree.item(name, values=(stats["count"], latest_str, delta_str))
+                else:
+                    # Use the formatted name as the iid so we can find it later
+                    self.imp_tree.insert("", "end", iid=name, text=name, 
+                                         values=(stats["count"], latest_str, "---"))
+                
+                # Force the UI to refresh
+                self.root.update_idletasks()
+            except Exception as e:
+                print(f"UI Update Error: {e}")
         
+        # Run on the main thread
         self.root.after(0, update_ui)
-        logger.info(f"✨ UI Updated for Gain: {name}")
 
 if __name__ == "__main__":
     root = tk.Tk()
