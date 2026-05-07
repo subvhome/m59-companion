@@ -7,6 +7,8 @@ import win32gui
 import win32con
 import os
 from datetime import datetime
+from m59_log_monitor import LogMonitor
+import threading
 
 # Import modular helper files
 from m59_bridge import find_game_window, get_stats, find_skill_listbox, mem, get_text_from_hwnd
@@ -41,7 +43,7 @@ class CompanionApp:
         self.knowledge_cache = {} 
         self.log_queue = queue.Queue()
         self.last_line_count = 0
-        self.current_log_path = None
+        self.current_log_path = None # Will hold our .log file path
         
         # Ensure logs directory exists
         if not os.path.exists("logs"):
@@ -52,8 +54,11 @@ class CompanionApp:
         self.setup_ui_main() 
         self.setup_ui_logs() 
         
+        # Start the first session immediately
+        self.start_new_log_session()
+        
         self.update_loop() 
-        logger.info("Application started. Core engine active.")
+        logger.info("Application started. Chat Logger is Active.")
         
     def setup_logging_infrastructure(self):
         logger.setLevel(logging.INFO)
@@ -62,16 +67,8 @@ class CompanionApp:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    def start_new_log_session(self):
-        """Creates a fresh timestamped file in the /logs folder."""
-        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.current_log_path = os.path.join("logs", f"session_{ts}.txt")
-        with open(self.current_log_path, "w") as f:
-            f.write(f"--- Meridian 59 Session Started: {datetime.now()} ---\n")
-        logger.info(f"Started new session log: {self.current_log_path}")
-
     def update_loop(self):
-        # 1. Update UI Logs from Queue
+        # 1. Internal System Log UI Update
         while not self.log_queue.empty():
             msg = self.log_queue.get()
             self.log_display.config(state="normal")
@@ -83,28 +80,36 @@ class CompanionApp:
         if hwnd and not self.is_syncing:
             if not mem.process_handle: mem.attach()
             
-            # 2. Stats Polling (HP/MP/VG) (KEEP)
+            # 2. Update Core Stats (Untouched)
             if mem.process_handle:
                 s = get_stats(hwnd)
                 if s: self.stats_label.config(text=f"HP: {s[0]} | MP: {s[1]} | VG: {s[2]}")
             
-            # 3. Buffer Management (PREPARE FOR LOGGER)
+            # 3. Enhanced Chat Logger Logic
             chat_hwnd = win32gui.GetDlgItem(hwnd, 1005)
             if chat_hwnd:
                 current_text = get_text_from_hwnd(chat_hwnd)
                 if current_text:
-                    lines = [l.strip() for l in current_text.splitlines() if l.strip()]
+                    all_lines = [l.strip() for l in current_text.splitlines() if l.strip()]
                     
-                    # Reset if buffer clears
-                    if len(lines) < self.last_line_count:
+                    # If game buffer wrapped or cleared, reset our pointer
+                    if len(all_lines) < self.last_line_count:
                         self.last_line_count = 0
                     
-                    # Detect new lines
-                    new_lines = lines[self.last_line_count:]
-                    self.last_line_count = len(lines)
-
-                    # We have captured new_lines here. 
-                    # For now, we do nothing with them until we build the logger.
+                    new_lines = all_lines[self.last_line_count:]
+                    
+                    if new_lines:
+                        # Update the pointer by how many lines we just processed
+                        self.last_line_count = len(all_lines)
+                        
+                        try:
+                            with open(self.current_log_path, "a", encoding="utf-8") as f:
+                                for line in new_lines:
+                                    log_ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+                                    f.write(f"{log_ts} {line}\n")
+                                f.flush() 
+                        except Exception as e:
+                            logger.error(f"Error writing to chat log: {e}")
         
         self.root.after(1000, self.update_loop)
 
@@ -203,6 +208,7 @@ class CompanionApp:
     def sync_all_data(self):
         if self.is_syncing: return
         self.is_syncing = True
+        self.status_label.config(text="Syncing Knowledge...", fg="blue")
         logger.info("Manual Sync Started: Tab Cycling Sequence.")
         
         try:
@@ -220,7 +226,7 @@ class CompanionApp:
             win32gui.EnumChildWindows(hwnd, lambda h, l: tab_handles.append(h) if win32gui.GetDlgCtrlID(h) == 1029 else None, None)
             
             if len(tab_handles) >= 3:
-                logger.info("Cycling tabs to force engine redraw...")
+                # Sequence: Spells -> Skills -> Spells
                 win32gui.SendMessage(tab_handles[1], win32con.BM_CLICK, 0, 0)
                 time.sleep(0.3)
                 win32gui.SendMessage(tab_handles[2], win32con.BM_CLICK, 0, 0)
@@ -259,10 +265,12 @@ class CompanionApp:
                     self.name_label.config(text=f"Identity: {name}")
 
             self.refresh_ui_display()
+            self.status_label.config(text="System Ready", fg="#555")
             logger.info("Knowledge Sync Complete.")
                 
         except Exception as e:
             logger.error(f"Sync error: {e}")
+            self.status_label.config(text="Sync Error", fg="red")
         finally:
             self.is_syncing = False
 
@@ -274,6 +282,38 @@ class CompanionApp:
         self.list_display.config(state="disabled")
         res = self.calc.calculate_all_unlocks(self.knowledge_cache)
         self.unlock_label.config(text="\n".join(res) if res else "No unlocks available.")
+        
+    def start_new_log_session(self):
+        """Creates a fresh log and starts the real-time string monitor."""
+        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.current_log_path = os.path.join("logs", f"session_{ts}.log")
+        
+        try:
+            with open(self.current_log_path, "w", encoding="utf-8") as f:
+                f.write(f"--- Session Started: {datetime.now()} ---\n")
+            
+            # Launch the monitor in a background thread so it doesn't freeze the UI
+            self.monitor = LogMonitor(self.current_log_path)
+            monitor_thread = threading.Thread(
+                target=self.monitor.watch, 
+                args=(self.handle_detected_improve,), 
+                daemon=True
+            )
+            monitor_thread.start()
+            
+            logger.info(f"Log monitor started for: {self.current_log_path}")
+        except Exception as e:
+            logger.error(f"Failed to initialize log session/monitor: {e}")
+    
+    def handle_detected_improve(self, skill_name):
+        """Triggered whenever the log monitor finds a valid skill gain."""
+        # Use .title() to make "dodge" look like "Dodge"
+        formatted_skill = skill_name.title()
+        
+        # Log it to the System Log UI
+        logger.info(f"✨ GAIN DETECTED: {formatted_skill}")
+        
+        # Optional: You could update a 'Gains This Session' counter here
 
 if __name__ == "__main__":
     root = tk.Tk()

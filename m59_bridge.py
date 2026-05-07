@@ -23,22 +23,26 @@ def find_game_window():
     logger.warning("Game window 'Meridian 59' not found.")
     return None
 def get_text_from_hwnd(hwnd):
-    """Enhanced extraction for RICHEDIT controls."""
-    # RichEdit controls can be massive; we use a larger 4KB buffer
-    max_len = 4096 
-    buffer = array.array('u', '\x00' * max_len)
-    
-    # Attempt to pull text
-    res = win32gui.SendMessage(hwnd, win32con.WM_GETTEXT, max_len, buffer)
-    
-    if res > 0:
-        text = buffer.tounicode()[:res].rstrip('\x00')
-        # Only log if it's not a tiny/empty string to avoid spam
-        if len(text) > 2:
-            logger.debug(f"Chat Scraped ({len(text)} chars) from HWND {hwnd}")
-        return text
-    
-    return ""
+    """Dynamically allocated extraction for large chat buffers."""
+    try:
+        # Ask the window how many characters it currently holds
+        text_length = win32gui.SendMessage(hwnd, win32con.WM_GETTEXTLENGTH, 0, 0)
+        
+        if text_length <= 0:
+            return ""
+
+        # Create a buffer large enough to hold everything + a safety margin
+        buffer_size = text_length + 1
+        buffer = array.array('u', '\x00' * buffer_size)
+        
+        # Pull the full content
+        win32gui.SendMessage(hwnd, win32con.WM_GETTEXT, buffer_size, buffer)
+        
+        # Clean up the text and return it
+        return buffer.tounicode().rstrip('\x00')
+    except Exception as e:
+        logger.error(f"Failed to get text from HWND: {e}")
+        return ""
 def get_stats(game_hwnd):
     """Retrieves HP, Mana, and Vigor stats from BlakGraph components."""
     #logger.debug(f"Enumerating stat graphs for HWND {game_hwnd}...")
