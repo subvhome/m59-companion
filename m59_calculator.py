@@ -108,6 +108,12 @@ class SchoolCalculator:
             needed = max(0, target_sum - current_sum)
             
             logger.debug(f"{name} Progress: Top3 Sum={current_sum}, Goal={target_sum}, Remaining={needed}")
-            results.append(f"{name} L{curr_lvl}: {int(needed)}% total needed for L{next_lvl}")
+            results.append({
+                'name': name,
+                'current_lvl': curr_lvl,
+                'current_sum': current_sum,
+                'target_sum': target_sum,
+                'needed': needed
+            })
             
         return results

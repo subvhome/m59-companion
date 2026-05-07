@@ -44,6 +44,7 @@ class CompanionApp:
         self.log_queue = queue.Queue()
         self.last_line_count = 0
         self.current_log_path = None # Will hold our .log file path
+        self.session_improves = {} # New storage for the grid data
         
         # Ensure logs directory exists
         if not os.path.exists("logs"):
@@ -114,24 +115,78 @@ class CompanionApp:
         self.root.after(1000, self.update_loop)
 
     def setup_ui_main(self):
-        """Builds the main character info and progression display."""
-        self.name_label = tk.Label(self.root, text="Character Name", font=("Arial", 10, "bold"))
-        self.name_label.pack(pady=5)
-        self.status_label = tk.Label(self.root, text="System Ready", font=("Arial", 9, "italic"), fg="#555")
-        self.status_label.pack(pady=2)
-        self.stats_label = tk.Label(self.root, text="HP: -- | MP: -- | VG: --", font=("Arial", 10))
-        self.stats_label.pack(pady=5)
+        """Creates the full UI with the correct names for the Sync function."""
         
-        self.unlock_frame = tk.LabelFrame(self.root, text="School Progression", bg="#C0C0C0")
-        self.unlock_frame.pack(fill="x", pady=5, padx=5)
-        self.unlock_label = tk.Label(self.unlock_frame, text="Waiting for data...", font=("Courier", 9), bg="#C0C0C0")
-        self.unlock_label.pack(padx=5, pady=5)
+        # 1. TOP STATS BAR
+        self.stats_frame = tk.Frame(self.root, bg="#C0C0C0")
+        self.stats_frame.pack(fill="x", side="top")
         
-        self.list_frame = tk.LabelFrame(self.root, text="Character Knowledge", bg="#C0C0C0")
-        self.list_frame.pack(fill="both", expand=True, pady=5, padx=5)
-        self.list_display = tk.Text(self.list_frame, height=6, font=("Arial", 8), state="disabled")
+        self.stats_label = tk.Label(
+            self.stats_frame, 
+            text="HP: -- | MP: -- | VG: --", 
+            font=("Arial", 10, "bold"), 
+            bg="#C0C0C0"
+        )
+        self.stats_label.pack(side="left", padx=5)
+        
+        self.status_label = tk.Label(
+            self.stats_frame, 
+            text="System Ready", 
+            font=("Arial", 9, "italic"), 
+            bg="#C0C0C0",
+            fg="#555"
+        )
+        self.status_label.pack(side="left", padx=20)
+        
+        self.name_label = tk.Label(self.stats_frame, text="Identity: Unknown", bg="#C0C0C0")
+        self.name_label.pack(side="right", padx=5)
+
+        # 2. MIDDLE CONTAINER (Split View)
+        self.mid_container = tk.Frame(self.root, bg="#C0C0C0")
+        self.mid_container.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # LEFT: Character Knowledge
+        self.know_frame = tk.LabelFrame(self.mid_container, text="Character Knowledge", bg="#C0C0C0")
+        self.know_frame.pack(side="left", fill="both", expand=True, padx=(0, 2))
+        
+        self.list_display = scrolledtext.ScrolledText(self.know_frame, height=10, width=25, state="disabled", font=("Arial", 9))
         self.list_display.pack(fill="both", expand=True)
 
+        # RIGHT: Improves Tracker
+        self.imp_frame = tk.LabelFrame(self.mid_container, text="Live Improves", bg="#C0C0C0")
+        self.imp_frame.pack(side="right", fill="both", expand=True, padx=(2, 0))
+
+        columns = ("Imps", "Latest", "Delta")
+        self.imp_tree = ttk.Treeview(self.imp_frame, columns=columns, height=10)
+        self.imp_tree.heading("#0", text="Skill/Spell")
+        self.imp_tree.heading("Imps", text="Imps")
+        self.imp_tree.heading("Latest", text="Latest")
+        self.imp_tree.heading("Delta", text="Delta")
+        self.imp_tree.column("#0", width=120)
+        self.imp_tree.column("Imps", width=40, anchor="center")
+        self.imp_tree.column("Latest", width=80, anchor="center")
+        self.imp_tree.column("Delta", width=80, anchor="center")
+        self.imp_tree.pack(fill="both", expand=True)
+
+        # 3. BOTTOM SECTION: School Progression Table
+        self.prog_frame = tk.LabelFrame(self.root, text="School Progression", bg="#C0C0C0")
+        self.prog_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        cols = ("Level", "Progress", "Remaining")
+        self.unlock_label = ttk.Treeview(self.prog_frame, columns=cols, height=5)
+        
+        self.unlock_label.heading("#0", text="School")
+        self.unlock_label.heading("Level", text="Current Lvl")
+        self.unlock_label.heading("Progress", text="Sum of Top 3")
+        self.unlock_label.heading("Remaining", text="Points Needed")
+
+        self.unlock_label.column("#0", width=120)
+        self.unlock_label.column("Level", width=80, anchor="center")
+        self.unlock_label.column("Progress", width=80, anchor="center")
+        self.unlock_label.column("Remaining", width=100, anchor="center")
+        
+        self.unlock_label.pack(fill="both", expand=True)
+        
     def setup_ui_logs(self):
         """Builds the collapsible system log window."""
         self.log_container = tk.Frame(self.root)
@@ -275,24 +330,50 @@ class CompanionApp:
             self.is_syncing = False
 
     def refresh_ui_display(self):
+        """Updates the Knowledge list and the School Progression table."""
+        # 1. Update Knowledge List (Left Side)
         self.list_display.config(state="normal")
         self.list_display.delete("1.0", tk.END)
         for n in sorted(self.knowledge_cache.keys()):
             self.list_display.insert(tk.END, f"{n.title()}: {self.knowledge_cache[n]}%\n")
         self.list_display.config(state="disabled")
-        res = self.calc.calculate_all_unlocks(self.knowledge_cache)
-        self.unlock_label.config(text="\n".join(res) if res else "No unlocks available.")
+
+        # 2. Clear and Refill the School Progression Table (Bottom)
+        for item in self.unlock_label.get_children():
+            self.unlock_label.delete(item)
+
+        results = self.calc.calculate_all_unlocks(self.knowledge_cache)
+        
+        for res in results:
+            if isinstance(res, dict):
+                # Get the raw number (e.g., 56)
+                top_3_raw = int(res.get('current_sum', 0))
+                
+                # We add the '%' symbol right here in the values tuple
+                self.unlock_label.insert("", "end", text=res['name'], values=(
+                    f"L{res['current_lvl']}",
+                    f"{top_3_raw}%",          # Added the % here
+                    f"{int(res['needed'])}%"    # Points needed
+                ))
+            else:
+                self.unlock_label.insert("", "end", text="Info", values=("---", "---", str(res)))
         
     def start_new_log_session(self):
         """Creates a fresh log and starts the real-time string monitor."""
+        if not os.path.exists("logs"):
+            os.makedirs("logs")
+
         ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.current_log_path = os.path.join("logs", f"session_{ts}.log")
+        self.current_log_path = os.path.abspath(os.path.join("logs", f"session_{ts}.log"))
         
         try:
+            # 1. Physically create the file first
             with open(self.current_log_path, "w", encoding="utf-8") as f:
                 f.write(f"--- Session Started: {datetime.now()} ---\n")
             
-            # Launch the monitor in a background thread so it doesn't freeze the UI
+            logger.info(f"Log file created: {self.current_log_path}")
+
+            # 2. Start the monitor with the ABSOLUTE path to avoid confusion
             self.monitor = LogMonitor(self.current_log_path)
             monitor_thread = threading.Thread(
                 target=self.monitor.watch, 
@@ -301,19 +382,44 @@ class CompanionApp:
             )
             monitor_thread.start()
             
-            logger.info(f"Log monitor started for: {self.current_log_path}")
         except Exception as e:
             logger.error(f"Failed to initialize log session/monitor: {e}")
     
     def handle_detected_improve(self, skill_name):
-        """Triggered whenever the log monitor finds a valid skill gain."""
-        # Use .title() to make "dodge" look like "Dodge"
-        formatted_skill = skill_name.title()
+        """Updates the UI grid whenever a new improve is detected in the logs."""
+        name = skill_name.title()
+        now = datetime.now()
         
-        # Log it to the System Log UI
-        logger.info(f"✨ GAIN DETECTED: {formatted_skill}")
+        # 1. Update the internal data
+        if name not in self.session_improves:
+            self.session_improves[name] = {
+                "count": 0,
+                "first_time": now,
+                "last_time": now
+            }
         
-        # Optional: You could update a 'Gains This Session' counter here
+        stats = self.session_improves[name]
+        stats["count"] += 1
+        
+        # Calculate Delta (Time since last improve)
+        diff = now - stats["last_time"]
+        delta_str = f"{int(diff.total_seconds() // 60)}m {int(diff.total_seconds() % 60)}s"
+        
+        # Update timestamp for next time
+        stats["last_time"] = now
+        latest_str = now.strftime("%H:%M:%S")
+
+        # 2. Update the UI Grid (Thread-safe)
+        def update_ui():
+            # If the skill is already in the list, update it. Otherwise, add new row.
+            if self.imp_tree.exists(name):
+                self.imp_tree.item(name, values=(stats["count"], latest_str, delta_str))
+            else:
+                self.imp_tree.insert("", "end", iid=name, text=name, 
+                                     values=(stats["count"], latest_str, "---"))
+        
+        self.root.after(0, update_ui)
+        logger.info(f"✨ UI Updated for Gain: {name}")
 
 if __name__ == "__main__":
     root = tk.Tk()
