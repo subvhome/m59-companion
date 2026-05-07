@@ -11,7 +11,6 @@ from datetime import datetime
 # Import modular helper files
 from m59_bridge import find_game_window, get_stats, find_skill_listbox, mem, get_text_from_hwnd
 from m59_identity import capture_character_name
-from m59_tracker import SkillTracker
 from m59_lists import get_raw_skill_dict
 from m59_calculator import SchoolCalculator
 from config_manager import ConfigManager # Matches your filename
@@ -51,12 +50,11 @@ class CompanionApp:
         self.setup_logging_infrastructure()
         self.setup_menu()
         self.setup_ui_main() 
-        self.tracker = SkillTracker(root) 
         self.setup_ui_logs() 
         
         self.update_loop() 
-        logger.info("Application started with Session Logic and Line Counter.")
-
+        logger.info("Application started. Core engine active.")
+        
     def setup_logging_infrastructure(self):
         logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', '%H:%M:%S')
@@ -85,44 +83,28 @@ class CompanionApp:
         if hwnd and not self.is_syncing:
             if not mem.process_handle: mem.attach()
             
-            # 2. Stats Polling (HP/MP/VG)
+            # 2. Stats Polling (HP/MP/VG) (KEEP)
             if mem.process_handle:
                 s = get_stats(hwnd)
                 if s: self.stats_label.config(text=f"HP: {s[0]} | MP: {s[1]} | VG: {s[2]}")
             
-            # 3. Line Counter Difference Engine
+            # 3. Buffer Management (PREPARE FOR LOGGER)
             chat_hwnd = win32gui.GetDlgItem(hwnd, 1005)
             if chat_hwnd:
                 current_text = get_text_from_hwnd(chat_hwnd)
                 if current_text:
                     lines = [l.strip() for l in current_text.splitlines() if l.strip()]
                     
-                    # Detect if buffer cleared or game restarted
+                    # Reset if buffer clears
                     if len(lines) < self.last_line_count:
                         self.last_line_count = 0
                     
-                    # Slice only the brand new lines
+                    # Detect new lines
                     new_lines = lines[self.last_line_count:]
                     self.last_line_count = len(lines)
 
-                    if new_lines:
-                        is_test = self.config.settings["character"].get("testing_mode", False)
-                        
-                        for line in new_lines:
-                            # Check for Session Reset (Welcome Message)
-                            if "welcome to the world of meridian 59" in line.lower():
-                                self.tracker.clear_session()
-                                self.start_new_log_session()
-                            
-                            # Check for Imps/Toughers
-                            is_gain = self.tracker.parse_skill_name(line, is_test)
-                            if is_gain:
-                                self.tracker.add_event(line, is_test)
-                                # Log specifically to the session file
-                                if self.current_log_path:
-                                    with open(self.current_log_path, "a") as f:
-                                        ts = datetime.now().strftime("[%H:%M:%S]")
-                                        f.write(f"{ts} {line}\n")
+                    # We have captured new_lines here. 
+                    # For now, we do nothing with them until we build the logger.
         
         self.root.after(1000, self.update_loop)
 
@@ -233,13 +215,12 @@ class CompanionApp:
                 self.is_syncing = False
                 return
 
-            # --- PHASE 1: TAB CYCLING (THE HANDSHAKE) ---
+            # --- PHASE 1: TAB CYCLING ---
             tab_handles = []
             win32gui.EnumChildWindows(hwnd, lambda h, l: tab_handles.append(h) if win32gui.GetDlgCtrlID(h) == 1029 else None, None)
             
             if len(tab_handles) >= 3:
                 logger.info("Cycling tabs to force engine redraw...")
-                # Sequence: Spells -> Skills -> Spells
                 win32gui.SendMessage(tab_handles[1], win32con.BM_CLICK, 0, 0)
                 time.sleep(0.3)
                 win32gui.SendMessage(tab_handles[2], win32con.BM_CLICK, 0, 0)
@@ -247,7 +228,6 @@ class CompanionApp:
                 win32gui.SendMessage(tab_handles[1], win32con.BM_CLICK, 0, 0)
                 
                 # --- PHASE 2: READ SPELLS ---
-                # Wait for Spells list to populate after the cycle
                 target_lb = None
                 start_wait = time.time()
                 while time.time() - start_wait < 2.0:
@@ -260,28 +240,23 @@ class CompanionApp:
                     time.sleep(0.1)
                 
                 if target_lb:
-                    data = get_raw_skill_dict(target_lb, 3) # 3 = Spells
+                    data = get_raw_skill_dict(target_lb, 3) 
                     self.knowledge_cache.update(data)
-                    logger.info(f"Sync: Read {len(data)} Spells.")
                 
                 # --- PHASE 3: READ SKILLS ---
                 win32gui.SendMessage(tab_handles[2], win32con.BM_CLICK, 0, 0)
-                time.sleep(0.5) # Give it a moment to switch back
+                time.sleep(0.5) 
                 lb_id = find_skill_listbox(hwnd)
                 if lb_id:
-                    data = get_raw_skill_dict(lb_id, 5) # 5 = Skills
+                    data = get_raw_skill_dict(lb_id, 5) 
                     self.knowledge_cache.update(data)
-                    logger.info(f"Sync: Read {len(data)} Skills.")
 
-            # --- PHASE 4: IDENTITY CAPTURE (FINAL) ---
+            # --- PHASE 4: IDENTITY ---
             if not self.char_name:
                 name = capture_character_name(hwnd)
-                bio_hwnd = win32gui.FindWindowEx(hwnd, 0, "#32770", "Player Description")
                 if name:
                     self.char_name = name
                     self.name_label.config(text=f"Identity: {name}")
-                if bio_hwnd:
-                    win32gui.PostMessage(bio_hwnd, win32con.WM_CLOSE, 0, 0)
 
             self.refresh_ui_display()
             logger.info("Knowledge Sync Complete.")
