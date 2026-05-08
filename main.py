@@ -146,6 +146,9 @@ class CompanionApp:
                                 f.flush()
                         except Exception as e:
                             logger.error(f"Log error: {e}")
+            
+            # 4. Live Chat Viewer Update
+            self.update_chat_view_live()
         
         self.root.after(1000, self.update_loop)
 
@@ -279,12 +282,202 @@ class CompanionApp:
         self.unlock_label.column("Remaining", width=100, anchor="center")
         self.unlock_label.pack(fill="both", expand=True)
 
-        # 2. CONSOLE TAB
+        # 2. CHAT LOGS TAB
+        self.chat_logs_tab = tk.Frame(self.notebook, bg="#C0C0C0")
+        self.notebook.add(self.chat_logs_tab, text=" Chat Logs ")
+        
+        # Split Window for Chat Logs
+        self.log_paned = tk.PanedWindow(self.chat_logs_tab, orient="horizontal", bg="#C0C0C0")
+        self.log_paned.pack(fill="both", expand=True)
+
+        # Left: List of Logs
+        self.log_list_frame = tk.Frame(self.log_paned, width=150, bg="#C0C0C0")
+        self.log_paned.add(self.log_list_frame)
+        
+        tk.Label(self.log_list_frame, text="Available Logs", bg="#C0C0C0", font=("Arial", 9, "bold")).pack(fill="x")
+        
+        # Switch to Treeview for better Wine/Linux compatibility
+        self.log_list = ttk.Treeview(self.log_list_frame, show="tree", selectmode="browse")
+        self.log_list.pack(fill="both", expand=True)
+        
+        # Configure Tags for colors and bolding
+        # Note: Bolding in Treeview often requires a font object or specific font string
+        self.log_list.tag_configure("active", foreground="darkgreen", font=("Arial", 9, "bold"))
+        self.log_list.tag_configure("history", foreground="#666666", font=("Arial", 9))
+        
+        self.log_list.bind("<<TreeviewSelect>>", self.on_log_select)
+        
+        # Bind Tab change to refresh the list automatically
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+        
+        tk.Button(self.log_list_frame, text="Refresh List", command=self.refresh_log_list).pack(fill="x")
+
+        # Right: Log Viewer
+        self.log_view_frame = tk.Frame(self.log_paned, bg="#C0C0C0")
+        self.log_paned.add(self.log_view_frame)
+        
+        self.log_view_header = tk.Label(self.log_view_frame, text="Select a log to view", bg="#C0C0C0", anchor="w", padx=5)
+        self.log_view_header.pack(fill="x")
+        
+        self.chat_view = scrolledtext.ScrolledText(self.log_view_frame, font=("Arial", 10), state="disabled", bg="white")
+        self.chat_view.pack(fill="both", expand=True)
+        
+        self.live_view_var = tk.BooleanVar(value=True)
+        self.live_check = tk.Checkbutton(self.log_view_frame, text="Live Scroll", variable=self.live_view_var, bg="#C0C0C0")
+        self.live_check.pack(side="right")
+
+        # 3. CONSOLE TAB
         self.console_tab = tk.Frame(self.notebook, bg="#F0F0F0")
         self.notebook.add(self.console_tab, text=" Console ")
         
         self.log_display = scrolledtext.ScrolledText(self.console_tab, font=("Consolas", 9), state="disabled", bg="black", fg="#00FF00")
         self.log_display.pack(fill="both", expand=True, padx=2, pady=2)
+
+        self.current_viewing_file = None
+        self.last_view_size = 0
+        self.setup_log_context_menu()
+        self.refresh_log_list()
+        
+        # Select the current session log by default
+        if self.current_log_path:
+            filename = os.path.basename(self.current_log_path)
+            if self.log_list.exists(filename):
+                self.log_list.selection_set(filename)
+                self.on_log_select(None)
+
+    def on_tab_changed(self, event):
+        """Refreshes the log list whenever the user switches to the Chat Logs tab."""
+        selected_tab = self.notebook.select()
+        tab_text = self.notebook.tab(selected_tab, "text").strip()
+        
+        if tab_text == "Chat Logs":
+            current_sel = self.log_list.selection()
+            self.refresh_log_list()
+            
+            # If nothing was selected before, or we want to ensure live is picked
+            if not current_sel and self.current_log_path:
+                filename = os.path.basename(self.current_log_path)
+                if self.log_list.exists(filename):
+                    self.log_list.selection_set(filename)
+            elif current_sel:
+                # Try to restore previous selection
+                if self.log_list.exists(current_sel[0]):
+                    self.log_list.selection_set(current_sel[0])
+
+    def refresh_log_list(self):
+        """Populates the treeview with log files and status indicators."""
+        for item in self.log_list.get_children():
+            self.log_list.delete(item)
+            
+        if not os.path.exists("logs"):
+            return
+
+        files = sorted([f for f in os.listdir("logs") if f.endswith(".log")], 
+                      key=lambda x: os.path.getmtime(os.path.join("logs", x)), 
+                      reverse=True)
+        
+        max_width = 15
+        for f in files:
+            is_active = (self.current_log_path and os.path.basename(self.current_log_path) == f)
+            
+            if is_active:
+                display_name = f"[LIVE] {f}"
+                self.log_list.insert("", tk.END, iid=f, text=display_name, tags=("active",))
+            else:
+                display_name = f"[HIST] {f}"
+                self.log_list.insert("", tk.END, iid=f, text=display_name, tags=("history",))
+            
+            max_width = max(max_width, len(display_name))
+
+        # Adjust left panel width based on longest filename
+        self.log_paned.paneconfigure(self.log_list_frame, width=max_width * 7 + 25)
+
+    def setup_log_context_menu(self):
+        """Adds a right-click menu to the log list."""
+        self.log_menu = tk.Menu(self.root, tearoff=0)
+        self.log_menu.add_command(label="Delete Log", command=self.delete_selected_log)
+        self.log_list.bind("<Button-3>", self.show_log_context_menu)
+
+    def show_log_context_menu(self, event):
+        try:
+            # Select the item under the mouse
+            item = self.log_list.identify_row(event.y)
+            if item:
+                self.log_list.selection_set(item)
+                self.log_menu.post(event.x_root, event.y_root)
+        except Exception:
+            pass
+
+    def delete_selected_log(self):
+        selection = self.log_list.selection()
+        if not selection: return
+        
+        filename = selection[0]
+        
+        if self.current_log_path and filename == os.path.basename(self.current_log_path):
+            messagebox.showwarning("Warning", "Cannot delete the active session log.")
+            return
+
+        if messagebox.askyesno("Delete", f"Are you sure you want to delete {filename}?"):
+            try:
+                os.remove(os.path.join("logs", filename))
+                self.refresh_log_list()
+                self.chat_view.config(state="normal")
+                self.chat_view.delete("1.0", tk.END)
+                self.chat_view.config(state="disabled")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not delete: {e}")
+
+    def on_log_select(self, event):
+        """Handles selecting a log file from the treeview."""
+        selection = self.log_list.selection()
+        if not selection:
+            return
+        
+        filename = selection[0]
+        filepath = os.path.join("logs", filename)
+        
+        self.current_viewing_file = filepath
+        self.last_view_size = 0
+        self.log_view_header.config(text=f"Viewing: {filename}")
+        
+        # Load file content
+        self.chat_view.config(state="normal")
+        self.chat_view.delete("1.0", tk.END)
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                self.chat_view.insert(tk.END, content)
+                self.last_view_size = os.path.getsize(filepath)
+        except Exception as e:
+            self.chat_view.insert(tk.END, f"Error loading log: {e}")
+        
+        self.chat_view.see(tk.END)
+        self.chat_view.config(state="disabled")
+
+    def update_chat_view_live(self):
+        """If viewing the current log and live scroll is on, append new data."""
+        if not self.current_viewing_file or not self.live_view_var.get():
+            return
+        
+        # Only live-update if the file we are viewing is the active session log
+        if os.path.normpath(self.current_viewing_file) != os.path.normpath(self.current_log_path):
+            return
+
+        try:
+            curr_size = os.path.getsize(self.current_viewing_file)
+            if curr_size > self.last_view_size:
+                with open(self.current_viewing_file, "r", encoding="utf-8", errors="ignore") as f:
+                    f.seek(self.last_view_size)
+                    new_data = f.read()
+                    if new_data:
+                        self.chat_view.config(state="normal")
+                        self.chat_view.insert(tk.END, new_data)
+                        self.chat_view.see(tk.END)
+                        self.chat_view.config(state="disabled")
+                self.last_view_size = curr_size
+        except Exception as e:
+            pass
 
     def setup_ui_logs(self):
         """No longer needed as logs are in a tab."""
