@@ -38,10 +38,13 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+# Application Version
+VERSION = "v0.40"
+
 class CompanionApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("M59 Companion")
+        self.root.title(f"M59 Companion {VERSION}")
         self.root.attributes("-topmost", True)
         
         # Initialize Managers
