@@ -1,38 +1,39 @@
 #!/bin/bash
-# 1. Try to find the latest version from git tags
-# If no tags exist, it defaults to v0.5
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
-if [ -z "$LATEST_TAG" ]; then
-    LATEST_TAG="v0.5"
+
+# M59 Companion Update Script
+# Usage: ./update_script.sh [new_version] "[commit_message]"
+
+NEW_VERSION=$1
+CUSTOM_MSG=$2
+
+if [ -z "$NEW_VERSION" ]; then
+    echo "Usage: ./update_script.sh vX.XX \"Optional commit message\""
+    exit 1
 fi
 
-# 2. Calculate the suggested next version (e.g., v0.5 -> v0.6)
-BASE_VERSION=$(echo $LATEST_TAG | cut -d. -f1)
-MINOR_VERSION=$(echo $LATEST_TAG | cut -d. -f2)
-SUGGESTED_VERSION="$BASE_VERSION.$((MINOR_VERSION + 1))"
+# Use custom message if provided, otherwise default to version bump message
+COMMIT_MSG=${CUSTOM_MSG:-"Bump version to $NEW_VERSION"}
 
-# 3. Prompt User for Version Number
-read -p "Enter version number (Default: $SUGGESTED_VERSION): " USER_VERSION
-USER_VERSION=${USER_VERSION:-$SUGGESTED_VERSION}
+echo "Updating M59 Companion to $NEW_VERSION..."
 
-# 4. Prompt User for Commit Message
-read -p "Enter commit message: " COMMIT_MSG
-if [ -z "$COMMIT_MSG" ]; then
-    COMMIT_MSG="Updates for version $USER_VERSION"
+# 1. Update the VERSION variable in main.py
+sed -i "s/VERSION = \".*\"/VERSION = \"$NEW_VERSION\"/" main.py
+
+if [ $? -eq 0 ]; then
+    echo "Success: Version updated to $NEW_VERSION in main.py"
+else
+    echo "Error: Failed to update version."
+    exit 1
 fi
 
-echo ">>> Proceeding with Version: $USER_VERSION"
-echo ">>> Message: $COMMIT_MSG"
-
-# 5. Git Operations
-# Ensure .gitignore is respected by removing cached files if you haven't yet:
-# git rm --cached chat_history.txt .active_sessions.json 2>/dev/null
-
+# 2. Git Automation
+echo "Committing and pushing to Git..."
 git add .
-git commit -m "[$USER_VERSION] $COMMIT_MSG"
-git tag -a "$USER_VERSION" -m "Version $USER_VERSION"
-git push origin main --tags
+git commit -m "$COMMIT_MSG"
+git push
 
-echo "---------------------------------------"
-echo "Project successfully pushed and tagged!"
-echo "---------------------------------------"
+if [ $? -eq 0 ]; then
+    echo "Success: Pushed $NEW_VERSION to repository with message: '$COMMIT_MSG'"
+else
+    echo "Warning: Git push failed. Please check your connection or credentials."
+fi

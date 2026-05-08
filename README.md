@@ -1,42 +1,92 @@
 # M59 Companion
 
-A specialized assistant designed to enhance your experience in the world of Meridian 59. This tool sits alongside your game client to track your progress, manage your character's data, and log your journey in real-time.
+A powerful, real-time utility for **Meridian 59** players. Track your progress, monitor your chat, and analyze your school progression with ease.
+
+![Version](https://img.shields.io/badge/version-v0.38-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)
 
 ---
 
-## 🚀 Features
+## 🚀 Key Features
 
-### **Smart Character Tracking**
-*   **Live Skill Monitoring**: Automatically detects when you improve a skill or gain hit points during your session.
-*   **Progress Dashboard**: View all your current skill percentages and spell levels in one organized window without digging through in-game menus.
-*   **School Unlock Calculator**: Instantly see which new magic schools or advanced skills you are eligible for based on your current knowledge.
+### 📊 Dashboard
+* **Real-time Stats:** Monitor HP, MP, and Vigor directly from the game window.
+* **Live Improves Tracker:** Automatically captures "You have improved in the art of..." messages.
+* **Skill Formatting:** Correctly formats skill names (e.g., `Hunter's Aim`, `Hand-To-Hand`).
+* **Time Delta:** See exactly how long it's been since your last skill gain.
+* **School Progression:** Automatically calculates sum-of-top-3 and remaining points for school unlocks.
 
-### **Session & Activity Logs**
-*   **Automatic Logging**: Every session is saved to a timestamped file, creating a permanent history of your character's growth.
-*   **Session Reset**: The app intelligently recognizes when you log in or out, clearing the live display so you always have a fresh view of your current gameplay session.
+### 📝 Chat Logs
+* **Integrated Viewer:** Review your current session or historical logs without leaving the app.
+* **Date-Based History:** Browsing previous logs organized by date/time.
+* **Live Scroll:** Toggle live updates to follow the action in real-time.
+* **Log Management:** Right-click to delete old logs and keep your workspace clean.
 
-### **One-Touch Synchronization**
-*   **Full Profile Sync**: With a single click, the app communicates with the game client to pull your entire list of spells and skills, ensuring your dashboard is perfectly accurate.
-*   **Identity Verification**: Automatically recognizes which character you are playing to keep your data organized.
-
----
-
-## 🎮 Compatibility
-The M59 Companion is currently optimized and fully compatible with:
-*   **Server 101**
-*   **Server 102**
+### 🛠 Console & System
+* **Logical Logs:** Dedicated console tab with terminal styling for system events.
+* **Testing Mode:** Toggle a "Relaxed Filter" in settings to test improvements via private messages.
+* **Auto-Sync:** Fingerprinting system to resume logs across different sessions seamlessly.
 
 ---
 
-## 🛠️ How It Works (The Simple Version)
-The companion works by monitoring the information the game client provides. It watches the chat for specific system messages regarding your growth and communicates with the game's interface to stay updated on your stats.
+## 📥 Installation
 
-> **Note**: This tool is designed to be a "read-only" companion. It helps you track and visualize your data but does not play the game for you or automate character actions.
+Choose the installation method for your operating system below. Replace `YOUR_USER/YOUR_REPO` with the actual path to your repository.
+
+### 🪟 Windows
+**Option 1: Quick Install (Standalone EXE)**
+1. Download `M59Companion.exe` from the [Releases](https://github.com/YOUR_USER/YOUR_REPO/releases) page.
+2. Run the EXE. (Click "Run Anyway" if prompted by Windows Defender).
+
+**Option 2: CLI Install (Source)**
+Run this in **Command Prompt** or **PowerShell**:
+```batch
+curl -sSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.bat -o install.bat && install.bat
+```
+
+### 🍎 macOS
+Run this in your **Terminal**:
+```bash
+curl -sSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.sh | bash
+```
+
+### 🐧 Linux
+Run this in your **Terminal**:
+```bash
+curl -sSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.sh | bash
+```
 
 ---
 
-## 📂 Installation
-1.  Download the latest release folder.
-2.  Ensure your Meridian 59 client is running and you are logged into a character.
-3.  Launch `main.exe` (or run `main.py` if using the source code).
-4.  Use the **System > Sync Now** menu option to pull your character's initial data.
+## 🛠️ Development & Compilation
+
+### Requirements
+* Python 3.8+
+* `pip install -r requirements.txt`
+
+### Compiling to EXE (Windows)
+To create a standalone executable:
+```bash
+pip install pyinstaller
+pyinstaller --noconsole --onefile --add-data "config.json;." main.py
+```
+
+### Updating Version & Repository
+Use the provided update script to bump the version and push changes:
+```bash
+./update_script.sh v0.39 "Added new features"
+```
+
+---
+
+## 🤝 Contributing
+Contributions are welcome! Please submit a Pull Request or open an issue for bugs and feature requests.
+
+---
+
+## 📜 License
+This project is licensed under the MIT License.
+
+---
+*Created for the Meridian 59 community.*
