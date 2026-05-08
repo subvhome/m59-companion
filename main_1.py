@@ -81,7 +81,7 @@ class CompanionApp:
         if hwnd and not self.is_syncing:
             if not mem.process_handle: mem.attach()
             
-            # 2. Update Core Stats
+            # 2. Update Core Stats (Untouched)
             if mem.process_handle:
                 s = get_stats(hwnd)
                 if s: self.stats_label.config(text=f"HP: {s[0]} | MP: {s[1]} | VG: {s[2]}")
@@ -99,6 +99,7 @@ class CompanionApp:
                         all_logs = sorted([os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".log")], 
                                          key=os.path.getmtime)
                         
+                        # Identify the previous log file
                         history_file = None
                         history_candidates = [f for f in all_logs if os.path.normpath(f) != os.path.normpath(self.current_log_path)]
                         if history_candidates:
@@ -108,6 +109,7 @@ class CompanionApp:
                         found_at = -1
                         
                         if fingerprint and len(fingerprint) >= 10:
+                            # Search the game buffer for the 20-line fingerprint
                             for i in range(len(all_lines) - len(fingerprint) + 1):
                                 if all_lines[i:i+len(fingerprint)] == fingerprint:
                                     found_at = i + len(fingerprint)
@@ -126,7 +128,7 @@ class CompanionApp:
 
                         self.chat_sync_done = True
 
-                    # --- LIVE RECORDING AND PROCESSING ---
+                    # --- NORMAL RECORDING ---
                     if len(all_lines) < self.last_line_count:
                         self.last_line_count = 0
                     
@@ -137,72 +139,15 @@ class CompanionApp:
                         try:
                             with open(self.current_log_path, "a", encoding="utf-8") as f:
                                 for line in new_lines:
-                                    # LIVE DETECTION (Before Timestamp)
-                                    self.detect_skill_gain(line)
-                                    
-                                    # Write to history log
+                                    # UPDATED: Added %Y-%m-%d to the timestamp
                                     ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
                                     f.write(f"{ts} {line}\n")
                                 f.flush()
                         except Exception as e:
-                            logger.error(f"Log error: {e}")
+                            logger.error(f"Write failed: {e}")
         
         self.root.after(1000, self.update_loop)
 
-    def detect_skill_gain(self, line):
-        """
-        Parses raw game lines for improvements immediately as they are scraped.
-        """
-        improve_phrase = "You have improved in the art of "
-        hp_phrase = "You suddenly feel a little tougher."
-
-        # Get testing mode from config
-        testing_mode = self.config.settings["character"].get("testing_mode", False)
-
-        found_skill_raw = None
-
-        # 1. Check for Skill Gain
-        if testing_mode:
-            # In testing mode, the phrase can be ANYWHERE in the line (e.g. inside a Tell)
-            if improve_phrase in line:
-                parts = line.split(improve_phrase)
-                if len(parts) > 1:
-                    found_skill_raw = parts[1].strip()
-        else:
-            # In normal mode, it MUST be a system message starting with the phrase
-            if line.startswith(improve_phrase):
-                found_skill_raw = line[len(improve_phrase):].strip()
-
-        if found_skill_raw:
-            # Clean up trailing punctuation: . or ." or ". or "
-            # This handles both system messages and captured chat messages
-            clean_name = found_skill_raw
-            for _ in range(2): # Strip up to two trailing punctuation marks (e.g. .")
-                if clean_name and clean_name[-1] in ['.', '"', "'", '!']:
-                    clean_name = clean_name[:-1].strip()
-
-            # Format: Hunter's Aim, Hand-To-Hand
-            words = clean_name.split(' ')
-            formatted_words = []
-            for word in words:
-                sub_words = word.split('-')
-                formatted_sub = "-".join([sw.capitalize() for sw in sub_words])
-                formatted_words.append(formatted_sub)
-
-            found_skill = " ".join(formatted_words).replace("'S", "'s")
-            logger.info(f"Skill Detected: {found_skill} (Testing: {testing_mode})")
-            self.handle_detected_improve(found_skill)
-            return
-
-        # 2. Check for HP Gain
-        if testing_mode:
-            if hp_phrase in line:
-                logger.info("HP Gain Detected (Test)")
-                self.handle_detected_improve("Hit Points")
-        else:
-            if line.startswith(hp_phrase):
-                logger.info("HP Gain Detected")
-                self.handle_detected_improve("Hit Points")
     def setup_ui_main(self):
         """Creates the full UI with the correct names for the Sync function."""
         
@@ -245,14 +190,16 @@ class CompanionApp:
         self.imp_frame = tk.LabelFrame(self.mid_container, text="Live Improves", bg="#C0C0C0")
         self.imp_frame.pack(side="right", fill="both", expand=True, padx=(2, 0))
 
-        columns = ("Imp Count", "Delta")
+        columns = ("Imps", "Latest", "Delta")
         self.imp_tree = ttk.Treeview(self.imp_frame, columns=columns, height=10)
         self.imp_tree.heading("#0", text="Skill/Spell")
-        self.imp_tree.heading("Imp Count", text="Imp Count")
+        self.imp_tree.heading("Imps", text="Imps")
+        self.imp_tree.heading("Latest", text="Latest")
         self.imp_tree.heading("Delta", text="Delta")
         self.imp_tree.column("#0", width=120)
-        self.imp_tree.column("Imp Count", width=80, anchor="center")
-        self.imp_tree.column("Delta", width=100, anchor="center")
+        self.imp_tree.column("Imps", width=40, anchor="center")
+        self.imp_tree.column("Latest", width=80, anchor="center")
+        self.imp_tree.column("Delta", width=80, anchor="center")
         self.imp_tree.pack(fill="both", expand=True)
 
         # 3. BOTTOM SECTION: School Progression Table
@@ -445,24 +392,39 @@ class CompanionApp:
             else:
                 self.unlock_label.insert("", "end", text="Info", values=("---", "---", str(res)))
         
-    def test_simulate_gain(self):
-        """Debug function to test the capture and UI logic."""
-        test_line = "You have improved in the art of axe wielding."
-        logger.info("Simulating test gain...")
-        self.detect_skill_gain(test_line)
-
     def start_new_log_session(self):
-        """Creates a fresh log file for history. Real-time detection is now handled in update_loop."""
+        """Creates a fresh log and starts the real-time string monitor."""
         if not os.path.exists("logs"):
             os.makedirs("logs")
 
         ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        # Use a very simple path to avoid Wine path issues
         self.current_log_path = os.path.join("logs", f"session_{ts}.log")
         
+        # 1. Create the file
         with open(self.current_log_path, "w", encoding="utf-8") as f:
             f.write(f"--- Session Started: {datetime.now()} ---\n")
         
-        logger.info(f"Logging history to: {os.path.basename(self.current_log_path)}")
+        # 2. START THE MONITOR
+        try:
+            print(f"DEBUG: Attempting to start monitor thread for {self.current_log_path}")
+            self.monitor = LogMonitor(self.current_log_path)
+            
+            # We use a wrapper function to make sure we catch thread crashes
+            def thread_wrapper():
+                try:
+                    self.monitor.watch(self.handle_detected_improve)
+                except Exception as e:
+                    print(f"CRITICAL: Monitor Thread Crashed: {e}")
+
+            monitor_thread = threading.Thread(target=thread_wrapper, daemon=True)
+            monitor_thread.start()
+            
+            # Log to the App UI so we know it worked
+            logger.info(f"Monitor Active: {os.path.basename(self.current_log_path)}")
+            
+        except Exception as e:
+            print(f"DEBUG: Failed to launch monitor: {e}")
     
     def handle_detected_improve(self, name):
         """
@@ -494,18 +456,19 @@ class CompanionApp:
             
         # Update the 'last_time' for the next calculation
         stats["last_time"] = now
+        latest_str = now.strftime("%H:%M:%S")
 
         def update_ui():
             try:
                 # Check if the skill is already in the visual list (the Treeview)
                 if self.imp_tree.exists(name):
                     # Update existing row
-                    self.imp_tree.item(name, values=(stats["count"], delta_str))
+                    self.imp_tree.item(name, values=(stats["count"], latest_str, delta_str))
                 else:
                     # Add new row
                     # iid=name allows us to find it later using the skill name
                     self.imp_tree.insert("", "end", iid=name, text=name, 
-                                         values=(stats["count"], "---"))
+                                         values=(stats["count"], latest_str, "---"))
                 
                 # Make the new/updated entry visible
                 self.imp_tree.see(name)

@@ -7,6 +7,6 @@
     "character": {
         "intellect": 25,
         "chat_log_enabled": true,
-        "testing_mode": false
+        "testing_mode": true
     }
 }

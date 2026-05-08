@@ -84,7 +84,7 @@ def find_skill_listbox(game_hwnd):
 import os
 
 def get_log_fingerprint(file_path, window_size=20):
-    """Extracts a clean 20-line fingerprint from the last log file."""
+    """Extracts a clean fingerprint, handling any timestamp length."""
     if not file_path or not os.path.exists(file_path):
         return []
     
@@ -97,9 +97,14 @@ def get_log_fingerprint(file_path, window_size=20):
             text = l.strip()
             if not text or text.startswith("---"): 
                 continue
-            # Strip the [HH:MM:SS]
-            if text.startswith("[") and "]" in text:
-                text = text.split("]", 1)[1].strip()
+            
+            # This is the key fix: split at the first ']' 
+            # and ignore everything before it, regardless of date length.
+            if "]" in text:
+                parts = text.split("]", 1)
+                if len(parts) > 1:
+                    text = parts[1].strip()
+            
             if text:
                 clean_history.append(text)
             
