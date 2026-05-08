@@ -204,10 +204,18 @@ class CompanionApp:
                 logger.info("HP Gain Detected")
                 self.handle_detected_improve("Hit Points")
     def setup_ui_main(self):
-        """Creates the full UI with the correct names for the Sync function."""
-        
-        # 1. TOP STATS BAR
-        self.stats_frame = tk.Frame(self.root, bg="#C0C0C0")
+        """Creates the full UI using tabs."""
+        # Create Notebook (Tabs)
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # 1. DASHBOARD TAB
+        self.dash_tab = tk.Frame(self.notebook, bg="#C0C0C0")
+        self.notebook.add(self.dash_tab, text=" Dashboard ")
+
+        # --- Dashboard Content ---
+        # TOP STATS BAR
+        self.stats_frame = tk.Frame(self.dash_tab, bg="#C0C0C0")
         self.stats_frame.pack(fill="x", side="top")
         
         self.stats_label = tk.Label(
@@ -230,8 +238,8 @@ class CompanionApp:
         self.name_label = tk.Label(self.stats_frame, text="Identity: Unknown", bg="#C0C0C0")
         self.name_label.pack(side="right", padx=5)
 
-        # 2. MIDDLE CONTAINER (Split View)
-        self.mid_container = tk.Frame(self.root, bg="#C0C0C0")
+        # MIDDLE CONTAINER (Split View)
+        self.mid_container = tk.Frame(self.dash_tab, bg="#C0C0C0")
         self.mid_container.pack(fill="both", expand=True, padx=5, pady=5)
 
         # LEFT: Character Knowledge
@@ -255,45 +263,36 @@ class CompanionApp:
         self.imp_tree.column("Delta", width=100, anchor="center")
         self.imp_tree.pack(fill="both", expand=True)
 
-        # 3. BOTTOM SECTION: School Progression Table
-        self.prog_frame = tk.LabelFrame(self.root, text="School Progression", bg="#C0C0C0")
+        # BOTTOM SECTION: School Progression Table
+        self.prog_frame = tk.LabelFrame(self.dash_tab, text="School Progression", bg="#C0C0C0")
         self.prog_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         cols = ("Level", "Progress", "Remaining")
         self.unlock_label = ttk.Treeview(self.prog_frame, columns=cols, height=5)
-        
         self.unlock_label.heading("#0", text="School")
         self.unlock_label.heading("Level", text="Current Lvl")
         self.unlock_label.heading("Progress", text="Sum of Top 3")
         self.unlock_label.heading("Remaining", text="Points Needed")
-
         self.unlock_label.column("#0", width=120)
         self.unlock_label.column("Level", width=80, anchor="center")
         self.unlock_label.column("Progress", width=80, anchor="center")
         self.unlock_label.column("Remaining", width=100, anchor="center")
-        
         self.unlock_label.pack(fill="both", expand=True)
+
+        # 2. CONSOLE TAB
+        self.console_tab = tk.Frame(self.notebook, bg="#F0F0F0")
+        self.notebook.add(self.console_tab, text=" Console ")
         
+        self.log_display = scrolledtext.ScrolledText(self.console_tab, font=("Consolas", 9), state="disabled", bg="black", fg="#00FF00")
+        self.log_display.pack(fill="both", expand=True, padx=2, pady=2)
+
     def setup_ui_logs(self):
-        """Builds the collapsible system log window."""
-        self.log_container = tk.Frame(self.root)
-        self.log_container.pack(fill="x", side="bottom")
-        self.toggle_btn = tk.Button(self.log_container, text="▲ Show System Logs", command=self.toggle_logs)
-        self.toggle_btn.pack(fill="x")
-        self.log_frame = tk.LabelFrame(self.log_container, text="System Logs", bg="#F0F0F0")
-        self.log_display = scrolledtext.ScrolledText(self.log_frame, height=5, font=("Consolas", 8), state="disabled")
-        self.log_display.pack(fill="both", expand=True)
-        self.logs_visible = False
+        """No longer needed as logs are in a tab."""
+        pass
 
     def toggle_logs(self):
-        if self.logs_visible:
-            self.log_frame.pack_forget()
-            self.toggle_btn.config(text="▲ Show System Logs")
-            self.logs_visible = False
-        else:
-            self.log_frame.pack(fill="both", expand=True, padx=5, pady=5)
-            self.toggle_btn.config(text="▼ Hide System Logs")
-            self.logs_visible = True
+        """Redundant in tabbed view."""
+        pass
 
     def setup_menu(self):
         menubar = tk.Menu(self.root)
