@@ -7,7 +7,6 @@ import win32gui
 import win32con
 import os
 from datetime import datetime
-from m59_log_monitor import LogMonitor
 import threading
 
 # Import modular helper files
@@ -27,6 +26,18 @@ class QueueHandler(logging.Handler):
     def emit(self, record):
         self.log_queue.put(self.format(record))
 
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 class CompanionApp:
     def __init__(self, root):
         self.root = root
@@ -34,7 +45,7 @@ class CompanionApp:
         self.root.attributes("-topmost", True)
         
         # Initialize Managers
-        self.config = ConfigManager()
+        self.config = ConfigManager() # Note: ConfigManager might need an internal update too
         self.calc = SchoolCalculator(self.config)
         
         # State Variables

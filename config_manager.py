@@ -1,42 +1,54 @@
 import json
 import os
-import logging
+import sys
 
-logger = logging.getLogger("m59.config")
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class ConfigManager:
-    def __init__(self, filepath="config.json"):
-        self.filepath = os.path.join(os.getcwd(), filepath)
-        self.defaults = {
-            "server": {"points_slope": 7.0, "max_points": 16.0, "min_needed_floor": 225},
-            "character": {
-                "intellect": 25, 
-                "chat_log_enabled": False,
-                "testing_mode": True  # Toggle this to False for production
-            }
-        }
-        self.settings = self.defaults.copy()
-        self.load()
+    def __init__(self):
+        # We always save/load from the folder where the EXE/script is located
+        # to ensure settings persist.
+        self.config_path = "config.json"
+        self.settings = self.load()
 
     def load(self):
-        if os.path.exists(self.filepath):
+        # Default settings
+        default_settings = {
+            "character": {
+                "intellect": 18,
+                "testing_mode": False
+            }
+        }
+        
+        # 1. Look for existing config next to the EXE
+        if os.path.exists(self.config_path):
             try:
-                with open(self.filepath, 'r') as f:
-                    self.settings = json.load(f)
-                    # Merge defaults for any missing keys
-                    for k, v in self.defaults["character"].items():
-                        if k not in self.settings["character"]:
-                            self.settings["character"][k] = v
-            except Exception as e:
-                logger.error(f"Failed to parse {self.filepath}: {e}")
-                self.settings = self.defaults.copy()
-        else:
-            self.save(self.defaults)
+                with open(self.config_path, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
 
-    def save(self, new_settings):
-        self.settings = new_settings
+        # 2. If not found, look for a bundled default (optional)
+        bundled_config = resource_path("config.json")
+        if os.path.exists(bundled_config) and bundled_config != self.config_path:
+            try:
+                with open(bundled_config, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+                
+        return default_settings
+
+    def save(self, settings):
+        self.settings = settings
         try:
-            with open(self.filepath, 'w') as f:
-                json.dump(self.settings, f, indent=4)
+            with open(self.config_path, "w") as f:
+                json.dump(settings, f, indent=4)
         except Exception as e:
-            logger.error(f"Failed to save configuration: {e}")
+            print(f"Error saving config: {e}")
