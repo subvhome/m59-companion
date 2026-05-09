@@ -1,6 +1,5 @@
 __pycache__/
 logs/
 *.txt
-*.json
 # If you want to keep config.json but ignore session files:
 .active_sessions.json
