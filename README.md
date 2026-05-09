@@ -49,10 +49,11 @@ Before installing, ensure you have the following installed on your system:
 ## 📥 Installation
 
 ### 🪟 Windows
-Run this in **Command Prompt** or **PowerShell** to automatically clone and set up the project:
+Run this in **PowerShell** or **Command Prompt** (as Administrator if possible) to automatically set up the project:
 ```batch
-curl -L https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat -o install.bat & install.bat
+curl.exe -L https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat -o install.bat && .\install.bat
 ```
+*Note: If `&&` fails in older PowerShell, run the two parts separately.*
 
 ### 🐧 Linux
 Run this in your **Terminal**:
