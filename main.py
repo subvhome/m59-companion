@@ -39,7 +39,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 # Application Version
-VERSION = "v0.39"
+VERSION = "v0.40"
 
 class CompanionApp:
     def __init__(self, root):
