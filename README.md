@@ -4,7 +4,7 @@ A powerful, real-time utility for **Meridian 59** players. Track your progress, 
 
 ![Version](https://img.shields.io/badge/version-v0.38-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)
 
 ---
 
@@ -23,65 +23,63 @@ A powerful, real-time utility for **Meridian 59** players. Track your progress, 
 * **Live Scroll:** Toggle live updates to follow the action in real-time.
 * **Log Management:** Right-click to delete old logs and keep your workspace clean.
 
-### 🛠 Console & System
-* **Logical Logs:** Dedicated console tab with terminal styling for system events.
-* **Testing Mode:** Toggle a "Relaxed Filter" in settings to test improvements via private messages.
-* **Auto-Sync:** Fingerprinting system to resume logs across different sessions seamlessly.
+---
+
+## 📋 Prerequisites
+
+Before installing, ensure you have the following installed on your system:
+
+### 🪟 Windows (Recommended)
+* **Python 3.10+**: [Download from Python.org](https://www.python.org/downloads/windows/). 
+    * *Important: Check "Add Python to PATH" during installation.*
+* **Git**: [Download from Git-scm.com](https://git-scm.com/download/win).
+* **Meridian 59**: The application must be running to track stats and improves.
+
+### 🐧 Linux
+* **Python 3.10+** and **pip**
+* **Git**
+* **Tkinter**: Usually needs to be installed via your package manager:
+    ```bash
+    sudo apt install python3-tk  # Ubuntu/Debian
+    sudo dnf install python3-tkinter # Fedora
+    ```
 
 ---
 
 ## 📥 Installation
 
-Choose the installation method for your operating system below. Replace `YOUR_USER/YOUR_REPO` with the actual path to your repository.
-
 ### 🪟 Windows
-**Option 1: Quick Install (Standalone EXE)**
-1. Download `M59Companion.exe` from the [Releases](https://github.com/YOUR_USER/YOUR_REPO/releases) page.
-2. Run the EXE. (Click "Run Anyway" if prompted by Windows Defender).
-
-**Option 2: CLI Install (Source)**
-Run this in **Command Prompt** or **PowerShell**:
+Run this in **Command Prompt** or **PowerShell** to automatically clone and set up the project:
 ```batch
-curl -sSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.bat -o install.bat && install.bat
-```
-
-### 🍎 macOS
-Run this in your **Terminal**:
-```bash
-curl -sSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat -o install.bat && install.bat
 ```
 
 ### 🐧 Linux
 Run this in your **Terminal**:
 ```bash
-curl -sSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/subvhome/m59-companion/main/install.sh | bash
 ```
 
 ---
 
-## 🛠️ Development & Compilation
+## 🛠️ Manual Installation (Developers)
 
-### Requirements
-* Python 3.8+
-* `pip install -r requirements.txt`
-
-### Compiling to EXE (Windows)
-To create a standalone executable:
-```bash
-pip install pyinstaller
-pyinstaller --noconsole --onefile --add-data "config.json;." main.py
-```
-
-### Updating Version & Repository
-Use the provided update script to bump the version and push changes:
-```bash
-./update_script.sh v0.39 "Added new features"
-```
-
----
-
-## 🤝 Contributing
-Contributions are welcome! Please submit a Pull Request or open an issue for bugs and feature requests.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/subvhome/m59-companion.git
+   cd m59-companion
+   ```
+2. **Create a virtual environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Linux
+   venv\Scripts\activate     # Windows
+   ```
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   *Note: On Windows, this will install `pywin32` and `pymem` which are required for memory reading and window interaction.*
 
 ---
 

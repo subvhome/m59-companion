@@ -1,13 +1,17 @@
 @echo off
-set REPO_URL=https://github.com/YOUR_USER/YOUR_REPO.git
+set REPO_URL=https://github.com/subvhome/m59-companion.git
 set DEST_DIR=m59-companion
 
-echo === M59 Companion Installer (Windows) ===
+echo =========================================
+echo   M59 Companion Installer (Windows)
+echo =========================================
 
 :: Check for Git
 where git >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Error: Git is not installed. Please install Git from https://git-scm.com/
+    echo [ERROR] Git is not installed.
+    echo Please download and install Git from: https://git-scm.com/download/win
+    echo After installing, please restart this script.
     pause
     exit /b
 )
@@ -15,35 +19,42 @@ if %errorlevel% neq 0 (
 :: Check for Python
 where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Error: Python is not installed. Please install Python from https://www.python.org/
+    echo [ERROR] Python is not installed.
+    echo Please download and install Python 3.10+ from: https://www.python.org/downloads/
+    echo NOTE: During installation, make sure to check "Add Python to PATH".
+    echo After installing, please restart this script.
     pause
     exit /b
 )
 
 :: Clone or Update
 if exist %DEST_DIR% (
-    echo Updating existing installation...
+    echo [INFO] Updating existing installation in %DEST_DIR%...
     cd %DEST_DIR%
     git pull
 ) else (
-    echo Cloning repository...
+    echo [INFO] Cloning repository to %DEST_DIR%...
     git clone %REPO_URL% %DEST_DIR%
     cd %DEST_DIR%
 )
 
 :: Setup Virtual Environment
-echo Setting up virtual environment...
+echo [INFO] Setting up virtual environment...
 python -m venv venv
 call venv\Scripts\activate
 
 :: Install requirements
-echo Installing dependencies...
+echo [INFO] Installing dependencies (this may take a minute)...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-echo === Installation Complete ===
-echo To run the app:
-echo cd %DEST_DIR%
-echo venv\Scripts\activate
-echo python main.py
+echo =========================================
+echo   Installation Complete!
+echo =========================================
+echo.
+echo To run the M59 Companion:
+echo   1. cd %DEST_DIR%
+echo   2. venv\Scripts\activate
+echo   3. python main.py
+echo.
 pause
