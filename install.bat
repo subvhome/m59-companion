@@ -6,28 +6,50 @@ echo =========================================
 echo   M59 Companion Installer (Windows)
 echo =========================================
 
-:: Check for Git
+:: 1. Check for winget
+where winget >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [ERROR] 'winget' (Windows Package Manager) is missing.
+    echo Please install it from the Microsoft Store or here: https://aka.ms/getwinget
+    pause
+    exit /b
+)
+
+:: 2. Check/Install Git
 where git >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] Git is not installed.
-    echo Please download and install Git from: https://git-scm.com/download/win
-    echo After installing, please restart this script.
+    echo [INFO] Git is missing. Attempting to install via winget...
+    winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
+    if %errorlevel% neq 0 (
+        echo [ERROR] Automatic Git installation failed. 
+        echo Try running this script as Administrator.
+        pause
+        exit /b
+    )
+    echo [SUCCESS] Git installed. 
+    echo PLEASE RESTART YOUR TERMINAL and run this script again.
     pause
     exit /b
 )
 
-:: Check for Python
+:: 3. Check/Install Python
 where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] Python is not installed.
-    echo Please download and install Python 3.10+ from: https://www.python.org/downloads/
-    echo NOTE: During installation, make sure to check "Add Python to PATH".
-    echo After installing, please restart this script.
+    echo [INFO] Python is missing. Attempting to install via winget...
+    winget install --id Python.Python.3.12 -e --source winget --accept-source-agreements --accept-package-agreements
+    if %errorlevel% neq 0 (
+        echo [ERROR] Automatic Python installation failed.
+        echo Try running this script as Administrator.
+        pause
+        exit /b
+    )
+    echo [SUCCESS] Python installed.
+    echo PLEASE RESTART YOUR TERMINAL and run this script again.
     pause
     exit /b
 )
 
-:: Clone or Update
+:: 4. Clone or Update
 if exist %DEST_DIR% (
     echo [INFO] Updating existing installation in %DEST_DIR%...
     cd %DEST_DIR%
@@ -38,12 +60,12 @@ if exist %DEST_DIR% (
     cd %DEST_DIR%
 )
 
-:: Setup Virtual Environment
+:: 5. Setup Virtual Environment
 echo [INFO] Setting up virtual environment...
 python -m venv venv
 call venv\Scripts\activate
 
-:: Install requirements
+:: 6. Install requirements
 echo [INFO] Installing dependencies (this may take a minute)...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
