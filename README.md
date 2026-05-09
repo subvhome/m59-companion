@@ -51,7 +51,7 @@ Before installing, ensure you have the following installed on your system:
 ### 🪟 Windows
 Run this in **Command Prompt** or **PowerShell** to automatically clone and set up the project:
 ```batch
-curl -sSL https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat -o install.bat && install.bat
+curl -L https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat -o install.bat & install.bat
 ```
 
 ### 🐧 Linux
