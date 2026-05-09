@@ -49,11 +49,19 @@ Before installing, ensure you have the following installed on your system:
 ## 📥 Installation
 
 ### 🪟 Windows
-Run this in **PowerShell** or **Command Prompt** (as Administrator if possible) to automatically set up the project:
-```batch
-curl.exe -L https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat -o install.bat && .\install.bat
-```
-*Note: If `&&` fails in older PowerShell, run the two parts separately.*
+1. **Open PowerShell** as Administrator.
+2. **Check Prerequisites:**
+   Ensure Python and Git are installed by running:
+   ```powershell
+   python --version; git --version
+   ```
+   *If either fails, download them from the links in the Prerequisites section above.*
+
+3. **Run the Installer:**
+   Copy and paste this entire block into PowerShell:
+   ```powershell
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat" -OutFile "install.bat"; .\install.bat
+   ```
 
 ### 🐧 Linux
 Run this in your **Terminal**:
