@@ -1,6 +1,8 @@
 import json
 import os
 import logging
+from utils import resource_path
+
 # Setup module-level logger
 logger = logging.getLogger("m59.calculator")
 class SchoolCalculator:
@@ -11,16 +13,17 @@ class SchoolCalculator:
         logger.info(f"SchoolCalculator initialized with data: {self.data_path}")
     def load_data(self):
         """Loads the school/skill definitions from the JSON data file."""
-        if os.path.exists(self.data_path):
+        res_data_path = resource_path(self.data_path)
+        if os.path.exists(res_data_path):
             try:
-                with open(self.data_path, "r") as f:
+                with open(res_data_path, "r") as f:
                     data = json.load(f).get("Schools", {})
-                    logger.debug(f"Loaded {len(data)} schools from {self.data_path}")
+                    logger.debug(f"Loaded {len(data)} schools from {res_data_path}")
                     return data
             except Exception as e:
-                logger.error(f"Failed to load {self.data_path}: {e}")
+                logger.error(f"Failed to load {res_data_path}: {e}")
         else:
-            logger.warning(f"Data file {self.data_path} not found.")
+            logger.warning(f"Data file {res_data_path} not found.")
         return {}
     def get_school_status(self, live_data, school_name, levels):
         """Determines the player's current level and internal point weight for a school."""
