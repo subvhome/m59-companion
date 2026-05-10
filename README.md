@@ -19,9 +19,9 @@ For most users, simply download the pre-compiled executable:
 ## ✨ Key Features
 
 ### 📊 Real-Time Dashboard
-*   **Live Vital Monitoring:** Track your **HP, Mana, and Vigor** directly in the companion window. No more squinting at the game's UI during intense combat.
+*   **Live Vital Monitoring:** View your **HP, Mana, and Vigor** directly in the companion window.
 *   **Identity Detection:** Automatically captures your character name so you know exactly which session is being logged.
-*   **Top-Most Window:** The companion can stay pinned on top of your game client for constant visibility.
+*   **Top-Most Window:** The companion stays pinned on top of your game client for constant visibility.
 
 ### 🎯 Skill & Spell Tracker (Improves)
 *   **Automatic Detection:** Captures every "You have improved..." message instantly.
