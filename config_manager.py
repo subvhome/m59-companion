@@ -1,14 +1,12 @@
 import json
 import os
 from utils import resource_path
-
 class ConfigManager:
     def __init__(self):
         # We always save/load from the folder where the EXE/script is located
         # to ensure settings persist.
         self.config_path = "config.json"
         self.settings = self.load()
-
     def load(self):
         # Default settings
         default_settings = {
@@ -25,7 +23,6 @@ class ConfigManager:
                     return json.load(f)
             except Exception:
                 pass
-
         # 2. If not found, look for a bundled default (optional)
         bundled_config = resource_path("config.json")
         if os.path.exists(bundled_config) and bundled_config != self.config_path:
@@ -36,7 +33,6 @@ class ConfigManager:
                 pass
                 
         return default_settings
-
     def save(self, settings):
         self.settings = settings
         try:
