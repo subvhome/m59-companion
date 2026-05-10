@@ -30,7 +30,7 @@ import sys
 from utils import resource_path
 
 # Application Version
-VERSION = "v0.50"
+VERSION = "v0.51"
 
 class CompanionApp:
     def __init__(self, root):

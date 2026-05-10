@@ -9,74 +9,67 @@ echo =========================================
 :: 1. Check for winget
 where winget >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] 'winget' (Windows Package Manager) is missing.
-    echo Please install it from the Microsoft Store or here: https://aka.ms/getwinget
+    echo [ERROR] 'winget' is missing. Please install it from the Microsoft Store. [cite: 1]
     pause
     exit /b
 )
 
-:: 2. Check/Install Git
-where git >nul 2>nul
+:: 2. Check/Install Git (Elevated)
+git --version >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [INFO] Git is missing. Attempting to install via winget...
-    winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
+    echo [INFO] Git is missing. Attempting elevated installation... 
+    powershell -Command "Start-Process winget -ArgumentList 'install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements' -Verb RunAs -Wait"
     if %errorlevel% neq 0 (
-        echo [ERROR] Automatic Git installation failed. 
-        echo Try running this script as Administrator.
+        echo [ERROR] Git installation failed. 
         pause
         exit /b
     )
-    echo [SUCCESS] Git installed. 
-    echo PLEASE RESTART YOUR TERMINAL and run this script again.
+    echo [SUCCESS] Git installed. PLEASE RESTART YOUR TERMINAL. [cite: 4]
     pause
     exit /b
 )
 
-:: 3. Check/Install Python
-where python >nul 2>nul
+:: 3. Check/Install Python and verify version output
+python --version >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [INFO] Python is missing. Attempting to install via winget...
-    winget install --id Python.Python.3.12 -e --source winget --accept-source-agreements --accept-package-agreements
+    echo [INFO] Python is missing. Attempting elevated installation... 
+    powershell -Command "Start-Process winget -ArgumentList 'install --id Python.Python.3.12 -e --source winget --accept-source-agreements --accept-package-agreements' -Verb RunAs -Wait"
     if %errorlevel% neq 0 (
-        echo [ERROR] Automatic Python installation failed.
-        echo Try running this script as Administrator.
+        echo [ERROR] Python installation failed. 
         pause
         exit /b
     )
-    echo [SUCCESS] Python installed.
-    echo PLEASE RESTART YOUR TERMINAL and run this script again.
+    echo [SUCCESS] Python installed. PLEASE RESTART YOUR TERMINAL. [cite: 4]
     pause
     exit /b
 )
 
 :: 4. Clone or Update
 if exist %DEST_DIR% (
-    echo [INFO] Updating existing installation in %DEST_DIR%...
+    echo [INFO] Updating existing installation... [cite: 5]
     cd %DEST_DIR%
     git pull
 ) else (
-    echo [INFO] Cloning repository to %DEST_DIR%...
+    echo [INFO] Cloning repository... [cite: 5]
     git clone %REPO_URL% %DEST_DIR%
     cd %DEST_DIR%
 )
 
 :: 5. Setup Virtual Environment
-echo [INFO] Setting up virtual environment...
+echo [INFO] Setting up virtual environment... [cite: 5]
 python -m venv venv
 call venv\Scripts\activate
 
-:: 6. Install requirements
-echo [INFO] Installing dependencies (this may take a minute)...
+:: 6. Install Pre-reqs (pymem and pywin32) + requirements.txt
+echo [INFO] Installing dependencies... 
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install pymem pywin32
+if exist requirements.txt (
+    pip install -r requirements.txt
+)
 
 echo =========================================
-echo   Installation Complete!
+echo   Installation Complete! 
 echo =========================================
-echo.
-echo To run the M59 Companion:
-echo   1. cd %DEST_DIR%
-echo   2. venv\Scripts\activate
-echo   3. python main.py
-echo.
-pause
+echo To run: python main.py
+pause [cite: 7]
