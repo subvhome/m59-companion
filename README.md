@@ -8,60 +8,49 @@ A powerful, real-time utility for **Meridian 59** players. Track your progress, 
 
 ---
 
+## 📥 Download (Latest Release)
+
+For most users, simply download the pre-compiled executable:
+
+👉 **[Download M59Companion.exe](https://github.com/subvhome/m59-companion/releases)**
+
+---
+
 ## 🚀 Key Features
 
 ### 📊 Dashboard
 * **Real-time Stats:** Monitor HP, MP, and Vigor directly from the game window.
 * **Live Improves Tracker:** Automatically captures "You have improved in the art of..." messages.
-* **Skill Formatting:** Correctly formats skill names (e.g., `Hunter's Aim`, `Hand-To-Hand`).
-* **Time Delta:** See exactly how long it's been since your last skill gain.
 * **School Progression:** Automatically calculates sum-of-top-3 and remaining points for school unlocks.
 
 ### 📝 Chat Logs
-* **Integrated Viewer:** Review your current session or historical logs without leaving the app.
-* **Date-Based History:** Browsing previous logs organized by date/time.
-* **Live Scroll:** Toggle live updates to follow the action in real-time.
+* **Integrated Viewer:** Review your current session or historical logs.
 * **Log Management:** Right-click to delete old logs and keep your workspace clean.
 
 ---
 
-## 📋 Prerequisites
+## 📋 Prerequisites (For CLI/Source Install)
 
-Before installing, ensure you have the following installed on your system:
+Before installing from source, ensure you have the following:
 
-### 🪟 Windows (Recommended)
-* **Python 3.10+**: [Download from Python.org](https://www.python.org/downloads/windows/). 
-    * *Important: Check "Add Python to PATH" during installation.*
-* **Git**: [Download from Git-scm.com](https://git-scm.com/download/win).
-* **Meridian 59**: The application must be running to track stats and improves.
+### 🪟 Windows
+* **Windows 10/11** (Includes `winget` for automated setup)
 
 ### 🐧 Linux
-* **Python 3.10+** and **pip**
-* **Git**
-* **Tkinter**: Usually needs to be installed via your package manager:
+* **Python 3.10+** and **Tkinter**
     ```bash
     sudo apt install python3-tk  # Ubuntu/Debian
-    sudo dnf install python3-tkinter # Fedora
     ```
 
 ---
 
-## 📥 Installation
+## 🛠️ Installation (Source/CLI)
 
 ### 🪟 Windows
-1. **Open PowerShell** as Administrator.
-2. **Check Prerequisites:**
-   Ensure Python and Git are installed by running:
-   ```powershell
-   python --version; git --version
-   ```
-   *If either fails, download them from the links in the Prerequisites section above.*
-
-3. **Run the Installer:**
-   Copy and paste this entire block into PowerShell:
-   ```powershell
-   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat" -OutFile "install.bat"; .\install.bat
-   ```
+Run this in **PowerShell** to automatically set up the project (installs Python/Git if needed):
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat" -OutFile "install.bat"; .\install.bat
+```
 
 ### 🐧 Linux
 Run this in your **Terminal**:
@@ -71,24 +60,23 @@ curl -sSL https://raw.githubusercontent.com/subvhome/m59-companion/main/install.
 
 ---
 
-## 🛠️ Manual Installation (Developers)
+## 🏗️ Development & Compilation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/subvhome/m59-companion.git
-   cd m59-companion
+To compile your own standalone executable on Windows:
+
+1. **Activate Environment:**
+   ```powershell
+   .\venv\Scripts\activate
    ```
-2. **Create a virtual environment:**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux
-   venv\Scripts\activate     # Windows
+2. **Install Build Tools:**
+   ```powershell
+   pip install pyinstaller
    ```
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
+3. **Run Compilation:**
+   ```powershell
+   pyinstaller --noconsole --onefile --clean --name "M59Companion" --add-data "config.json;." --add-data "m59_data.json;." --add-data "moblist.csv;." main.py
    ```
-   *Note: On Windows, this will install `pywin32` and `pymem` which are required for memory reading and window interaction.*
+   The finished EXE will be in the `dist/` folder.
 
 ---
 
