@@ -16,20 +16,43 @@ For most users, simply download the pre-compiled executable:
 
 ---
 
-## 🚀 Key Features
+## ✨ Key Features
 
-### 📊 Dashboard
-* **Real-time Stats:** Monitor HP, MP, and Vigor directly from the game window.
-* **Live Improves Tracker:** Automatically captures "You have improved in the art of..." messages.
-* **School Progression:** Automatically calculates sum-of-top-3 and remaining points for school unlocks.
+### 📊 Real-Time Dashboard
+*   **Live Vital Monitoring:** Track your **HP, Mana, and Vigor** directly in the companion window. No more squinting at the game's UI during intense combat.
+*   **Identity Detection:** Automatically captures your character name so you know exactly which session is being logged.
+*   **Top-Most Window:** The companion can stay pinned on top of your game client for constant visibility.
 
-### 📝 Chat Logs
-* **Integrated Viewer:** Review your current session or historical logs.
-* **Log Management:** Right-click to delete old logs and keep your workspace clean.
+### 🎯 Skill & Spell Tracker (Improves)
+*   **Automatic Detection:** Captures every "You have improved..." message instantly.
+*   **Improvement History:** See exactly how many times you've gained in a specific skill during your current session.
+*   **Time Deltas:** Tracks the **time elapsed** between improvements, helping you optimize your training speed and detect "droughts."
+*   **Smart Formatting:** Automatically cleans and formats skill names (e.g., `axe wielding` becomes `Axe Wielding`) for a professional look.
+
+### 🎓 School Progression Engine
+*   **Knowledge Sync:** With one click, the app "scans" your Spells and Skills tabs in-game to build a local cache of your percentages.
+*   **Unlock Predictor:** Uses advanced formulas (taking into account your **Intellect** and server settings) to calculate exactly how much more training you need to unlock the next level of a school.
+*   **Sum-of-Top-3 Logic:** Automatically identifies your three highest skills in a school level to give you an accurate "Progress %" toward your next unlock.
+
+### 📝 Integrated Chat & System Logs
+*   **Live Chat Viewer:** Read your game chat in a clean, scrollable window with "Live Scroll" support.
+*   **Historical Browsing:** All sessions are saved as `.log` files in the `/logs` directory. Review past adventures or combat logs without leaving the app.
+*   **Log Management:** Right-click any log in the list to quickly delete old or unnecessary files.
+*   **System Console:** A dedicated tab for technical events, showing you exactly when the app connects to the game or syncs data.
+
+---
+
+## 🛠️ How It Works
+
+M59 Companion uses a hybrid approach to provide its features:
+1.  **Window Interaction:** It communicates with the Meridian 59 window components to "scrape" text from the chat and listboxes.
+2.  **Memory Reading:** It uses a secure, read-only memory hook to retrieve your HP/MP/Vigor and specific skill percentages for maximum accuracy.
+3.  **Local Intelligence:** All calculations are performed locally using data from `m59_data.json`, ensuring your data stays private and fast.
 
 ---
 
 ## 📋 Prerequisites (For CLI/Source Install)
+...
 
 Before installing from source, ensure you have the following:
 
