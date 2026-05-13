@@ -8,6 +8,7 @@ import win32con
 import os
 from datetime import datetime
 import threading
+import urllib.request
 
 # Import modular helper files
 from m59_bridge import find_game_window, get_stats, find_skill_listbox, mem, get_text_from_hwnd, get_all_game_instances
@@ -46,11 +47,14 @@ class CompanionApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"M59 Companion {VERSION}")
-        self.root.attributes("-topmost", True)
         
         # Initialize Managers
         self.config = ConfigManager() # Note: ConfigManager might need an internal update too
         self.calc = SchoolCalculator(self.config)
+        
+        # Set Always on Top from Config
+        self.always_on_top = tk.BooleanVar(value=self.config.settings.get("app", {}).get("always_on_top", True))
+        self.root.attributes("-topmost", self.always_on_top.get())
         
         # State Variables
         self.is_syncing = False 
@@ -75,6 +79,7 @@ class CompanionApp:
         
         self.update_loop() 
         logger.info("Application started. Ready to connect.")
+        self.check_for_updates()
         
     def setup_logging_infrastructure(self):
         logger.setLevel(logging.INFO)
@@ -561,6 +566,7 @@ class CompanionApp:
         menubar.add_cascade(label="System", menu=file_menu)
         
         settings_menu = tk.Menu(menubar, tearoff=0)
+        settings_menu.add_checkbutton(label="Always on Top", variable=self.always_on_top, command=self.toggle_always_on_top)
         settings_menu.add_command(label="App Settings", command=self.open_settings)
         menubar.add_cascade(label="Settings", menu=settings_menu)
         
@@ -570,6 +576,35 @@ class CompanionApp:
         log_menu.add_command(label="Clear Log Window", command=self.clear_logs)
         menubar.add_cascade(label="Logging", menu=log_menu)
         self.root.config(menu=menubar)
+
+    def toggle_always_on_top(self):
+        is_on = self.always_on_top.get()
+        self.root.attributes("-topmost", is_on)
+        if "app" not in self.config.settings:
+            self.config.settings["app"] = {}
+        self.config.settings["app"]["always_on_top"] = is_on
+        self.config.save(self.config.settings)
+        logger.info(f"Always on Top: {'Enabled' if is_on else 'Disabled'}")
+
+    def check_for_updates(self):
+        """Checks GitHub for a new version in a separate thread."""
+        def check():
+            try:
+                # Direct URL to the VERSION file on your main branch
+                url = "https://raw.githubusercontent.com/subzerofusion/m59-companion/main/VERSION"
+                with urllib.request.urlopen(url, timeout=5) as response:
+                    remote_version = response.read().decode('utf-8').strip()
+                    if remote_version != VERSION:
+                        logger.info(f"Update Available! Remote: {remote_version} | Local: {VERSION}")
+                        self.root.after(0, lambda: messagebox.showinfo("Update Available", 
+                            f"A new version of M59 Companion is available!\n\n"
+                            f"Current: {VERSION}\n"
+                            f"Latest: {remote_version}\n\n"
+                            "Please check the GitHub repository for the latest release."))
+            except Exception as e:
+                logger.debug(f"Update check failed: {e}")
+
+        threading.Thread(target=check, daemon=True).start()
 
     def toggle_debug(self):
         logger.setLevel(logging.DEBUG if self.debug_var.get() else logging.INFO)

@@ -13,6 +13,9 @@ class ConfigManager:
             "character": {
                 "intellect": 18,
                 "testing_mode": False
+            },
+            "app": {
+                "always_on_top": True
             }
         }
         
