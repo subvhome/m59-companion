@@ -58,7 +58,8 @@ class CompanionApp:
         self.knowledge_cache = {} 
         self.log_queue = queue.Queue()
         self.last_line_count = 0
-        self.current_log_path = None # Will hold our .log file path
+        self.current_log_path = None # Will hold our [username]_chat.log path
+        self.log_creation_time = 0
         self.session_improves = {} # New storage for the grid data
         
         self.target_pid = None
@@ -72,11 +73,8 @@ class CompanionApp:
         self.setup_menu()
         self.setup_ui_main() 
         
-        # Start the first session immediately
-        self.start_new_log_session()
-        
         self.update_loop() 
-        logger.info("Application started. Chat Logger is Active.")
+        logger.info("Application started. Ready to connect.")
         
     def setup_logging_infrastructure(self):
         logger.setLevel(logging.INFO)
@@ -113,59 +111,35 @@ class CompanionApp:
                     if current_text:
                         all_lines = [l.strip() for l in current_text.splitlines() if l.strip()]
                         
-                        if not hasattr(self, 'chat_sync_done'):
-                            import m59_bridge
-                            log_dir = os.path.dirname(self.current_log_path)
-                            all_logs = sorted([os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".log")], 
-                                             key=os.path.getmtime)
+                        if self.char_name:
+                            self.manage_chat_log()
                             
-                            history_file = None
-                            history_candidates = [f for f in all_logs if os.path.normpath(f) != os.path.normpath(self.current_log_path)]
-                            if history_candidates:
-                                history_file = history_candidates[-1]
+                            # Initialize line count on first capture for this character
+                            if not hasattr(self, 'chat_init_done') or self.chat_init_done != self.char_name:
+                                self.last_line_count = len(all_lines)
+                                self.chat_init_done = self.char_name
+                                logger.info(f"Chat logging initialized for {self.char_name}. Waiting for new lines...")
 
-                            fingerprint = m59_bridge.get_log_fingerprint(history_file)
-                            found_at = -1
+                            # --- LIVE RECORDING AND PROCESSING ---
+                            if len(all_lines) < self.last_line_count:
+                                self.last_line_count = 0
                             
-                            if fingerprint and len(fingerprint) >= 10:
-                                for i in range(len(all_lines) - len(fingerprint) + 1):
-                                    if all_lines[i:i+len(fingerprint)] == fingerprint:
-                                        found_at = i + len(fingerprint)
-                                        break
+                            new_lines = all_lines[self.last_line_count:]
                             
-                            with open(self.current_log_path, "a", encoding="utf-8") as f:
-                                if found_at != -1:
-                                    self.last_line_count = found_at
-                                    f.write(f"--- Found match: continuing log from {os.path.basename(history_file)} ---\n")
-                                    logger.info("Sync Success: Found fingerprint match.")
-                                else:
-                                    self.last_line_count = len(all_lines)
-                                    f.write("--- No match found / fresh log session ---\n")
-                                    logger.info("Sync Failed: Starting from live text.")
-                                f.flush()
-
-                            self.chat_sync_done = True
-
-                        # --- LIVE RECORDING AND PROCESSING ---
-                        if len(all_lines) < self.last_line_count:
-                            self.last_line_count = 0
-                        
-                        new_lines = all_lines[self.last_line_count:]
-                        
-                        if new_lines:
-                            self.last_line_count = len(all_lines)
-                            try:
-                                with open(self.current_log_path, "a", encoding="utf-8") as f:
-                                    for line in new_lines:
-                                        # LIVE DETECTION (Before Timestamp)
-                                        self.detect_skill_gain(line)
-                                        
-                                        # Write to history log
-                                        ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                                        f.write(f"{ts} {line}\n")
-                                    f.flush()
-                            except Exception as e:
-                                logger.error(f"Log error: {e}")
+                            if new_lines:
+                                self.last_line_count = len(all_lines)
+                                try:
+                                    with open(self.current_log_path, "a", encoding="utf-8") as f:
+                                        for line in new_lines:
+                                            # LIVE DETECTION (Before Timestamp)
+                                            self.detect_skill_gain(line)
+                                            
+                                            # Write to history log
+                                            ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+                                            f.write(f"{ts} {line}\n")
+                                        f.flush()
+                                except Exception as e:
+                                    logger.error(f"Log error: {e}")
                 
                 # 4. Live Chat Viewer Update
                 self.update_chat_view_live()
@@ -734,18 +708,39 @@ class CompanionApp:
         logger.info("Simulating test gain...")
         self.detect_skill_gain(test_line)
 
-    def start_new_log_session(self):
-        """Creates a fresh log file for history. Real-time detection is now handled in update_loop."""
-        if not os.path.exists("logs"):
-            os.makedirs("logs")
+    def manage_chat_log(self):
+        """Ensures [username]_chat.log exists and handles 24-hour rotation."""
+        if not self.char_name:
+            return
 
-        ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.current_log_path = os.path.join("logs", f"session_{ts}.log")
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        # Sanitize name: remove spaces for filename safety
+        safe_name = self.char_name.replace(" ", "_")
+        log_filename = f"{safe_name}_chat.log"
+        log_path = os.path.join(log_dir, log_filename)
         
-        with open(self.current_log_path, "w", encoding="utf-8") as f:
-            f.write(f"--- Session Started: {datetime.now()} ---\n")
-        
-        logger.info(f"Logging history to: {os.path.basename(self.current_log_path)}")
+        # Check for rotation (24 hours after creation)
+        if os.path.exists(log_path):
+            creation_time = os.path.getctime(log_path)
+            if time.time() - creation_time > 86400: # 24 hours
+                ts = datetime.fromtimestamp(creation_time).strftime("%Y-%m-%d_%H%M%S")
+                rotated_path = os.path.join(log_dir, f"{safe_name}_chat_{ts}.log")
+                try:
+                    os.rename(log_path, rotated_path)
+                    logger.info(f"Rotated log file to {rotated_path}")
+                except Exception as e:
+                    logger.error(f"Failed to rotate log: {e}")
+
+        # Set or reset current log path
+        if self.current_log_path != log_path:
+            self.current_log_path = log_path
+            if not os.path.exists(log_path):
+                with open(log_path, "w", encoding="utf-8") as f:
+                    f.write(f"--- Chat Log Started for {self.char_name}: {datetime.now()} ---\n")
+            logger.info(f"Logging chat to: {log_filename}")
     
     def handle_detected_improve(self, name):
         """

@@ -12,18 +12,21 @@ WM_USER = 0x0400
 GRPH_POSGET = WM_USER + 1005 
 
 def get_all_game_instances():
-    """Returns a list of all Meridian 59 windows with their PIDs."""
+    """Returns a list of all Meridian 59 windows with their PIDs (unique PIDs only)."""
     instances = []
+    seen_pids = set()
     def callback(hwnd, extra):
         if win32gui.IsWindowVisible(hwnd):
             text = win32gui.GetWindowText(hwnd)
             if text.startswith("Meridian 59"):
                 _, pid = win32process.GetWindowThreadProcessId(hwnd)
-                instances.append({
-                    "hwnd": hwnd,
-                    "pid": pid,
-                    "title": text
-                })
+                if pid not in seen_pids:
+                    instances.append({
+                        "hwnd": hwnd,
+                        "pid": pid,
+                        "title": text
+                    })
+                    seen_pids.add(pid)
     win32gui.EnumWindows(callback, None)
     return instances
 
@@ -108,34 +111,6 @@ def find_skill_listbox(game_hwnd):
     
 import os
 
-def get_log_fingerprint(file_path, window_size=20):
-    """Extracts a clean fingerprint, handling any timestamp length."""
-    if not file_path or not os.path.exists(file_path):
-        return []
-    
-    try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            lines = f.readlines()
-        
-        clean_history = []
-        for l in lines:
-            text = l.strip()
-            if not text or text.startswith("---"): 
-                continue
-            
-            # This is the key fix: split at the first ']' 
-            # and ignore everything before it, regardless of date length.
-            if "]" in text:
-                parts = text.split("]", 1)
-                if len(parts) > 1:
-                    text = parts[1].strip()
-            
-            if text:
-                clean_history.append(text)
-            
-        return clean_history[-window_size:]
-    except:
-        return []
 # Initialize the global memory object
 # Note: The MemoryReader handles its own internal attachment logging
 logger.info("Initializing global MemoryReader instance 'mem' in bridge.")
