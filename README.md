@@ -1,110 +1,56 @@
 # M59 Companion
 
-A powerful, real-time utility for **Meridian 59** players. Track your progress, monitor your chat, and analyze your school progression with ease.
+A lightweight, multi-instance companion tool for Meridian 59 that helps you track your character's progression and masters the "Knowledge Math" for you.
 
-![Version](https://img.shields.io/badge/version-v0.38-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)
+[**Download Latest Release (EXE)**](https://github.com/subvhome/m59-companion/raw/main/M59Companion.exe)
 
----
+## Key Features
 
-## 📥 Download (Latest Release)
+### 1. School Progression Tracker
+*   **Target Calculation**: Automatically determines the exact % sum required to unlock your next school rank.
+*   **Progress Monitoring**: Shows your current "Top 3" sum and exactly how many more points you need to advance.
+*   **Smart Calibration**: Factors in your Intellect and "Generalization Penalty" (how many other schools you've trained) to give you accurate goals.
 
-For most users, simply download the pre-compiled executable:
+### 2. Live Gain Monitor (Improves)
+*   **Real-time Tracking**: Detects "You have improved..." messages instantly.
+*   **Gain Counters**: Tracks how many times each skill has improved during your current session.
+*   **Efficiency Timer**: Shows the time elapsed between your last two gains, helping you monitor your "cast bonus" efficiency.
 
-👉 **[Download M59Companion.exe](https://github.com/subvhome/m59-companion/releases)**
+### 3. Connection Manager
+*   **Multi-Instance Support**: Easily switch between different running `Meridian.exe` windows.
+*   **Identity Mapping**: Remembers individual character stats and knowledge sets even when running multiple game sessions simultaneously.
 
----
+### 4. Chat Log Explorer
+*   **Session Archiving**: Automatically saves all game text into timestamped `.log` files.
+*   **Live Viewer**: Read and search through your current and historical game logs without leaving the companion app.
 
-## ✨ Key Features
+## Installation
 
-### 📊 Real-Time Dashboard
-*   **Live Vital Monitoring:** View your **HP, Mana, and Vigor** directly in the companion window.
-*   **Identity Detection:** Automatically captures your character name so you know exactly which session is being logged.
-*   **Top-Most Window:** The companion stays pinned on top of your game client for constant visibility.
-
-### 🎯 Skill & Spell Tracker (Improves)
-*   **Automatic Detection:** Captures every "You have improved..." message instantly.
-*   **Improvement History:** See exactly how many times you've gained in a specific skill during your current session.
-*   **Time Deltas:** Tracks the **time elapsed** between improvements, helping you optimize your training speed and detect "droughts."
-*   **Smart Formatting:** Automatically cleans and formats skill names (e.g., `axe wielding` becomes `Axe Wielding`) for a professional look.
-
-### 🎓 School Progression Engine
-*   **Knowledge Sync:** With one click, the app "scans" your Spells and Skills tabs in-game to build a local cache of your percentages.
-*   **Unlock Predictor:** Uses advanced formulas (taking into account your **Intellect** and server settings) to calculate exactly how much more training you need to unlock the next level of a school.
-*   **Sum-of-Top-3 Logic:** Automatically identifies your three highest skills in a school level to give you an accurate "Progress %" toward your next unlock.
-
-### 📝 Integrated Chat & System Logs
-*   **Live Chat Viewer:** Read your game chat in a clean, scrollable window with "Live Scroll" support.
-*   **Historical Browsing:** All sessions are saved as `.log` files in the `/logs` directory. Review past adventures or combat logs without leaving the app.
-*   **Log Management:** Right-click any log in the list to quickly delete old or unnecessary files.
-*   **System Console:** A dedicated tab for technical events, showing you exactly when the app connects to the game or syncs data.
-
----
-
-## 🛠️ How It Works
-
-M59 Companion uses a hybrid approach to provide its features:
-1.  **Window Interaction:** It communicates with the Meridian 59 window components to "scrape" text from the chat and listboxes.
-2.  **Memory Reading:** It uses a secure, read-only memory hook to retrieve your HP/MP/Vigor and specific skill percentages for maximum accuracy.
-3.  **Local Intelligence:** All calculations are performed locally using data from `m59_data.json`, ensuring your data stays private and fast.
-
----
-
-## 📋 Prerequisites (For CLI/Source Install)
-...
-
-Before installing from source, ensure you have the following:
-
-### 🪟 Windows
-* **Windows 10/11** (Includes `winget` for automated setup)
-
-### 🐧 Linux
-* **Python 3.10+** and **Tkinter**
-    ```bash
-    sudo apt install python3-tk  # Ubuntu/Debian
-    ```
-
----
-
-## 🛠️ Installation (Source/CLI)
-
-### 🪟 Windows
-Run this in **PowerShell** to automatically set up the project (installs Python/Git if needed):
+### Windows (One-Liner)
+*Placeholder: Coming Soon*
 ```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/subvhome/m59-companion/main/install.bat" -OutFile "install.bat"; .\install.bat
+# [PowerShell command placeholder]
 ```
 
-### 🐧 Linux
-Run this in your **Terminal**:
+### Linux / Wine (One-Liner)
+*Placeholder: Coming Soon*
 ```bash
-curl -sSL https://raw.githubusercontent.com/subvhome/m59-companion/main/install.sh | bash
+# [Bash command placeholder]
 ```
 
 ---
 
-## 🏗️ Development & Compilation
+## How it Works (Technical Details)
 
-To compile your own standalone executable on Windows:
+The M59 Companion interacts with the game through a combination of memory reading and UI scraping to ensure 100% accuracy without interfering with game performance.
 
-1. **Activate Environment:**
-   ```powershell
-   .\venv\Scripts\activate
-   ```
-2. **Install Build Tools:**
-   ```powershell
-   pip install pyinstaller
-   ```
-3. **Run Compilation:**
-   ```powershell
-   pyinstaller --noconsole --onefile --clean --name "M59Companion" --add-data "config.json;." --add-data "m59_data.json;." --add-data "moblist.csv;." main.py
-   ```
-   The finished EXE will be in the `dist/` folder.
+### The Progression Engine
+The tool uses the standard server advancement formula to calculate your `iNeed` (the sum of your top 3 spells/skills in a rank).
+*   **Intellect Buffer**: The higher your Intellect, the lower your required % sum becomes.
+*   **iPoints Calculation**: Every school rank you've already achieved adds a "Generalization Penalty," raising the requirement for your next unlock.
+*   **Detection**: The tool identifies your current level by scanning your spellbook and prioritizes the lowest "unfinished" level to ensure you always know what to work on next.
 
----
-
-## 📜 License
-This project is licensed under the MIT License.
-
----
-*Created for the Meridian 59 community.*
+### Data Capture
+*   **Memory Hooks**: Uses `Pymem` to read core character stats directly from the game's memory.
+*   **UI Scrapers**: Utilizes standard Windows API calls to read text from the game's ListBoxes and Chat components safely.
+*   **Sync Logic**: The "Sync Now" feature performs a sequence of UI tab switches to refresh your character's internal knowledge base.
