@@ -3,3 +3,4 @@ logs/
 *.txt
 # If you want to keep config.json but ignore session files:
 .active_sessions.json
+knowledge

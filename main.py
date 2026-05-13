@@ -10,7 +10,7 @@ from datetime import datetime
 import threading
 
 # Import modular helper files
-from m59_bridge import find_game_window, get_stats, find_skill_listbox, mem, get_text_from_hwnd
+from m59_bridge import find_game_window, get_stats, find_skill_listbox, mem, get_text_from_hwnd, get_all_game_instances
 from m59_identity import capture_character_name
 from m59_lists import get_raw_skill_dict
 from m59_calculator import SchoolCalculator
@@ -30,7 +30,7 @@ import sys
 from utils import resource_path
 
 # Application Version
-VERSION = "v0.57"
+VERSION = "CompanionApp(root).01"
 
 class CompanionApp:
     def __init__(self, root):
@@ -51,6 +51,9 @@ class CompanionApp:
         self.current_log_path = None # Will hold our .log file path
         self.session_improves = {} # New storage for the grid data
         
+        self.target_pid = None
+        self.target_hwnd = None
+        
         # Ensure logs directory exists
         if not os.path.exists("logs"):
             os.makedirs("logs")
@@ -58,7 +61,6 @@ class CompanionApp:
         self.setup_logging_infrastructure()
         self.setup_menu()
         self.setup_ui_main() 
-        self.setup_ui_logs() 
         
         # Start the first session immediately
         self.start_new_log_session()
@@ -82,78 +84,85 @@ class CompanionApp:
             self.log_display.see(tk.END)
             self.log_display.config(state="disabled")
 
-        hwnd = find_game_window()
-        if hwnd and not self.is_syncing:
-            if not mem.process_handle: mem.attach()
-            
-            # 2. Update Core Stats
-            if mem.process_handle:
-                s = get_stats(hwnd)
-                if s: self.stats_label.config(text=f"HP: {s[0]} | MP: {s[1]} | VG: {s[2]}")
-            
-            # 3. Enhanced Chat Logger Logic
-            chat_hwnd = win32gui.GetDlgItem(hwnd, 1005)
-            if chat_hwnd:
-                current_text = get_text_from_hwnd(chat_hwnd)
-                if current_text:
-                    all_lines = [l.strip() for l in current_text.splitlines() if l.strip()]
-                    
-                    if not hasattr(self, 'chat_sync_done'):
-                        import m59_bridge
-                        log_dir = os.path.dirname(self.current_log_path)
-                        all_logs = sorted([os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".log")], 
-                                         key=os.path.getmtime)
+        hwnd = find_game_window(self.target_pid)
+        if hwnd:
+            self.target_hwnd = hwnd
+            if not self.is_syncing:
+                if not mem.process_handle or mem.target_pid != self.target_pid: 
+                    mem.attach(self.target_pid)
+                
+                # 2. Update Core Stats
+                if mem.process_handle:
+                    s = get_stats(hwnd)
+                    if s: self.stats_label.config(text=f"HP: {s[0]} | MP: {s[1]} | VG: {s[2]}")
+                
+                # 3. Enhanced Chat Logger Logic
+                chat_hwnd = win32gui.GetDlgItem(hwnd, 1005)
+                if chat_hwnd:
+                    current_text = get_text_from_hwnd(chat_hwnd)
+                    if current_text:
+                        all_lines = [l.strip() for l in current_text.splitlines() if l.strip()]
                         
-                        history_file = None
-                        history_candidates = [f for f in all_logs if os.path.normpath(f) != os.path.normpath(self.current_log_path)]
-                        if history_candidates:
-                            history_file = history_candidates[-1]
+                        if not hasattr(self, 'chat_sync_done'):
+                            import m59_bridge
+                            log_dir = os.path.dirname(self.current_log_path)
+                            all_logs = sorted([os.path.join(log_dir, f) for f in os.listdir(log_dir) if f.endswith(".log")], 
+                                             key=os.path.getmtime)
+                            
+                            history_file = None
+                            history_candidates = [f for f in all_logs if os.path.normpath(f) != os.path.normpath(self.current_log_path)]
+                            if history_candidates:
+                                history_file = history_candidates[-1]
 
-                        fingerprint = m59_bridge.get_log_fingerprint(history_file)
-                        found_at = -1
-                        
-                        if fingerprint and len(fingerprint) >= 10:
-                            for i in range(len(all_lines) - len(fingerprint) + 1):
-                                if all_lines[i:i+len(fingerprint)] == fingerprint:
-                                    found_at = i + len(fingerprint)
-                                    break
-                        
-                        with open(self.current_log_path, "a", encoding="utf-8") as f:
-                            if found_at != -1:
-                                self.last_line_count = found_at
-                                f.write(f"--- Found match: continuing log from {os.path.basename(history_file)} ---\n")
-                                logger.info("Sync Success: Found fingerprint match.")
-                            else:
-                                self.last_line_count = len(all_lines)
-                                f.write("--- No match found / fresh log session ---\n")
-                                logger.info("Sync Failed: Starting from live text.")
-                            f.flush()
-
-                        self.chat_sync_done = True
-
-                    # --- LIVE RECORDING AND PROCESSING ---
-                    if len(all_lines) < self.last_line_count:
-                        self.last_line_count = 0
-                    
-                    new_lines = all_lines[self.last_line_count:]
-                    
-                    if new_lines:
-                        self.last_line_count = len(all_lines)
-                        try:
+                            fingerprint = m59_bridge.get_log_fingerprint(history_file)
+                            found_at = -1
+                            
+                            if fingerprint and len(fingerprint) >= 10:
+                                for i in range(len(all_lines) - len(fingerprint) + 1):
+                                    if all_lines[i:i+len(fingerprint)] == fingerprint:
+                                        found_at = i + len(fingerprint)
+                                        break
+                            
                             with open(self.current_log_path, "a", encoding="utf-8") as f:
-                                for line in new_lines:
-                                    # LIVE DETECTION (Before Timestamp)
-                                    self.detect_skill_gain(line)
-                                    
-                                    # Write to history log
-                                    ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                                    f.write(f"{ts} {line}\n")
+                                if found_at != -1:
+                                    self.last_line_count = found_at
+                                    f.write(f"--- Found match: continuing log from {os.path.basename(history_file)} ---\n")
+                                    logger.info("Sync Success: Found fingerprint match.")
+                                else:
+                                    self.last_line_count = len(all_lines)
+                                    f.write("--- No match found / fresh log session ---\n")
+                                    logger.info("Sync Failed: Starting from live text.")
                                 f.flush()
-                        except Exception as e:
-                            logger.error(f"Log error: {e}")
-            
-            # 4. Live Chat Viewer Update
-            self.update_chat_view_live()
+
+                            self.chat_sync_done = True
+
+                        # --- LIVE RECORDING AND PROCESSING ---
+                        if len(all_lines) < self.last_line_count:
+                            self.last_line_count = 0
+                        
+                        new_lines = all_lines[self.last_line_count:]
+                        
+                        if new_lines:
+                            self.last_line_count = len(all_lines)
+                            try:
+                                with open(self.current_log_path, "a", encoding="utf-8") as f:
+                                    for line in new_lines:
+                                        # LIVE DETECTION (Before Timestamp)
+                                        self.detect_skill_gain(line)
+                                        
+                                        # Write to history log
+                                        ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+                                        f.write(f"{ts} {line}\n")
+                                    f.flush()
+                            except Exception as e:
+                                logger.error(f"Log error: {e}")
+                
+                # 4. Live Chat Viewer Update
+                self.update_chat_view_live()
+        else:
+            self.stats_label.config(text="HP: -- | MP: -- | VG: --")
+            if self.target_pid:
+                self.status_label.config(text="Target process lost", fg="red")
         
         self.root.after(1000, self.update_loop)
 
@@ -331,7 +340,12 @@ class CompanionApp:
         self.live_check = tk.Checkbutton(self.log_view_frame, text="Live Scroll", variable=self.live_view_var, bg="#C0C0C0")
         self.live_check.pack(side="right")
 
-        # 3. CONSOLE TAB
+        # 3. CONNECTIONS TAB
+        self.conn_tab = tk.Frame(self.notebook, bg="#C0C0C0")
+        self.notebook.add(self.conn_tab, text=" Connections ")
+        self.setup_ui_connections()
+
+        # 4. CONSOLE TAB
         self.console_tab = tk.Frame(self.notebook, bg="#F0F0F0")
         self.notebook.add(self.console_tab, text=" Console ")
         
@@ -349,6 +363,68 @@ class CompanionApp:
             if self.log_list.exists(filename):
                 self.log_list.selection_set(filename)
                 self.on_log_select(None)
+
+    def setup_ui_connections(self):
+        """Creates the connections management UI."""
+        tk.Label(self.conn_tab, text="Active Game Instances", bg="#C0C0C0", font=("Arial", 10, "bold")).pack(pady=5)
+        
+        columns = ("PID", "Status")
+        self.conn_tree = ttk.Treeview(self.conn_tab, columns=columns, height=10)
+        self.conn_tree.heading("#0", text="Window Title")
+        self.conn_tree.heading("PID", text="PID")
+        self.conn_tree.heading("Status", text="Status")
+        self.conn_tree.column("#0", width=250)
+        self.conn_tree.column("PID", width=80, anchor="center")
+        self.conn_tree.column("Status", width=100, anchor="center")
+        self.conn_tree.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        btn_frame = tk.Frame(self.conn_tab, bg="#C0C0C0")
+        btn_frame.pack(fill="x", padx=10, pady=5)
+        
+        tk.Button(btn_frame, text="Refresh Instances", command=self.refresh_connections).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Connect to Selected", command=self.connect_to_selected, bg="#4CAF50", fg="white").pack(side="right", padx=5)
+
+        self.refresh_connections()
+
+    def refresh_connections(self):
+        """Scans for all running game windows."""
+        for item in self.conn_tree.get_children():
+            self.conn_tree.delete(item)
+            
+        instances = get_all_game_instances()
+        for inst in instances:
+            status = "Connected" if inst["pid"] == self.target_pid else "Available"
+            self.conn_tree.insert("", "end", iid=inst["pid"], text=inst["title"], values=(inst["pid"], status))
+
+    def connect_to_selected(self):
+        """Sets the target PID and HWND based on selection."""
+        selection = self.conn_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a game instance from the list.")
+            return
+            
+        pid = int(selection[0])
+        inst = next((i for i in get_all_game_instances() if i["pid"] == pid), None)
+        
+        if inst:
+            self.target_pid = pid
+            self.target_hwnd = inst["hwnd"]
+            self.char_name = None # Reset name so it captures from the new session
+            self.knowledge_cache = {} # Clear cache
+            self.refresh_ui_display()
+            
+            # Force memory re-attach
+            mem.attach(pid)
+            
+            logger.info(f"Connected to instance: {inst['title']} (PID: {pid})")
+            self.status_label.config(text=f"Connected to PID {pid}", fg="green")
+            self.refresh_connections()
+            
+            # Switch back to Dashboard automatically
+            self.notebook.select(self.dash_tab)
+        else:
+            messagebox.showerror("Error", "Selected instance is no longer running.")
+            self.refresh_connections()
 
     def on_tab_changed(self, event):
         """Refreshes the log list whenever the user switches to the Chat Logs tab."""
@@ -551,11 +627,11 @@ class CompanionApp:
         logger.info("Manual Sync Started: Tab Cycling Sequence.")
         
         try:
-            if not mem.attach(): 
+            if not mem.attach(self.target_pid): 
                 self.is_syncing = False
                 return
             
-            hwnd = find_game_window()
+            hwnd = find_game_window(self.target_pid)
             if not hwnd: 
                 self.is_syncing = False
                 return

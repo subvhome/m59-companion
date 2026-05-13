@@ -5,33 +5,44 @@ logger = logging.getLogger("m59.memory")
 class MemoryReader:
     def __init__(self, process_name="Meridian.exe"):
         self.process_name = process_name
+        self.target_pid = None
         self.pm = None
         self.process_handle = None
         logger.info(f"MemoryReader initialized for {self.process_name}")
         self.attach()
         
-    def attach(self):
-        """Attempts to find the process and update the handle."""
-        # 1. Check if we have a healthy handle already
+    def attach(self, pid=None):
+        """Attempts to find the process and update the handle. If pid is provided, attaches to that specific PID."""
+        # 1. Check if we have a healthy handle already and it matches the target PID
         if self.pm and self.process_handle:
-            try:
-                # Test the handle; if it fails, the process likely restarted
-                self.pm.read_int(self.pm.base_address)
-                return True
-            except Exception:
-                logger.warning("Existing handle is stale. Clearing for re-attachment.")
-                self.pm = None
-                self.process_handle = None
+            if pid is None or pid == self.target_pid:
+                try:
+                    # Test the handle; if it fails, the process likely restarted
+                    self.pm.read_int(self.pm.base_address)
+                    return True
+                except Exception:
+                    logger.warning("Existing handle is stale. Clearing for re-attachment.")
+                    self.pm = None
+                    self.process_handle = None
+
         # 2. Attempt a fresh attachment
         try:
-            self.pm = pymem.Pymem(self.process_name)
+            if pid:
+                self.pm = pymem.Pymem(pid)
+                self.target_pid = pid
+            else:
+                self.pm = pymem.Pymem(self.process_name)
+                self.target_pid = self.pm.process_id
+            
             self.process_handle = self.pm.process_handle
-            logger.info(f"Successfully attached to {self.process_name} (Handle: {self.process_handle})")
+            logger.info(f"Successfully attached to PID {self.target_pid} (Handle: {self.process_handle})")
             return True
-        except Exception:
+        except Exception as e:
             # Silently fail here; the update_loop will try again in 1 second
+            logger.debug(f"Attachment failed: {e}")
             self.pm = None
             self.process_handle = None
+            self.target_pid = None
             return False
             
     def read_skill_percent(self, base_address):

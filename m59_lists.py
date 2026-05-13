@@ -3,12 +3,11 @@ import win32con
 import array
 import time
 import logging
-from m59_memory import MemoryReader
+# We import the shared memory object from bridge to ensure we always target the correct PID
+from m59_bridge import mem
+
 # Setup module-level logger
 logger = logging.getLogger("m59.lists")
-# We reference the global mem object from bridge usually, 
-# but keeping this local instance logic for standalone module integrity.
-mem = MemoryReader()
 def get_raw_skill_dict(hwnd, min_items=1):
     """
     Scrapes the game ListBox and correlates it with memory addresses.

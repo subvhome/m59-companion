@@ -1,6 +1,7 @@
 import win32gui
 import win32con
 import win32api
+import win32process
 import array
 import logging
 import os
@@ -9,19 +10,43 @@ from m59_memory import MemoryReader
 logger = logging.getLogger("m59.bridge")
 WM_USER = 0x0400
 GRPH_POSGET = WM_USER + 1005 
-def find_game_window():
+
+def get_all_game_instances():
+    """Returns a list of all Meridian 59 windows with their PIDs."""
+    instances = []
+    def callback(hwnd, extra):
+        if win32gui.IsWindowVisible(hwnd):
+            text = win32gui.GetWindowText(hwnd)
+            if text.startswith("Meridian 59"):
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                instances.append({
+                    "hwnd": hwnd,
+                    "pid": pid,
+                    "title": text
+                })
+    win32gui.EnumWindows(callback, None)
+    return instances
+
+def find_game_window(target_pid=None):
     """Locates the Meridian 59 window and logs the process."""
     #logger.debug("Searching for Meridian 59 game window...")
     hwnds = []
-    win32gui.EnumWindows(lambda hwnd, l: hwnds.append(hwnd) 
-        if win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd).startswith("Meridian 59") 
-        else None, None)
+    def callback(hwnd, extra):
+        if win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd).startswith("Meridian 59"):
+            if target_pid:
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                if pid == target_pid:
+                    hwnds.append(hwnd)
+            else:
+                hwnds.append(hwnd)
+    
+    win32gui.EnumWindows(callback, None)
     
     if hwnds:
         #logger.debug(f"Found game window: {win32gui.GetWindowText(hwnds[0])} (HWND: {hwnds[0]})")
         return hwnds[0]
     
-    logger.warning("Game window 'Meridian 59' not found.")
+    # logger.warning("Game window 'Meridian 59' not found.")
     return None
 def get_text_from_hwnd(hwnd):
     """Dynamically allocated extraction for large chat buffers."""
@@ -114,4 +139,4 @@ def get_log_fingerprint(file_path, window_size=20):
 # Initialize the global memory object
 # Note: The MemoryReader handles its own internal attachment logging
 logger.info("Initializing global MemoryReader instance 'mem' in bridge.")
-mem = MemoryReader()
+mem = MemoryReader() # This is the single source of truth for memory access

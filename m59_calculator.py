@@ -79,44 +79,49 @@ class SchoolCalculator:
         logger.debug(f"Total global base points calculated: {total_base_points}")
         # --- 3. PREDICT NEXT LEVEL REQUIREMENTS ---
         for name in known_schools:
-            curr_lvl = school_lvls[name]
-            if curr_lvl >= 6: 
-                logger.debug(f"{name} is already max level (6). Skipping.")
-                continue
+            school_data = schools[name]
+            # Find the lowest level that doesn't meet its target sum yet
+            # This handles characters who skip levels during creation
+            target_lvl = None
+            target_lvl_data = None
             
-            next_lvl = curr_lvl + 1
-            point_values = {1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2}
-            next_lvl_points = point_values.get(next_lvl, 2)
+            for i in range(1, 6):
+                # Calculate target sum for level i -> i+1
+                point_values = {1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2}
+                next_lvl_points = point_values.get(i + 1, 2)
+                pts_in_formula = total_base_points + next_lvl_points
+                
+                # Check how much iPoints we currently have for THIS specific school detection
+                # We use the current level for total_base_points, but if we haven't reached i,
+                # we adjust the calculation to be based on the jump TO i+1.
+                
+                t_sum = (pts_in_formula * points_slope) + \
+                        (297 - (max_points * points_slope)) - \
+                        ((intellect * 2 * points_slope) // 5)
+                
+                # Check current sum of top 3 for level i
+                lvl_skills = [s.lower() for s in school_data.get(f"Level_{i}", [])]
+                percents = sorted([live_data.get(s, 0) for s in lvl_skills], reverse=True)
+                c_sum = sum(percents[:3])
+                
+                if c_sum < t_sum:
+                    target_lvl = i
+                    target_lvl_data = (c_sum, t_sum)
+                    break
             
-            # Predict the iPoint total if the player gained the next level
-            pts_in_formula = total_base_points + next_lvl_points
-            
-            # CORE FORMULA: Calculates the required sum of the top 3 skills
-            target_sum = (pts_in_formula * points_slope) + \
-                         (297 - (max_points * points_slope)) - \
-                         ((intellect * 2 * points_slope) // 5)
-            
-            logger.debug(f"{name} L{next_lvl} calculation: TargetSum={target_sum} based on {pts_in_formula} projected iPoints")
-            
-            if target_sum > 297:
-                logger.warning(f"{name} L{next_lvl} is unreachable: TargetSum {target_sum} > 297")
-                results.append(f"{name} L{next_lvl}: [Locked - Cap Exceeded]")
-                continue
-            # Check current percentages of skills in the current level
-            current_lvl_skills = [s.lower() for s in schools[name].get(f"Level_{curr_lvl}", [])]
-            percents = sorted([live_data.get(s, 0) for s in current_lvl_skills], reverse=True)
-            
-            # Sum the top 3 highest skills in that level
-            current_sum = sum(percents[:3])
-            needed = max(0, target_sum - current_sum)
-            
-            logger.debug(f"{name} Progress: Top3 Sum={current_sum}, Goal={target_sum}, Remaining={needed}")
-            results.append({
-                'name': name,
-                'current_lvl': curr_lvl,
-                'current_sum': current_sum,
-                'target_sum': target_sum,
-                'needed': needed
-            })
+            if target_lvl:
+                c_sum, t_sum = target_lvl_data
+                needed = max(0, t_sum - c_sum)
+                
+                logger.debug(f"{name} L{target_lvl}->L{target_lvl+1} Progress: Top3 Sum={c_sum}, Goal={t_sum}, Remaining={needed}")
+                results.append({
+                    'name': name,
+                    'current_lvl': target_lvl,
+                    'current_sum': c_sum,
+                    'target_sum': t_sum,
+                    'needed': needed
+                })
+            else:
+                logger.debug(f"{name} is fully trained or at max level. Skipping.")
             
         return results
