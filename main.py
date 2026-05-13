@@ -30,7 +30,17 @@ import sys
 from utils import resource_path
 
 # Application Version
-VERSION = "CompanionApp(root).01"
+def load_version():
+    try:
+        v_path = resource_path("VERSION")
+        if os.path.exists(v_path):
+            with open(v_path, "r") as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    return "v0.58" # Fallback
+
+VERSION = load_version()
 
 class CompanionApp:
     def __init__(self, root):
