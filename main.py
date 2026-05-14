@@ -591,7 +591,7 @@ class CompanionApp:
         def check():
             try:
                 # Direct URL to the VERSION file on your main branch
-                url = "https://raw.githubusercontent.com/subzerofusion/m59-companion/main/VERSION"
+                url = "https://raw.githubusercontent.com/subvhome/m59-companion/main/VERSION"
                 with urllib.request.urlopen(url, timeout=5) as response:
                     remote_version = response.read().decode('utf-8').strip()
                     if remote_version != VERSION:
@@ -602,7 +602,8 @@ class CompanionApp:
                             f"Latest: {remote_version}\n\n"
                             "Please check the GitHub repository for the latest release."))
             except Exception as e:
-                logger.debug(f"Update check failed: {e}")
+                pass # Suppress logging of update check failures
+
 
         threading.Thread(target=check, daemon=True).start()
 
