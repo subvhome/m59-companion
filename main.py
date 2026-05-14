@@ -611,12 +611,24 @@ class CompanionApp:
         def check():
             try:
                 logger.info("Update check thread started.")
-                url = "https://raw.githubusercontent.com/subvhome/m59-companion/main/VERSION"
+                # Add a timestamp to bypass GitHub's raw content cache
+                cache_buster = int(time.time())
+                url = f"https://raw.githubusercontent.com/subvhome/m59-companion/main/VERSION?t={cache_buster}"
                 logger.info(f"Fetching remote version from: {url}")
                 with urllib.request.urlopen(url, timeout=5) as response:
                     remote_version = response.read().decode('utf-8').strip()
                     logger.info(f"Remote version: {remote_version} | Local version: {VERSION}")
-                    if remote_version != VERSION:
+                    
+                    # Robust version comparison (assuming simple decimal versioning like 0.81)
+                    try:
+                        remote_val = float(remote_version)
+                        local_val = float(VERSION)
+                        is_newer = remote_val > local_val
+                    except ValueError:
+                        # Fallback to string comparison if not simple floats
+                        is_newer = remote_version != VERSION
+
+                    if is_newer:
                         logger.info("Update Available! Triggering popup.")
                         self.root.after(0, lambda: messagebox.showinfo("Update Available", 
                             f"A new version of M59 Companion is available!\n\n"
@@ -624,7 +636,7 @@ class CompanionApp:
                             f"Latest: {remote_version}\n\n"
                             "Please check the GitHub repository for the latest release."))
                     else:
-                        logger.info("Local version is up to date.")
+                        logger.info("Local version is up to date (or newer than remote).")
             except Exception as e:
                 logger.error(f"Update check failed with error: {e}")
 
