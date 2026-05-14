@@ -619,28 +619,105 @@ class CompanionApp:
                     remote_version = response.read().decode('utf-8').strip()
                     logger.info(f"Remote version: {remote_version} | Local version: {VERSION}")
                     
-                    # Robust version comparison (assuming simple decimal versioning like 0.81)
                     try:
                         remote_val = float(remote_version)
                         local_val = float(VERSION)
                         is_newer = remote_val > local_val
                     except ValueError:
-                        # Fallback to string comparison if not simple floats
                         is_newer = remote_version != VERSION
 
                     if is_newer:
-                        logger.info("Update Available! Triggering popup.")
-                        self.root.after(0, lambda: messagebox.showinfo("Update Available", 
-                            f"A new version of M59 Companion is available!\n\n"
-                            f"Current: {VERSION}\n"
-                            f"Latest: {remote_version}\n\n"
-                            "Please check the GitHub repository for the latest release."))
+                        logger.info("Update Available! Asking user.")
+                        self.root.after(0, lambda: self.prompt_update(remote_version))
                     else:
                         logger.info("Local version is up to date (or newer than remote).")
             except Exception as e:
                 logger.error(f"Update check failed with error: {e}")
 
         threading.Thread(target=check, daemon=True).start()
+
+    def prompt_update(self, new_version):
+        if messagebox.askyesno("Update Available", 
+            f"A new version of M59 Companion is available (v{new_version})!\n\n"
+            f"Current: {VERSION}\n"
+            f"Latest: {new_version}\n\n"
+            "Would you like to download and install it now?"):
+            self.start_update(new_version)
+
+    def start_update(self, new_version):
+        """Initializes the download window and starts the update thread."""
+        dl_win = DownloadWindow(self.root, new_version)
+        
+        def run_update():
+            success = self.download_and_install(dl_win)
+            if not success:
+                self.root.after(0, lambda: messagebox.showerror("Update Error", "The download or installation failed."))
+                dl_win.destroy()
+
+        threading.Thread(target=run_update, daemon=True).start()
+
+    def download_and_install(self, dl_win):
+        """Handles the binary download and the batch swap sequence."""
+        try:
+            exe_url = "https://github.com/subvhome/m59-companion/raw/main/dist/M59Companion.exe"
+            temp_exe = "M59Companion.exe.new"
+            
+            def reporthook(blocknum, blocksize, totalsize):
+                readsofar = blocknum * blocksize
+                if totalsize > 0:
+                    percent = min(100, int(readsofar * 100 / totalsize))
+                    dl_win.update_progress(percent)
+                else: # Unknown size
+                    dl_win.update_progress(0)
+
+            # 1. Download the new version
+            urllib.request.urlretrieve(exe_url, temp_exe, reporthook)
+            
+            # 2. Prepare the batch script swap
+            # We use a batch script because we cannot overwrite a running EXE on Windows.
+            current_exe = sys.executable if getattr(sys, 'frozen', False) else "M59Companion.exe"
+            current_exe_name = os.path.basename(current_exe)
+            
+            bat_content = f"""@echo off
+timeout /t 2 /nobreak > nul
+del /f "{current_exe_name}"
+rename "{temp_exe}" "{current_exe_name}"
+start "" "{current_exe_name}"
+del "%~f0"
+"""
+            with open("update_m59.bat", "w") as f:
+                f.write(bat_content)
+
+            # 3. Trigger the hand-off and exit
+            logger.info("Download complete. Handing off to batch script for replacement...")
+            os.startfile("update_m59.bat")
+            self.root.after(0, self.root.quit)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Download/Install Error: {e}")
+            return False
+
+class DownloadWindow(tk.Toplevel):
+    def __init__(self, parent, version):
+        super().__init__(parent)
+        self.title(f"Updating to v{version}")
+        self.geometry("300x120")
+        self.attributes("-topmost", True)
+        self.protocol("WM_DELETE_WINDOW", lambda: None) # Disable close
+        
+        tk.Label(self, text=f"Downloading M59 Companion v{version}...", pady=10).pack()
+        
+        self.progress = ttk.Progressbar(self, orient="horizontal", length=250, mode="determinate")
+        self.progress.pack(pady=10)
+        
+        self.status = tk.Label(self, text="0%")
+        self.status.pack()
+
+    def update_progress(self, val):
+        self.progress['value'] = val
+        self.status.config(text=f"{val}%")
+        self.update_idletasks()
 
     def toggle_debug(self):
         logger.setLevel(logging.DEBUG if self.debug_var.get() else logging.INFO)
