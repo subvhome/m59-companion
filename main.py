@@ -84,9 +84,19 @@ class CompanionApp:
     def setup_logging_infrastructure(self):
         logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', '%H:%M:%S')
-        handler = QueueHandler(self.log_queue)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+
+        # Handler for the GUI console
+        handler_queue = QueueHandler(self.log_queue)
+        handler_queue.setFormatter(formatter)
+        logger.addHandler(handler_queue)
+
+        # Handler for file logging (crucial for --noconsole debugging)
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        file_handler = logging.FileHandler(os.path.join(log_dir, "app_debug.log"))
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     def update_loop(self):
         # 1. Internal System Log UI Update
@@ -110,8 +120,17 @@ class CompanionApp:
                     if s: self.stats_label.config(text=f"HP: {s[0]} | MP: {s[1]} | VG: {s[2]}")
                 
                 # 3. Enhanced Chat Logger Logic
-                chat_hwnd = win32gui.GetDlgItem(hwnd, 1005)
+                try:
+                    chat_hwnd = win32gui.GetDlgItem(hwnd, 1005)
+                except Exception:
+                    chat_hwnd = None
+                    if not getattr(self, '_waiting_for_login_msg_shown', False):
+                        logger.info("Game window detected. Please log in to a character to start tracking.")
+                        self._waiting_for_login_msg_shown = True
+
                 if chat_hwnd:
+                    # Reset the message flag when chat is found
+                    self._waiting_for_login_msg_shown = False
                     current_text = get_text_from_hwnd(chat_hwnd)
                     if current_text:
                         all_lines = [l.strip() for l in current_text.splitlines() if l.strip()]
@@ -588,22 +607,26 @@ class CompanionApp:
 
     def check_for_updates(self):
         """Checks GitHub for a new version in a separate thread."""
+        logger.info("Starting update check thread.")
         def check():
             try:
-                # Direct URL to the VERSION file on your main branch
+                logger.info("Update check thread started.")
                 url = "https://raw.githubusercontent.com/subvhome/m59-companion/main/VERSION"
+                logger.info(f"Fetching remote version from: {url}")
                 with urllib.request.urlopen(url, timeout=5) as response:
                     remote_version = response.read().decode('utf-8').strip()
+                    logger.info(f"Remote version: {remote_version} | Local version: {VERSION}")
                     if remote_version != VERSION:
-                        logger.info(f"Update Available! Remote: {remote_version} | Local: {VERSION}")
+                        logger.info("Update Available! Triggering popup.")
                         self.root.after(0, lambda: messagebox.showinfo("Update Available", 
                             f"A new version of M59 Companion is available!\n\n"
                             f"Current: {VERSION}\n"
                             f"Latest: {remote_version}\n\n"
                             "Please check the GitHub repository for the latest release."))
+                    else:
+                        logger.info("Local version is up to date.")
             except Exception as e:
-                pass # Suppress logging of update check failures
-
+                logger.error(f"Update check failed with error: {e}")
 
         threading.Thread(target=check, daemon=True).start()
 

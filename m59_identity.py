@@ -13,7 +13,11 @@ def capture_character_name(game_hwnd):
     logger.info("Attempting to capture character identity...")
     
     # ID 5001 is the standard 'Face' button in the Meridian 59 client
-    face_btn = win32gui.GetDlgItem(game_hwnd, 5001)
+    try:
+        face_btn = win32gui.GetDlgItem(game_hwnd, 5001)
+    except Exception:
+        face_btn = None
+
     if not face_btn: 
         logger.error("Could not find Face Button (ID 5001). Is the game in a logged-in state?")
         return None
@@ -33,8 +37,13 @@ def capture_character_name(game_hwnd):
         
         if bio_hwnd:
             logger.debug(f"Bio window found (HWND: {bio_hwnd}). Checking name field...")
-            name_hwnd = win32gui.GetDlgItem(bio_hwnd, 1011)
-            name = get_text_from_hwnd(name_hwnd)
+            try:
+                name_hwnd = win32gui.GetDlgItem(bio_hwnd, 1011)
+            except Exception:
+                name_hwnd = None
+                
+            if name_hwnd:
+                name = get_text_from_hwnd(name_hwnd)
             
             # Ensure we didn't just grab the "..." placeholder
             if name and name != "...":
