@@ -26,11 +26,11 @@
     },
     "Qor": {
       "Level_1": ["Cloak", "Darkness", "Detect Good", "Unholy Resolve"],
-      "Level_2": ["Acid Touch", "Fade", "Kara'hol's Curse", "Unholy Weapon"],
+      "Level_2": ["Acid Touch", "Fade", "Kara'Hol'S Curse", "Unholy Weapon"],
       "Level_3": ["Defile", "Enfeeble", "Poison Fog", "Silence", "Vampiric Drain"],
-      "Level_4": ["Animate", "Curse Weapon", "Hold", "Shadow Rift", "Shal'ille Bane", "Splash of Acid"],
-      "Level_5": ["Blind", "Blood Inheritance", "Death Link", "Invisibility", "Node Burst", "Swap"],
-      "Level_6": ["Gaze of the Basilisk"]
+      "Level_4": ["Animate", "Curse Weapon", "Hold", "Shadow Rift", "Shal'illebane", "Splash of Acid"],
+      "Level_5": ["Blind", "Blood Inheritance", "Death Link", "Invisibility", "Nodeburst", "Swap"],
+      "Level_6": ["Gaze Of The Basilisk"]
     },
     "Kraanan": {
       "Level_1": ["Create Food", "Create Weapon", "Glow", "Relay"],
@@ -42,7 +42,7 @@
     },
     "Jala": {
       "Level_1": ["Invigorate", "Melancholy", "Mirth", "Truth"],
-      "Level_2": ["Civility", "Concilation", "Warp Time"],
+      "Level_2": ["Civility", "Conciliation", "Warp Time"],
       "Level_3": ["Distill", "Profane Resonance", "Restorate", "Sacred Resonance", "Spellbane"],
       "Level_4": ["Disharmony", "Jig"],
       "Level_5": ["Mana Convergence", "Rejuvenate"],
