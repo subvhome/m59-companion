@@ -18,7 +18,7 @@ A lightweight, multi-instance companion tool for Meridian 59 designed to automat
 
 ### PK Alert System
 ![PK Alert](demo/PVP%20alert.gif)
-*Configurable alerts that trigger when non-mob entities attack you. Works even when the app is in the background.*
+*I USED THE RAT IN THIS DEMO -- Configurable alerts that trigger when non-mob entities attack you. Works even when the app is in the background.*
 
 ### Vault Manager
 ![Vault Manager](demo/Vault%20Management.gif)
