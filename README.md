@@ -2,7 +2,7 @@
 
 A lightweight, multi-instance companion tool for Meridian 59 designed to automate character tracking, progression math, and tactical awareness.
 
-[**Download Latest Release (EXE)**](https://github.com/subvhome/m59-companion/raw/main/M59Companion.exe)
+[**Download Latest Release (EXE)**](https://github.com/subvhome/m59-companion/raw/main/dist/M59Companion.exe)
 
 ---
 
