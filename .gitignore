@@ -1,6 +1,13 @@
-__pycache__/
 logs/
-*.txt
-# If you want to keep config.json but ignore session files:
-.active_sessions.json
-knowledge
+__pycache__/
+*.spec
+build/
+dist/
+dev_pipeline.py
+m59_companion_locks/
+.lock
+config.json
+MISSION.md
+python
+VERSION
+sync.ffs_db

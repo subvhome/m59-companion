@@ -1,117 +1,169 @@
-import win32gui
-import win32con
-import win32api
-import win32process
-import array
-import logging
 import os
-from m59_memory import MemoryReader
-# Setup module-level logger
-logger = logging.getLogger("m59.bridge")
-WM_USER = 0x0400
-GRPH_POSGET = WM_USER + 1005 
+import time
+import json
+import pymem
+import win32gui
+import win32process
+import tempfile
 
-def get_all_game_instances():
-    """Returns a list of all Meridian 59 windows with their PIDs (unique PIDs only)."""
-    instances = []
-    seen_pids = set()
+# Configuration Path
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            return json.load(f)
+    except:
+        return {"process": {"target_name": "Meridian.exe"}}
+
+def get_lock_dir():
+    """Returns the directory used for PID locks to support multi-instance isolation."""
+    lock_dir = os.path.join(tempfile.gettempdir(), "m59_companion_locks")
+    if not os.path.exists(lock_dir):
+        os.makedirs(lock_dir)
+    return lock_dir
+
+def cleanup_stale_locks():
+    """Removes lock files ONLY if we are 100% sure the companion or game is dead."""
+    lock_dir = get_lock_dir()
+    for filename in os.listdir(lock_dir):
+        if filename.endswith(".lock"):
+            lock_path = os.path.join(lock_dir, filename)
+            try:
+                game_pid = int(filename.replace(".lock", ""))
+                
+                # Try to read the companion PID. If we can't (busy file), SKIP it.
+                try:
+                    with open(lock_path, "r") as f:
+                        content = f.read().strip()
+                        if not content:
+                            continue 
+                        companion_pid = int(content)
+                except (IOError, ValueError):
+                    # File might be locked by another process or being written.
+                    # Do NOT delete it.
+                    continue
+                
+                # Check if Game is still running
+                import psutil
+                game_alive = psutil.pid_exists(game_pid)
+                companion_alive = psutil.pid_exists(companion_pid)
+                
+                # Only remove if one of them is definitively gone
+                if not game_alive:
+                    print(f"DEBUG: Removing lock for Game PID {game_pid} (Game closed)")
+                    os.remove(lock_path)
+                elif not companion_alive:
+                    print(f"DEBUG: Removing lock for Game PID {game_pid} (Companion closed)")
+                    os.remove(lock_path)
+                    
+            except Exception as e:
+                # General error, skip this file to be safe
+                pass
+
+def release_pid(game_pid):
+    """Manually removes a lock file, but only if it belongs to us."""
+    lock_file = os.path.join(get_lock_dir(), f"{game_pid}.lock")
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "r") as f:
+                owner_pid = int(f.read().strip())
+            if owner_pid == os.getpid():
+                os.remove(lock_file)
+        except:
+            pass
+
+def is_pid_locked(pid):
+    """Checks if a PID is already claimed by another companion instance."""
+    lock_file = os.path.join(get_lock_dir(), f"{pid}.lock")
+    return os.path.exists(lock_file)
+
+def claim_pid(pid):
+    """Atomic exclusive creation of a lock file."""
+    lock_file = os.path.join(get_lock_dir(), f"{pid}.lock")
+    try:
+        # 'x' mode = Create only if not exists (Atomic on most OS)
+        with open(lock_file, "x") as f:
+            f.write(str(os.getpid()))
+        return True
+    except FileExistsError:
+        return False
+    except Exception as e:
+        print(f"DEBUG: Lock error for {pid}: {e}")
+        return False
+
+def find_available_instance(target_name):
+    """Finds all instances of target_name and returns the first one not already locked."""
+    cleanup_stale_locks()
+    
+    available_pids = []
+    
     def callback(hwnd, extra):
         if win32gui.IsWindowVisible(hwnd):
             text = win32gui.GetWindowText(hwnd)
-            if text.startswith("Meridian 59"):
+            # Use 'Meridian 59' for window title check, but also allow checking by process name
+            if "Meridian 59" in text:
                 _, pid = win32process.GetWindowThreadProcessId(hwnd)
-                if pid not in seen_pids:
-                    instances.append({
-                        "hwnd": hwnd,
-                        "pid": pid,
-                        "title": text
-                    })
-                    seen_pids.add(pid)
+                if pid not in available_pids:
+                    available_pids.append(pid)
+    
     win32gui.EnumWindows(callback, None)
-    return instances
+    
+    if not available_pids:
+        print("DEBUG: No visible 'Meridian 59' windows found via EnumWindows.")
+        # Fallback: check all processes for the target executable name
+        try:
+            import psutil
+            for proc in psutil.process_iter(['pid', 'name']):
+                if proc.info['name'].lower() == target_name.lower():
+                    available_pids.append(proc.info['pid'])
+        except ImportError:
+            pass
 
-def find_game_window(target_pid=None):
-    """Locates the Meridian 59 window and logs the process."""
-    #logger.debug("Searching for Meridian 59 game window...")
-    hwnds = []
-    def callback(hwnd, extra):
-        if win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd).startswith("Meridian 59"):
-            if target_pid:
-                _, pid = win32process.GetWindowThreadProcessId(hwnd)
-                if pid == target_pid:
-                    hwnds.append(hwnd)
-            else:
-                hwnds.append(hwnd)
+    print(f"DEBUG: Found PIDs: {available_pids}")
     
-    win32gui.EnumWindows(callback, None)
-    
-    if hwnds:
-        #logger.debug(f"Found game window: {win32gui.GetWindowText(hwnds[0])} (HWND: {hwnds[0]})")
-        return hwnds[0]
-    
-    # logger.warning("Game window 'Meridian 59' not found.")
+    for pid in available_pids:
+        locked = is_pid_locked(pid)
+        print(f"DEBUG: Checking PID {pid} - Locked: {locked}")
+        if not locked:
+            if claim_pid(pid):
+                return pid
     return None
-def get_text_from_hwnd(hwnd):
-    """Dynamically allocated extraction for large chat buffers."""
+
+def establish_bridge():
+    config = load_config()
+    target = config["process"]["target_name"]
+    
+    print(f"--- M59 Bridge: Searching for {target} ---")
+    
+    while True:
+        pid = find_available_instance(target)
+        if pid:
+            try:
+                pm = pymem.Pymem(pid)
+                print(f"SUCCESS: Attached to {target} (PID: {pid})")
+                return pm, pid
+            except Exception as e:
+                print(f"ERROR: Could not attach to PID {pid}: {e}")
+        
+        time.sleep(2) # Wait and retry
+
+if __name__ == "__main__":
+    pm = None
+    pid = None
     try:
-        # Ask the window how many characters it currently holds
-        text_length = win32gui.SendMessage(hwnd, win32con.WM_GETTEXTLENGTH, 0, 0)
-        
-        if text_length <= 0:
-            return ""
-
-        # Create a buffer large enough to hold everything + a safety margin
-        buffer_size = text_length + 1
-        buffer = array.array('u', '\x00' * buffer_size)
-        
-        # Pull the full content
-        win32gui.SendMessage(hwnd, win32con.WM_GETTEXT, buffer_size, buffer)
-        
-        # Clean up the text and return it
-        return buffer.tounicode().rstrip('\x00')
+        pm, pid = establish_bridge()
+        print("Bridge established. Holding connection...")
+        while True:
+            # Test connection
+            pm.read_int(pm.base_address)
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print("\nUser requested exit.")
     except Exception as e:
-        logger.error(f"Failed to get text from HWND: {e}")
-        return ""
-def get_stats(game_hwnd):
-    """Retrieves HP, Mana, and Vigor stats from BlakGraph components."""
-    #logger.debug(f"Enumerating stat graphs for HWND {game_hwnd}...")
-    graphs = []
-    win32gui.EnumChildWindows(game_hwnd, lambda h, l: graphs.append((h, win32gui.GetWindowRect(h)[1])) 
-                              if win32gui.GetClassName(h) == "BlakGraph" else None, None)
-    
-    # Sort by vertical position to identify HP vs MP vs VG
-    graphs.sort(key=lambda x: x[1]) 
-    
-    if len(graphs) >= 3:
-        h = win32gui.SendMessage(graphs[0][0], GRPH_POSGET, 0, 0)
-        m = win32gui.SendMessage(graphs[1][0], GRPH_POSGET, 0, 0)
-        v = win32gui.SendMessage(graphs[2][0], GRPH_POSGET, 0, 0)
-        #logger.debug(f"Stats retrieved - HP: {h}, MP: {m}, VG: {v}")
-        return h, m, v
-    
-    logger.error(f"Failed to find all 3 stat graphs. Found: {len(graphs)}")
-    return None
-def find_skill_listbox(game_hwnd):
-    """Searches the game for the active ListBox ID automatically."""
-    logger.debug(f"Scanning for active skill ListBox in HWND {game_hwnd}...")
-    found_id = [None]
-    
-    def callback(hwnd, extra):
-        if win32gui.GetClassName(hwnd) == "ListBox" and win32gui.IsWindowVisible(hwnd):
-            found_id[0] = hwnd
-            
-    win32gui.EnumChildWindows(game_hwnd, callback, None)
-    
-    if found_id[0]:
-        logger.info(f"Active ListBox identified: HWND {found_id[0]}")
-    else:
-        logger.debug("No visible ListBox found in current window state.")
-        
-    return found_id[0]
-    
-import os
-
-# Initialize the global memory object
-# Note: The MemoryReader handles its own internal attachment logging
-logger.info("Initializing global MemoryReader instance 'mem' in bridge.")
-mem = MemoryReader() # This is the single source of truth for memory access
+        print(f"\nConnection lost or error: {e}")
+    finally:
+        if pid:
+            print(f"Releasing lock for PID {pid}...")
+            release_pid(pid)
+        print("Cleanup complete.")

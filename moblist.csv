@@ -36,9 +36,6 @@ DragonFlyPet is Monster,dead pet dragonfly
 Centipede is Monster,puuckinich
 Centipede is Monster,centipede
 Centipede is Monster,dead centipede
-Zombie is Monster,ixleoc
-Zombie is Monster,zombie
-Zombie is Monster,dead zombie
 CaveOrc is Monster,utom
 CaveOrc is Monster,cave orc
 CaveOrc is Monster,dead cave orc
@@ -164,3 +161,8 @@ DarkAngel is Monster,dead dark angel
 EvilEnt is Monster,teotezmecya
 EvilEnt is Monster,diseased tree
 EvilEnt is Monster,dead remains of diseased tree
+DukeTroop is FactionTroop,soldier of the Duke's army
+NecromancerTroop is FactionTroop,necromancer
+PrincessTroop is FactionTroop,soldier of the Princess' army
+RebelTroop is FactionTroop,rebel soldier
+Zombie is Monster,zombie

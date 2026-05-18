@@ -1,4 +1,7 @@
 {
+    "process": {
+        "target_name": "Meridian.exe"
+    },
     "server": {
         "points_slope": 7.0,
         "max_points": 16.0,
@@ -10,6 +13,6 @@
         "testing_mode": false
     },
     "app": {
-        "always_on_top": false
+        "always_on_top": true
     }
 }
