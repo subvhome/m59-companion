@@ -497,6 +497,15 @@ class M59Dashboard(tk.Tk):
                     self.pm_obj.read_int(self.pm_obj.base_address)
                     self.manage_rotation(log_path)
                     
+                    # Re-validate chat handle (ID 1005) to handle logout/login recreation
+                    ch_current = win32gui.GetDlgItem(self.main_hwnd, 1005)
+                    if ch_current and ch_current != ch:
+                        self.debug_log("CHAT", f"Chat handle changed from {ch} to {ch_current}. Re-binding...")
+                        ch = ch_current
+
+                    if not ch:
+                        time.sleep(1); continue
+
                     cur = get_text_from_hwnd(ch); lines = [l.strip() for l in cur.splitlines() if l.strip()]
                     new = []; found = -1; tail = list(self.last_tail)
                     while tail:
