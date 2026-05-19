@@ -34,93 +34,127 @@ class SchoolCalculator:
     def _load_config(self):
         try:
             with open(self.config_path, "r") as f:
-                return json.load(f)
+                config = json.load(f)
+                # Ensure we use the correct game defaults if not specified or incorrect
+                if config.get("server", {}).get("points_slope") != 7:
+                    config.setdefault("server", {})["points_slope"] = 7
+                if config.get("server", {}).get("max_points") != 16:
+                    config.setdefault("server", {})["max_points"] = 16
+                return config
         except:
-            # Default fallback if config is missing
+            # Default fallback matching Meridian 59 1.6.0 source
             return {
-                "server": {"max_points": 25, "points_slope": 6},
-                "character": {"intellect": 20}
+                "server": {"max_points": 16, "points_slope": 7},
+                "character": {"intellect": 25}
             }
 
-    def get_school_status(self, live_data, levels):
-        """Determines the player's current level and internal point weight (iPoints) for a school."""
-        current_lvl = 0
-        total_pts = 0
-        # Global iPoint System: L1,2 = 1pt, L3,4,5,6 = 2pts
-        point_values = {1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2}
-        
-        for i in range(1, 7):
+    def get_school_status(self, knowledge_cache, levels):
+        """Returns (max_level_reached, points_for_max_level)"""
+        # Based on system.kod vlLevelPoints = [1, 2, 4, 6, 8, 10]
+        point_values = {0: 0, 1: 1, 2: 2, 3: 4, 4: 6, 5: 8, 6: 10}
+        max_lvl = 0
+        for i in range(6, 0, -1):
             lvl_key = f"Level_{i}"
             if lvl_key not in levels: continue
             
             skills = [s.lower() for s in levels[lvl_key] if s.lower() != "blink"]
-            # If the player knows any skill in this level, they are considered that level
-            if skills and any(s in live_data for s in skills):
-                current_lvl = i
-                total_pts += point_values.get(i, 0)
+            if any(s in knowledge_cache for s in skills):
+                max_lvl = i
+                break
                 
-        return current_lvl, total_pts
+        return max_lvl, point_values.get(max_lvl, 0)
 
     def calculate_progression(self, knowledge_cache, intellect=None):
         """
-        The CORE ENGINE: Replicates the original calibrated progression formula.
+        The CORE ENGINE: Replicates the original Meridian 59 PlayerCanLearn logic.
         """
-        # Use provided intellect or fall back to config
         if intellect is None:
-            intellect = self.config.get("character", {}).get("intellect", 20)
+            intellect = self.config.get("character", {}).get("intellect", 25)
             
-        max_points = self.config.get("server", {}).get("max_points", 25)
-        points_slope = self.config.get("server", {}).get("points_slope", 6)
+        max_points = self.config.get("server", {}).get("max_points", 16)
+        points_slope = self.config.get("server", {}).get("points_slope", 7)
         
-        # --- 1. Identify Active Schools ---
-        known_schools = []
-        for name, levels in self.schools.items():
-            all_skills = [s.lower() for lvl in levels.values() for s in lvl]
-            known_count = sum(1 for s in all_skills if s in knowledge_cache)
-            
-            if name == "Riija" and known_count <= 1: continue
-            if known_count > 0: known_schools.append(name)
-        
-        # --- 2. Calculate Global Knowledge (Total iPoints) ---
+        # --- 1. Identify Active Schools and Calculate Base iPoints ---
+        school_stats = {}
         total_base_points = 0
-        for name in known_schools:
-            _, pts = self.get_school_status(knowledge_cache, self.schools[name])
-            total_base_points += pts
-            
-        # --- 3. Predict Next Level Requirements ---
-        results = []
-        point_values = {1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2}
+        for name, levels in self.schools.items():
+            max_lvl, pts = self.get_school_status(knowledge_cache, levels)
+            if max_lvl > 0:
+                school_stats[name] = max_lvl
+                total_base_points += pts
 
-        for name in known_schools:
-            school_data = self.schools[name]
-            target_lvl = None
-            target_lvl_data = None
+        # --- 2. Calculate Progression for Each School ---
+        results = []
+        point_values = {0: 0, 1: 1, 2: 2, 3: 4, 4: 6, 5: 8, 6: 10}
+
+        for name, school_data in self.schools.items():
+            # Check if player knows anything in this school
+            current_lvl = school_stats.get(name, 0)
             
-            for i in range(1, 6):
-                # Calculate required sum for level i -> i+1
-                next_lvl_points = point_values.get(i + 1, 2)
-                pts_in_formula = total_base_points + next_lvl_points
+            # Determine the target level we are working towards
+            target_lvl = 1
+            if current_lvl > 0:
+                # Count skills at current highest level
+                skills_at_lvl = [s.lower() for s in school_data.get(f"Level_{current_lvl}", [])]
+                known_at_lvl = sum(1 for s in skills_at_lvl if s in knowledge_cache)
                 
-                # THE CALIBRATED FORMULA
-                t_sum = (pts_in_formula * points_slope) + \
-                        (297 - (max_points * points_slope)) - \
-                        ((intellect * 2.0 * points_slope) / 5.0)
-                
-                # Check current sum of top 3 for level i
-                lvl_skills = [s.lower() for s in school_data.get(f"Level_{i}", [])]
-                percents = sorted([knowledge_cache.get(s, 0) for s in lvl_skills], reverse=True)
+                # Rule: Level > 2 or 2+ skills known means you've "passed" this level
+                if current_lvl > 2 or known_at_lvl >= 2:
+                    target_lvl = current_lvl + 1
+                else:
+                    target_lvl = current_lvl
+
+            if target_lvl > 6:
+                continue
+
+            # --- Calculate iNeed for target_lvl ---
+            
+            # iPoints calculation: Sum of other schools' max points + target level's points
+            i_points = total_base_points - point_values.get(current_lvl, 0) + point_values.get(target_lvl, 0)
+            
+            # The Formula from player.kod
+            t_sum = (i_points * points_slope) + \
+                    (297 - (max_points * points_slope)) - \
+                    ((intellect * 2.0 * points_slope) / 5.0)
+            
+            # MIN_NEEDED_TO_ADVANCE is 75 in player.kod
+            t_sum = max(75, t_sum)
+            
+            # Scarcity adjustment: Check number of skills in PREVIOUS level
+            if target_lvl > 1:
+                prev_lvl_skills = [s.lower() for s in school_data.get(f"Level_{target_lvl-1}", [])]
+                num_in_prev = len(prev_lvl_skills)
+                if num_in_prev == 1:
+                    t_sum = t_sum / 3.0
+                elif num_in_prev == 2:
+                    t_sum = (t_sum * 2.0) / 3.0
+            else:
+                # Level 1 always has iNeed = 297, and iHave is set to 297 by default
+                t_sum = 297
+            
+            # --- Calculate iHave (Sum of top 3 of target_lvl - 1) ---
+            if target_lvl == 1:
+                c_sum = 297
+            else:
+                prev_lvl_skills = [s.lower() for s in school_data.get(f"Level_{target_lvl-1}", [])]
+                percents = sorted([knowledge_cache.get(s, 0) for s in prev_lvl_skills], reverse=True)
                 c_sum = sum(percents[:3])
-                
-                if c_sum < t_sum:
-                    target_lvl = i
-                    target_lvl_data = (c_sum, t_sum)
-                    break
             
-            if target_lvl:
-                c_sum, t_sum = target_lvl_data
+            # Calculate display current level (what the user "is")
+            # If they are working on getting the 2nd skill of L2, they are "Level 2 (1/2)"
+            display_lvl = current_lvl
+            if target_lvl > current_lvl:
+                display_lvl = current_lvl
+            else:
+                # They are working on the current level (getting 2nd skill)
+                display_lvl = current_lvl - 1 if current_lvl > 0 else 0
+
+            # Only add to results if they have some knowledge or are close to Level 1
+            if current_lvl > 0 or (target_lvl == 1 and any(s in knowledge_cache for s in [sk.lower() for sk in school_data.get("Level_1", [])])):
                 results.append({
                     'name': name,
-                    'current_lvl': target_lvl,
+                    'current_lvl': display_lvl,
+                    'target_lvl': target_lvl,
                     'current_sum': int(c_sum),
                     'target_sum': int(t_sum),
                     'needed': max(0, int(t_sum - c_sum))
@@ -138,17 +172,22 @@ def test_calculator():
     }
     
     calc = SchoolCalculator()
-    print("--- M59 Calculator: Calibrated Formula Test ---")
+    print("--- M59 Calculator: Source-Synced Logic Test ---")
     print(f"Using Intellect: {calc.config['character']['intellect']}")
     print(f"Server Config: MaxPoints={calc.config['server']['max_points']}, Slope={calc.config['server']['points_slope']}")
-    print("-" * 50)
+    print("-" * 60)
     
     progression = calc.calculate_progression(real_knowledge)
     
     for res in progression:
-        status = f"L{res['current_lvl']} ({res['current_sum']}/{res['target_sum']}%)"
-        needed = f"Next: {res['needed']}% needed"
-        print(f" - {res['name']:<15}: {status:<15} | {needed}")
+        if res['needed'] > 0:
+            status = f"Current Level: {res['current_lvl']}"
+            target = f"Goal: Level {res['target_lvl']}"
+            progress = f"Progress: {res['current_sum']}/{res['target_sum']}%"
+            needed = f"NEED: {res['needed']}% more"
+            print(f" - {res['name']:<15} | {status:<18} | {target:<15} | {progress:<15} | {needed}")
+        else:
+            print(f" - {res['name']:<15} | Current Level: {res['current_lvl']} (Ready for Level {res['target_lvl']})")
 
 if __name__ == "__main__":
     test_calculator()

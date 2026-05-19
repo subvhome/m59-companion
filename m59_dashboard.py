@@ -285,9 +285,17 @@ class M59Dashboard(tk.Tk):
         ctrl = tk.Frame(self.tab_prog, bg="#f0f0f0"); ctrl.pack(fill="x", padx=10, pady=10)
         tk.Label(ctrl, text="Real-time School Progression Goals", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
         self.sync_btn = tk.Button(ctrl, text="Sync All (Tab Dance)", command=self.trigger_sync, bg="#2196F3", fg="white", font=("Arial", 10, "bold"), padx=15); self.sync_btn.pack(side="right")
-        self.prog_tree = ttk.Treeview(self.tab_prog, columns=("Name", "Level", "Sum", "Goal", "Needed"), show="headings")
-        for c, w in [("Name", 150), ("Level", 80), ("Sum", 120), ("Goal", 120), ("Needed", 120)]:
-            self.prog_tree.heading(c, text=c); self.prog_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
+        
+        # Use a treeview that supports expansion (show="tree headings")
+        # Column #0 will be the "School / Ability" column
+        self.prog_tree = ttk.Treeview(self.tab_prog, columns=("Level", "Sum", "Goal", "Needed"), show="tree headings")
+        self.prog_tree.heading("#0", text="School / Ability")
+        self.prog_tree.column("#0", width=220)
+        
+        for c, w in [("Level", 80), ("Sum", 100), ("Goal", 100), ("Needed", 100)]:
+            self.prog_tree.heading(c, text=c)
+            self.prog_tree.column(c, width=w, anchor="center")
+            
         self.prog_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
     def setup_tab_vault(self):
@@ -313,16 +321,65 @@ class M59Dashboard(tk.Tk):
 
     def setup_tab_logs(self):
         paned = ttk.PanedWindow(self.tab_logs, orient=tk.HORIZONTAL); paned.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Left Side: Live Chat Mirror
         cf = tk.LabelFrame(paned, text=" Live Chat Mirror ", bg="#f0f0f0", font=("Arial", 10, "bold")); paned.add(cf, weight=3)
         self.chat_view = scrolledtext.ScrolledText(cf, bg="black", fg="#00FF00", font=("Consolas", 10), state="disabled"); self.chat_view.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Right Side: Historical Log Viewer
         rp = tk.Frame(paned, bg="#f0f0f0"); paned.add(rp, weight=2)
-        cmf = tk.LabelFrame(rp, text=" Combat Ticker ", bg="#f0f0f0", font=("Arial", 10, "bold")); cmf.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-        self.combat_ticker = ttk.Treeview(cmf, columns=("Time", "Event"), show="headings")
-        self.combat_ticker.heading("Time", text="Time"); self.combat_ticker.heading("Event", text="Combat Event")
-        self.combat_ticker.column("Time", width=80); self.combat_ticker.column("Event", width=250); self.combat_ticker.pack(fill="both", expand=True, padx=5, pady=5)
-        bf = tk.LabelFrame(rp, text=" Log Browser ", bg="#f0f0f0", font=("Arial", 10, "bold")); bf.pack(fill="x", padx=5, pady=5)
+        
+        hf = tk.LabelFrame(rp, text=" Historical Log Viewer ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        hf.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        
+        # File selection list
+        list_frame = tk.Frame(hf, bg="#f0f0f0")
+        list_frame.pack(fill="x", padx=5, pady=5)
+        tk.Label(list_frame, text="Select Log File:", bg="#f0f0f0", font=("Arial", 8)).pack(side="left")
+        self.log_file_list = ttk.Combobox(list_frame, state="readonly")
+        self.log_file_list.pack(side="left", fill="x", expand=True, padx=5)
+        self.log_file_list.bind("<<ComboboxSelected>>", self.load_historical_log)
+        tk.Button(list_frame, text="↻", command=self.refresh_log_list, bg="#f0f0f0").pack(side="left")
+        
+        # History content area
+        self.history_view = scrolledtext.ScrolledText(hf, bg="#1e1e1e", fg="#cccccc", font=("Consolas", 9), state="disabled")
+        self.history_view.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Bottom: Utilities
+        bf = tk.LabelFrame(rp, text=" Log Utilities ", bg="#f0f0f0", font=("Arial", 10, "bold")); bf.pack(fill="x", padx=5, pady=5)
         tk.Button(bf, text="Open Logs Folder", command=lambda: os.startfile(os.path.abspath("logs")), bg="#607D8B", fg="white", pady=5).pack(fill="x", padx=10, pady=5)
         tk.Button(bf, text="Open Latest Chat Log", command=self.open_latest_log, bg="#4CAF50", fg="white", pady=5).pack(fill="x", padx=10, pady=5)
+
+    def refresh_log_list(self):
+        """Populates the log file list from the logs directory."""
+        if not os.path.exists("logs"): 
+            os.makedirs("logs", exist_ok=True)
+        
+        files = [f for f in os.listdir("logs") if f.endswith(".log")]
+        # Sort by modification time, newest first
+        files.sort(key=lambda x: os.path.getmtime(os.path.join("logs", x)), reverse=True)
+        self.log_file_list['values'] = files
+        if files:
+            self.log_file_list.current(0)
+            self.load_historical_log()
+
+    def load_historical_log(self, event=None):
+        """Loads the content of the selected log file into the viewer."""
+        filename = self.log_file_list.get()
+        if not filename: return
+        
+        path = os.path.join("logs", filename)
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            
+            self.history_view.config(state="normal")
+            self.history_view.delete("1.0", tk.END)
+            self.history_view.insert(tk.END, content)
+            self.history_view.see(tk.END) # Scroll to bottom of history
+            self.history_view.config(state="disabled")
+        except Exception as e:
+            logger.error(f"Failed to load log {filename}: {e}")
 
     def trigger_pk_alert(self):
         if not self.pk_alert_enabled.get(): return
@@ -365,6 +422,7 @@ class M59Dashboard(tk.Tk):
             self.title(f"M59 Companion v{self.version} - {self.char_name}")
             self.status_var.set(f"Connected: {self.char_name}")
             self.load_vault_cache(); self.load_kill_book(); self.update_hud(); self.pk_frame = PKFrame(self, self.main_hwnd)
+            self.refresh_log_list()
             threading.Thread(target=lambda: self._initial_sync(), daemon=True).start(); self.start_chat_monitor()
         except: self.destroy()
 
@@ -384,16 +442,37 @@ class M59Dashboard(tk.Tk):
             except: pass
         self.countdown_lbl.config(text=f"{self.refresh_counter}s"); self.after(1000, self.update_hud)
 
+    def manage_rotation(self, log_path):
+        """Handles 24-hour rotation with unique timestamps."""
+        if not os.path.exists(log_path): return
+        creation_time = os.path.getctime(log_path)
+        if time.time() - creation_time > 86400: # 24 hours
+            safe_name = self.char_name.replace(" ", "_")
+            now_ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            rotated_path = os.path.join("logs", f"{safe_name}_chat_{now_ts}.log")
+            try:
+                os.rename(log_path, rotated_path)
+                logger.info(f"ROTATION: Moved old log to {os.path.basename(rotated_path)}")
+                self.after(0, self.refresh_log_list)
+            except: pass
+
     def start_chat_monitor(self):
         def loop():
             tr = SessionTracker(); co = CombatMonitor(self.char_name)
             ch = win32gui.GetDlgItem(self.main_hwnd, 1005)
             if not ch: return
+            
+            safe_name = self.char_name.replace(" ", "_")
+            log_path = os.path.join("logs", f"{safe_name}_chat.log")
+            
             cur = get_text_from_hwnd(ch); lines = [l.strip() for l in cur.splitlines() if l.strip()]
             self.last_tail = lines[-50:] if lines else []
+            
             while self.is_running:
                 try:
                     self.pm_obj.read_int(self.pm_obj.base_address)
+                    self.manage_rotation(log_path)
+                    
                     cur = get_text_from_hwnd(ch); lines = [l.strip() for l in cur.splitlines() if l.strip()]
                     new = []; found = -1; tail = list(self.last_tail)
                     while tail:
@@ -404,17 +483,24 @@ class M59Dashboard(tk.Tk):
                         tail.pop(0)
                     if found != -1: new = lines[found:]
                     elif lines: self.last_tail = lines[-50:]
+                    
                     if new:
-                        for l in new:
-                            self.after(0, lambda ln=l: self.append_chat_line(ln))
-                            try:
-                                g = tr.process_line(l)
-                                if g: self.after(0, lambda gn=g: self.on_gain_detected(gn)); self.after(0, lambda gn=g: self.append_combat_event(f"GAIN: {gn['name']} ({gn['delta']})"))
-                                r = co.process_line(l)
-                                if r:
-                                    if r["type"] == "KILL": self.after(0, lambda res=r: self.on_kill_detected(res)); self.after(0, lambda res=r: self.append_combat_event(f"KILL: {res['name']}"))
-                                    elif r["type"] == "PK_ALERT": self.after(0, self.trigger_pk_alert); self.after(0, lambda res=r: self.append_combat_event(f"!!! PK ALERT: {res['name']} !!!"))
-                            except: pass
+                        ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+                        try:
+                            with open(log_path, "a", encoding="utf-8") as f:
+                                for l in new:
+                                    f.write(f"{ts} {l}\n")
+                                    self.after(0, lambda ln=l: self.append_chat_line(ln))
+                                    try:
+                                        g = tr.process_line(l)
+                                        if g: self.after(0, lambda gn=g: self.on_gain_detected(gn))
+                                        r = co.process_line(l)
+                                        if r:
+                                            if r["type"] == "KILL": self.after(0, lambda res=r: self.on_kill_detected(res))
+                                            elif r["type"] == "PK_ALERT": self.after(0, self.trigger_pk_alert)
+                                    except: pass
+                                f.flush()
+                        except: pass
                         for l in new: self.last_tail.append(l)
                         self.last_tail = self.last_tail[-50:]
                 except:
@@ -445,10 +531,6 @@ class M59Dashboard(tk.Tk):
         if int(self.chat_view.index('end-1c').split('.')[0]) > 500:
             self.chat_view.config(state="normal"); self.chat_view.delete("1.0", "2.0"); self.chat_view.config(state="disabled")
 
-    def append_combat_event(self, txt):
-        self.combat_ticker.insert("", 0, values=(datetime.now().strftime("%H:%M:%S"), txt))
-        if len(self.combat_ticker.get_children()) > 50: self.combat_ticker.delete(self.combat_ticker.get_children()[-1])
-
     def trigger_sync(self):
         self.sync_btn.config(state="disabled"); threading.Thread(target=self.perform_sync, daemon=True).start()
 
@@ -466,9 +548,31 @@ class M59Dashboard(tk.Tk):
 
     def update_progression_tab(self):
         if not self.knowledge_cache: return
-        res = self.calculator.calculate_progression(self.knowledge_cache, self.current_attributes.get("Intellect", 20))
+        
+        # Save which items were expanded to restore them after refresh
+        expanded_schools = {self.prog_tree.item(i)['text'] for i in self.prog_tree.get_children() if self.prog_tree.item(i, 'open')}
+        
+        res = self.calculator.calculate_progression(self.knowledge_cache, self.current_attributes.get("Intellect", 25))
         for i in self.prog_tree.get_children(): self.prog_tree.delete(i)
-        for r in res: self.prog_tree.insert("", "end", values=(r['name'], f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", f"{r['needed']}%"))
+        
+        for r in res:
+            name = r['name']
+            is_open = name in expanded_schools
+            parent = self.prog_tree.insert("", "end", text=name, 
+                                          values=(f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", f"{r['needed']}%"),
+                                          open=is_open)
+            
+            # Add child abilities for this school
+            school_data = self.calculator.schools.get(name, {})
+            for lvl_num in range(1, 7):
+                lvl_key = f"Level_{lvl_num}"
+                if lvl_key not in school_data: continue
+                for skill in school_data[lvl_key]:
+                    s_lower = skill.lower()
+                    if s_lower in self.knowledge_cache:
+                        val = self.knowledge_cache[s_lower]
+                        self.prog_tree.insert(parent, "end", text=f"  {skill}", 
+                                             values=(f"L{lvl_num}", f"{val}%", "", ""))
 
     def trigger_vault_scan(self, vt):
         if not messagebox.askyesno("Scan", f"Scan {vt} vault?"): return
@@ -518,7 +622,34 @@ class M59Dashboard(tk.Tk):
     def background_update_check(self):
         def check():
             u, rv = check_for_updates(self.version)
-            if u: self.after(0, lambda: messagebox.showinfo("Update", f"New version v{rv} available."))
+            if not u: return
+            
+            def show_prompt():
+                msg = f"A new version (v{rv}) is available!\n\n" \
+                      "Options:\n" \
+                      "1. 'Auto-Update' (Recommended): Downloads and swaps files automatically.\n" \
+                      "2. 'Open Browser': Opens the GitHub page for manual download.\n\n" \
+                      "Note: Auto-update may trigger a Windows SmartScreen warning. " \
+                      "If it does, click 'More Info' -> 'Run Anyway'."
+                
+                choice = messagebox.askquestion("Update Available", msg, icon="info", 
+                                               type="yesnocancel", # Yes=Auto, No=Browser, Cancel=Later
+                                               default="yes")
+                
+                if choice == "yes": # Auto-Update
+                    self.status_var.set("Downloading update...")
+                    from m59_updater import download_update, apply_update
+                    new_path = download_update()
+                    if new_path:
+                        apply_update(new_path)
+                    else:
+                        messagebox.showerror("Error", "Download failed.")
+                        self.status_var.set("Update failed.")
+                elif choice == "no": # Browser
+                    from m59_updater import open_browser
+                    open_browser()
+            
+            self.after(0, show_prompt)
         threading.Thread(target=check, daemon=True).start()
 
     def find_all_instances(self):
