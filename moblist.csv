@@ -165,4 +165,29 @@ DukeTroop is FactionTroop,soldier of the Duke's army
 NecromancerTroop is FactionTroop,necromancer
 PrincessTroop is FactionTroop,soldier of the Princess' army
 RebelTroop is FactionTroop,rebel soldier
-Zombie is Monster,zombie
+Zombie is Monster,zombiebattered skeleton,battered skeleton
+dead battered skeleton,dead battered skeleton
+tusked skeleton,tusked skeleton
+dead tusked skeleton,dead tusked skeleton
+daemon skeleton,daemon skeleton
+dead daemon skeleton,dead daemon skeleton
+groundworm larva,groundworm larva
+dead groundworm larva,dead groundworm larva
+groundworm queen,groundworm queen
+dead groundworm queen,dead groundworm queen
+te'xeochicatl,te'xeochicatl
+dead te'xeochicatl,dead te'xeochicatl
+ma'xeochicatl,ma'xeochicatl
+dead ma'xeochicatl,dead ma'xeochicatl
+ro'xeochicatl,ro'xeochicatl
+dead ro'xeochicatl,dead ro'xeochicatl
+ve'xeochicatl,ve'xeochicatl
+dead ve'xeochicatl,dead ve'xeochicatl
+shadow mummy,shadow mummy
+dead shadow mummy,dead shadow mummy
+dead soldier,dead soldier
+dead rebel soldier,dead rebel soldier
+dead necromancer,dead necromancer
+town guard,town guard
+dead town guard,dead town guard
+the town guard,the town guard
