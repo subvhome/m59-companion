@@ -6,7 +6,7 @@ import subprocess
 import webbrowser
 
 VERSION_URL = "https://raw.githubusercontent.com/subvhome/m59-companion/main/VERSION"
-EXE_URL = "https://github.com/subvhome/m59-companion/releases/latest/download/M59Companion.exe"
+EXE_URL = "https://github.com/subvhome/m59-companion/raw/main/dist/M59Companion.exe"
 GITHUB_SITE = "https://github.com/subvhome/m59-companion"
 
 def check_for_updates(current_version):
