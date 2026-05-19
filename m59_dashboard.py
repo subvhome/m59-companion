@@ -95,6 +95,7 @@ class M59Dashboard(tk.Tk):
         self.pk_sound_enabled = tk.BooleanVar(value=True)
         self.pk_frame_enabled = tk.BooleanVar(value=True)
         self.pk_sound_path = tk.StringVar(value="SystemExclamation")
+        self.debug_enabled = tk.BooleanVar(value=False)
         self.load_settings()
         
         # --- Internal State ---
@@ -167,6 +168,7 @@ class M59Dashboard(tk.Tk):
                     self.pk_sound_enabled.set(s.get("pk_sound_enabled", True))
                     self.pk_frame_enabled.set(s.get("pk_frame_enabled", True))
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
+                    self.debug_enabled.set(s.get("debug_enabled", False))
             except: pass
 
     def save_settings(self):
@@ -177,9 +179,22 @@ class M59Dashboard(tk.Tk):
                     "pk_alert_enabled": self.pk_alert_enabled.get(),
                     "pk_sound_enabled": self.pk_sound_enabled.get(),
                     "pk_frame_enabled": self.pk_frame_enabled.get(),
-                    "pk_sound_path": self.pk_sound_path.get()
+                    "pk_sound_path": self.pk_sound_path.get(),
+                    "debug_enabled": self.debug_enabled.get()
                 }, f)
         except: pass
+
+    def debug_log(self, category, message):
+        """Helper to print high-visibility debug info to terminal and file if enabled."""
+        if self.debug_enabled.get():
+            ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            log_line = f"[{ts}] [DEBUG:{category}] {message}"
+            print(log_line)
+            try:
+                if not os.path.exists("logs"): os.makedirs("logs")
+                with open("logs/companion_debug.log", "a", encoding="utf-8") as f:
+                    f.write(log_line + "\n")
+            except: pass
 
     def setup_tab_book(self):
         """Creates the Kill Book tab."""
@@ -237,6 +252,12 @@ class M59Dashboard(tk.Tk):
         tk.Entry(sbf, textvariable=self.pk_sound_path, width=40, state="readonly").pack(side="left")
         tk.Button(sbf, text="Browse...", command=self.browse_sound).pack(side="left", padx=5); tk.Button(sbf, text="▶", command=self.test_sound).pack(side="left")
         tk.Checkbutton(sub, text="Show In-Game Red Frame (Visual)", variable=self.pk_frame_enabled, bg="#f0f0f0").grid(row=1, column=0, sticky="w", pady=5)
+        
+        # Developer/Debug Group
+        dev_group = tk.LabelFrame(container, text=" Developer & Diagnostic Tools ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15); dev_group.pack(fill="x", pady=10)
+        tk.Checkbutton(dev_group, text="Enable Verbose Debug Mode (Terminal Output)", variable=self.debug_enabled, bg="#f0f0f0", font=("Arial", 10)).pack(anchor="w")
+        tk.Label(dev_group, text="Outputs internal scraper data and school calculations to the console.", font=("Arial", 8, "italic"), bg="#f0f0f0", fg="gray").pack(anchor="w", padx=20)
+
         tk.Button(container, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
 
     def browse_sound(self):
@@ -355,7 +376,8 @@ class M59Dashboard(tk.Tk):
         if not os.path.exists("logs"): 
             os.makedirs("logs", exist_ok=True)
         
-        files = [f for f in os.listdir("logs") if f.endswith(".log")]
+        # Filter out the debug log so it's not visible in the UI viewer
+        files = [f for f in os.listdir("logs") if f.endswith(".log") and "debug" not in f.lower()]
         # Sort by modification time, newest first
         files.sort(key=lambda x: os.path.getmtime(os.path.join("logs", x)), reverse=True)
         self.log_file_list['values'] = files
@@ -423,8 +445,10 @@ class M59Dashboard(tk.Tk):
             self.status_var.set(f"Connected: {self.char_name}")
             self.load_vault_cache(); self.load_kill_book(); self.update_hud(); self.pk_frame = PKFrame(self, self.main_hwnd)
             self.refresh_log_list()
-            threading.Thread(target=lambda: self._initial_sync(), daemon=True).start(); self.start_chat_monitor()
-        except: self.destroy()
+            threading.Thread(target=self.perform_sync, daemon=True).start(); self.start_chat_monitor()
+        except Exception as e:
+            self.debug_log("CONN", f"Connection error: {e}")
+            self.destroy()
 
     def update_hud(self):
         if not self.main_hwnd or not self.is_running: return
@@ -438,7 +462,7 @@ class M59Dashboard(tk.Tk):
                         if k in st: l.config(text=str(st[k]))
                     for k, l in self.attr_labels.items():
                         if k in st: self.current_attributes[k] = st[k]; l.config(text=str(st[k]))
-                    if self.knowledge_cache: self.update_progression_tab()
+                    # Progression now only updates on Sync (Tab Dance) or Startup
             except: pass
         self.countdown_lbl.config(text=f"{self.refresh_counter}s"); self.after(1000, self.update_hud)
 
@@ -535,13 +559,16 @@ class M59Dashboard(tk.Tk):
         self.sync_btn.config(state="disabled"); threading.Thread(target=self.perform_sync, daemon=True).start()
 
     def perform_sync(self):
+        self.debug_log("SYNC", "Starting manual synchronization cycle...")
         try:
             mr = MemoryReader(self.pm_obj); kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
             if kn or st: self.after(0, lambda: self._apply_sync_results(kn, st))
-        except: pass
+        except Exception as e:
+            self.debug_log("SYNC", f"Sync failed: {e}")
         finally: self.after(0, lambda: self.sync_btn.config(state="normal"))
 
     def _apply_sync_results(self, kn, st):
+        self.debug_log("SYNC", f"Received data - Knowledge count: {len(kn)}, Stats count: {len(st)}")
         if st: self._apply_initial_stats(st)
         if kn: self.knowledge_cache.update(kn)
         self.update_progression_tab()
@@ -552,7 +579,19 @@ class M59Dashboard(tk.Tk):
         # Save which items were expanded to restore them after refresh
         expanded_schools = {self.prog_tree.item(i)['text'] for i in self.prog_tree.get_children() if self.prog_tree.item(i, 'open')}
         
-        res = self.calculator.calculate_progression(self.knowledge_cache, self.current_attributes.get("Intellect", 25))
+        intellect = self.current_attributes.get("Intellect", 25)
+        self.debug_log("CALC", f"Calculating progression with Intellect: {intellect}")
+        
+        if self.debug_enabled.get():
+            self.debug_log("DATA", f"Full Knowledge Cache: {self.knowledge_cache}")
+        
+        res = self.calculator.calculate_progression(self.knowledge_cache, intellect)
+        self.debug_log("CALC", f"Calculation returned {len(res)} active schools.")
+        
+        if self.debug_enabled.get():
+            for r in res:
+                self.debug_log("CALC", f"SCHOOL:{r['name']} | L{r['current_lvl']}->L{r['target_lvl']} | Sum:{r['current_sum']}/{r['target_sum']}% | Need:{r['needed']}%")
+        
         for i in self.prog_tree.get_children(): self.prog_tree.delete(i)
         
         for r in res:
@@ -606,12 +645,6 @@ class M59Dashboard(tk.Tk):
                         d = json.load(f); self.vault_data[vt] = d.get("items", [])
                         self.update_vault_tree(vt)
                 except: pass
-
-    def _initial_sync(self):
-        try:
-            kn, st = cycle_tabs_and_scrape(self.main_hwnd, MemoryReader(self.pm_obj))
-            if kn or st: self.after(0, lambda: self._apply_sync_results(kn, st))
-        except: pass
 
     def _apply_initial_stats(self, st):
         for k, l in self.attr_labels.items():
