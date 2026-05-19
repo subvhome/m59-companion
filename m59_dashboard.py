@@ -153,8 +153,8 @@ class M59Dashboard(tk.Tk):
         # Set a more permissive minimum size
         self.minsize(400, 300)
         
-        self.after(100, self.establish_connection)
-        self.after(2000, self.background_update_check)
+        # Priority 1: Check for updates before touching the game
+        self.after(100, self.background_update_check)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def load_settings(self):
@@ -419,13 +419,16 @@ class M59Dashboard(tk.Tk):
         self.alert_active = False; self.tab_dash.config(bg="#f0f0f0"); self.status_bar.config(bg="SystemButtonFace")
 
     def establish_connection(self):
-        self.status_var.set("Scanning...")
+        self.status_var.set("Scanning for game...")
         try:
             insts = self.find_all_instances()
             if not insts:
                 if messagebox.askretrycancel("Error", "No game found."): self.establish_connection()
                 else: self.destroy(); return
-            if len(insts) == 1: self.pm_obj, self.target_pid = establish_bridge(); self.main_hwnd = insts[0]["hwnd"]
+            
+            if len(insts) == 1: 
+                self.pm_obj, self.target_pid = establish_bridge()
+                self.main_hwnd = insts[0]["hwnd"]
             else:
                 from tkinter import Toplevel, Listbox
                 sel_win = Toplevel(self); sel_win.title("Select Instance"); sel_win.geometry("400x300")
@@ -440,15 +443,39 @@ class M59Dashboard(tk.Tk):
                 self.wait_window(sel_win)
                 if not self.target_pid: self.destroy(); return
                 import pymem; self.pm_obj = pymem.Pymem(self.target_pid); claim_pid(self.target_pid)
+            
+            # Step 1: Lightweight capture of identity
             self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
             self.title(f"M59 Companion v{self.version} - {self.char_name}")
             self.status_var.set(f"Connected: {self.char_name}")
-            self.load_vault_cache(); self.load_kill_book(); self.update_hud(); self.pk_frame = PKFrame(self, self.main_hwnd)
-            self.refresh_log_list()
-            threading.Thread(target=self.perform_sync, daemon=True).start(); self.start_chat_monitor()
+            
+            # Step 2: Delay the heavy profile loading to allow UI to breathe
+            self.after(500, self._post_connection_init)
+            
         except Exception as e:
             self.debug_log("CONN", f"Connection error: {e}")
             self.destroy()
+
+    def _post_connection_init(self):
+        """Heavy lifting: Load history, start monitors, and perform first sync."""
+        if not self.is_running: return
+        self.debug_log("INIT", "Starting heavy profile initialization...")
+        try:
+            self.load_vault_cache()
+            self.load_kill_book()
+            self.refresh_log_list()
+            self.pk_frame = PKFrame(self, self.main_hwnd)
+            
+            # Start asynchronous background loops
+            self.update_hud()
+            self.start_chat_monitor()
+            
+            # Perform first full data capture
+            threading.Thread(target=self.perform_sync, daemon=True).start()
+            
+            self.debug_log("INIT", "Profile initialization complete.")
+        except Exception as e:
+            self.debug_log("INIT", f"Post-connection error: {e}")
 
     def update_hud(self):
         if not self.main_hwnd or not self.is_running: return
@@ -664,7 +691,10 @@ class M59Dashboard(tk.Tk):
     def background_update_check(self):
         def check():
             u, rv = check_for_updates(self.version)
-            if not u: return
+            if not u: 
+                # No update found, proceed to game connection
+                self.after(0, self.establish_connection)
+                return
             
             def show_prompt():
                 msg = f"A new version (v{rv}) is available!\n\n" \
@@ -687,9 +717,13 @@ class M59Dashboard(tk.Tk):
                     else:
                         messagebox.showerror("Error", "Download failed.")
                         self.status_var.set("Update failed.")
+                        self.establish_connection() # Proceed after failure
                 elif choice == "no": # Browser
                     from m59_updater import open_browser
                     open_browser()
+                    self.establish_connection() # Proceed after browser open
+                else: # Cancel / Update Later
+                    self.establish_connection() # Proceed to game
             
             self.after(0, show_prompt)
         threading.Thread(target=check, daemon=True).start()

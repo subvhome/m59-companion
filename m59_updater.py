@@ -31,9 +31,9 @@ def download_update():
 def apply_update(new_exe_path):
     """Uses PowerShell to swap files silently after app exit."""
     current_exe = sys.executable
-    # PowerShell Script: Wait 2s, Swap, Alert, Restart
+    # PowerShell Script: Wait 5s (to prevent MEI cleanup race), Swap, Alert, Restart
     ps_script = f"""
-    Start-Sleep -s 2
+    Start-Sleep -s 5
     if (Test-Path '{new_exe_path}') {{
         Move-Item -Path '{new_exe_path}' -Destination '{current_exe}' -Force
         [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null
