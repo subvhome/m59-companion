@@ -42,6 +42,32 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+class DraggableNotebook(ttk.Notebook):
+    """A ttk.Notebook with drag-and-drop tab reordering."""
+    def __init__(self, master=None, **kw):
+        super().__init__(master, **kw)
+        self.bind("<Button-1>", self.on_start_drag, add=True)
+        self.bind("<B1-Motion>", self.on_drag_motion, add=True)
+
+    def on_start_drag(self, event):
+        """Identify which tab is being dragged."""
+        try:
+            index = self.index(f"@{event.x},{event.y}")
+            self._drag_index = index
+        except:
+            self._drag_index = None
+
+    def on_drag_motion(self, event):
+        """Reorder tabs as the mouse moves."""
+        if self._drag_index is None: return
+        try:
+            index = self.index(f"@{event.x},{event.y}")
+            if index != self._drag_index:
+                dragged_widget = self.nametowidget(self.tabs()[self._drag_index])
+                self.insert(index, dragged_widget)
+                self._drag_index = index
+        except: pass
+
 class PKFrame(tk.Toplevel):
     """Refined Strategy: 4 separate windows that form a frame around the GAME window."""
     def __init__(self, parent, target_hwnd):
@@ -105,7 +131,27 @@ class M59Dashboard(tk.Tk):
         self.main_hwnd = None
         self.is_running = True
         self.pk_frame = None
+        self.alert_active = False
+        self.comms_data = {"all": [], "tells": [], "broadcasts": [], "social": [], "clean": []}
         
+        # Pre-compile social regex patterns
+        import re
+        self.re_speech = re.compile(r'^(.*?) (?:broadcasts?|tells?|says?|yells?|sends?), "(.*)"$', re.I)
+        
+        # Combat Filter (Subtraction logic from Blakod source)
+        self.combat_verbs = {
+            "wounds", "damages", "slays", "burns", "sears", "disfigures", "dissolves",
+            "incinerates", "scorches", "chars", "singes", "electrocutes", "fries",
+            "shocks", "jolts", "freezes", "frosts", "chills", "cools", "purifies",
+            "mortifies", "cleanses", "infuses", "corrupts", "appalls", "pollutes",
+            "maligns", "flattens", "slams", "buffets", "shakes", "devours", "gnaws",
+            "bites", "nips", "shreds", "rends", "rakes", "claws", "impales", "pricks",
+            "stings", "irritates", "thrashes", "mangles", "pummels", "slaps", "cleaves",
+            "maims", "slashes", "cuts", "brutalizes", "smashes", "crushes", "bashes",
+            "runs through", "stabs", "pokes", "fells", "lacerates", "pierces", "grazes",
+            "blocks", "dodges", "parries", "avoids", "nicks", "fails to damage"
+        }
+
         # Tracking State
         self.session_kills = {"monsters": {}, "players": {}}
         self.all_time_kills = {"monsters": {}, "players": {}}
@@ -115,39 +161,36 @@ class M59Dashboard(tk.Tk):
         self.current_attributes = {}
         self.vault_data = {"barloque": [], "hungry": []}
         self.calculator = SchoolCalculator()
-        self.alert_active = False
 
         # --- UI Layout ---
         self.status_var = tk.StringVar(value="Initializing...")
-        # Pack the status frame FIRST with side=BOTTOM to ensure it claims its space
         self.status_frame = tk.Frame(self, bd=1, relief=tk.SUNKEN)
         self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        
         self.status_bar = tk.Label(self.status_frame, textvariable=self.status_var, anchor=tk.W, padx=5)
         self.status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self.notebook = ttk.Notebook(self)
+        self.notebook = DraggableNotebook(self)
         self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
         
         self.tab_dash = tk.Frame(self.notebook, bg="#f0f0f0")
+        self.tab_comms = tk.Frame(self.notebook, bg="#f0f0f0")
         self.tab_prog = tk.Frame(self.notebook, bg="#f0f0f0")
         self.tab_vault = tk.Frame(self.notebook, bg="#f0f0f0")
         self.tab_book = tk.Frame(self.notebook, bg="#f0f0f0") 
-        self.tab_logs = tk.Frame(self.notebook, bg="#f0f0f0")
         self.tab_settings = tk.Frame(self.notebook, bg="#f0f0f0")
         
         self.notebook.add(self.tab_dash, text=" Dashboard ")
+        self.notebook.add(self.tab_comms, text=" Communications ")
         self.notebook.add(self.tab_prog, text=" Progression ")
         self.notebook.add(self.tab_vault, text=" Vault ")
         self.notebook.add(self.tab_book, text=" Kill Book ")
-        self.notebook.add(self.tab_logs, text=" Logs & History ")
         self.notebook.add(self.tab_settings, text=" Settings ")
         
         self.setup_tab_dashboard()
+        self.setup_tab_communications()
         self.setup_tab_progression()
         self.setup_tab_vault()
         self.setup_tab_book()
-        self.setup_tab_logs()
         self.setup_tab_settings()
         
         # Set a more permissive minimum size
@@ -156,6 +199,18 @@ class M59Dashboard(tk.Tk):
         # Priority 1: Check for updates before touching the game
         self.after(100, self.background_update_check)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def is_combat_line(self, line):
+        """Returns True if the line matches any known Blakod combat patterns."""
+        l = line.lower()
+        # Check for verbs in the line
+        for verb in self.combat_verbs:
+            if f" {verb} " in l or l.endswith(f" {verb}."):
+                return True
+        # Check for specific 'You' patterns
+        if l.startswith("you ") and any(v in l for v in ["block", "dodge", "parry", "avoid"]):
+            return True
+        return False
 
     def load_settings(self):
         if os.path.exists(SETTINGS_FILE):
@@ -271,6 +326,119 @@ class M59Dashboard(tk.Tk):
             else: winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
         except: messagebox.showerror("Error", "Could not play sound.")
 
+    def setup_tab_communications(self):
+        """Creates a unified Communications Hub for live chat and historical logs."""
+        paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
+        paned.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # --- Left Sidebar: Channels & History ---
+        sidebar = tk.Frame(paned, bg="#f0f0f0")
+        paned.add(sidebar, weight=1)
+        
+        # 1. Live Channels Section
+        tk.Label(sidebar, text=" LIVE CHANNELS ", font=("Arial", 9, "bold"), bg="#ddd", fg="#333").pack(fill="x", pady=(0, 5))
+        for cat in ["All Chat", "Clean Feed", "Tells", "Broadcasts", "Social"]:
+            btn = tk.Button(sidebar, text=cat, command=lambda c=cat: self.show_comms_channel(c), font=("Arial", 8), anchor="w", padx=10)
+            btn.pack(fill="x", padx=5, pady=1)
+
+        # 2. History Section
+        tk.Label(sidebar, text=" HISTORICAL LOGS ", font=("Arial", 9, "bold"), bg="#ddd", fg="#333").pack(fill="x", pady=(15, 5))
+        
+        list_frame = tk.Frame(sidebar, bg="#f0f0f0")
+        list_frame.pack(fill="x", padx=5)
+        self.log_file_list = ttk.Combobox(list_frame, state="readonly", font=("Arial", 8))
+        self.log_file_list.pack(side="left", fill="x", expand=True)
+        self.log_file_list.bind("<<ComboboxSelected>>", self.load_historical_log)
+        
+        btn_row = tk.Frame(sidebar, bg="#f0f0f0")
+        btn_row.pack(fill="x", padx=5, pady=5)
+        tk.Button(btn_row, text="Refresh List", command=self.refresh_log_list, font=("Arial", 7)).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="Open Folder", command=lambda: os.startfile(os.path.abspath("logs")), font=("Arial", 7)).pack(side="left", fill="x", expand=True, padx=2)
+
+        # --- Right Side: The Unified Feed ---
+        right = tk.Frame(paned, bg="#f0f0f0")
+        paned.add(right, weight=4)
+        
+        self.comms_header_lbl = tk.Label(right, text="All Chat (Live Stream)", font=("Arial", 11, "bold"), bg="#f0f0f0")
+        self.comms_header_lbl.pack(pady=5)
+        
+        self.comms_view = scrolledtext.ScrolledText(right, bg="black", fg="#00FFFF", font=("Consolas", 10), state="disabled")
+        self.comms_view.pack(fill="both", expand=True, padx=5, pady=5)
+        self.current_comms_channel = "All Chat"
+
+    def show_comms_channel(self, channel):
+        self.current_comms_channel = channel
+        self.comms_header_lbl.config(text=channel)
+        self.comms_view.config(state="normal")
+        self.comms_view.delete("1.0", tk.END)
+        
+        # Map channel names to data keys
+        key_map = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}
+        key = key_map.get(channel, "all")
+        
+        for line in self.comms_data[key]:
+            self.comms_view.insert(tk.END, line + "\n")
+        
+        self.comms_view.see(tk.END)
+        self.comms_view.config(state="disabled")
+
+    def load_historical_log(self, event=None):
+        """Loads historical log into the same view as live chat."""
+        filename = self.log_file_list.get()
+        if not filename: return
+        
+        self.current_comms_channel = f"History: {filename}"
+        self.comms_header_lbl.config(text=f"Viewing Log: {filename}")
+        
+        path = os.path.join("logs", filename)
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            
+            self.comms_view.config(state="normal")
+            self.comms_view.delete("1.0", tk.END)
+            self.comms_view.insert(tk.END, content)
+            self.comms_view.see(tk.END)
+            self.comms_view.config(state="disabled")
+        except Exception as e:
+            logger.error(f"Failed to load log {filename}: {e}")
+
+    def append_comms_line(self, line):
+        """Unified entry point for all chat. Routes to internal buffers and updates live view."""
+        ts_str = f"[{datetime.now().strftime('%H:%M:%S')}] {line}"
+        
+        # 1. Always add to 'All Chat'
+        self.comms_data["all"].append(ts_str)
+        if len(self.comms_data["all"]) > 500: self.comms_data["all"].pop(0)
+        
+        # 2. Check if it's combat
+        is_combat = self.is_combat_line(line)
+        target_key = None
+        
+        if not is_combat:
+            # 2a. Clean Feed (Social + System)
+            self.comms_data["clean"].append(ts_str)
+            if len(self.comms_data["clean"]) > 500: self.comms_data["clean"].pop(0)
+            
+            # 2b. Specific Social Channels
+            l_lower = line.lower()
+            target_key = "social"
+            if "broadcasts," in l_lower or "broadcasts:" in l_lower: target_key = "broadcasts"
+            elif "tells you," in l_lower or "you tell" in l_lower or "sends," in l_lower: target_key = "tells"
+            
+            self.comms_data[target_key].append(ts_str)
+            if len(self.comms_data[target_key]) > 500: self.comms_data[target_key].pop(0)
+        
+        # 3. Live Update the UI if viewing a live channel
+        key_map = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}
+        current_view_key = key_map.get(self.current_comms_channel)
+        
+        if current_view_key == "all" or (not is_combat and current_view_key in ["clean", target_key]):
+            self.comms_view.config(state="normal")
+            self.comms_view.insert(tk.END, ts_str + "\n")
+            self.comms_view.see(tk.END)
+            self.comms_view.config(state="disabled")
+
     def setup_tab_dashboard(self):
         top = tk.Frame(self.tab_dash, bg="#f0f0f0"); top.pack(fill="x", padx=10, pady=5)
         self.hud_values = {}
@@ -340,37 +508,6 @@ class M59Dashboard(tk.Tk):
             sl = tk.Label(f, text="No scan data", font=("Arial", 7, "italic"), bg="#f0f0f0", fg="gray"); sl.pack(side="bottom", fill="x")
             self.vault_widgets[vt] = {"tree": tr, "filter_var": fv, "status_lbl": sl, "sync_btn": btn}
 
-    def setup_tab_logs(self):
-        paned = ttk.PanedWindow(self.tab_logs, orient=tk.HORIZONTAL); paned.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        # Left Side: Live Chat Mirror
-        cf = tk.LabelFrame(paned, text=" Live Chat Mirror ", bg="#f0f0f0", font=("Arial", 10, "bold")); paned.add(cf, weight=3)
-        self.chat_view = scrolledtext.ScrolledText(cf, bg="black", fg="#00FF00", font=("Consolas", 10), state="disabled"); self.chat_view.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        # Right Side: Historical Log Viewer
-        rp = tk.Frame(paned, bg="#f0f0f0"); paned.add(rp, weight=2)
-        
-        hf = tk.LabelFrame(rp, text=" Historical Log Viewer ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        hf.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-        
-        # File selection list
-        list_frame = tk.Frame(hf, bg="#f0f0f0")
-        list_frame.pack(fill="x", padx=5, pady=5)
-        tk.Label(list_frame, text="Select Log File:", bg="#f0f0f0", font=("Arial", 8)).pack(side="left")
-        self.log_file_list = ttk.Combobox(list_frame, state="readonly")
-        self.log_file_list.pack(side="left", fill="x", expand=True, padx=5)
-        self.log_file_list.bind("<<ComboboxSelected>>", self.load_historical_log)
-        tk.Button(list_frame, text="↻", command=self.refresh_log_list, bg="#f0f0f0").pack(side="left")
-        
-        # History content area
-        self.history_view = scrolledtext.ScrolledText(hf, bg="#1e1e1e", fg="#cccccc", font=("Consolas", 9), state="disabled")
-        self.history_view.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        # Bottom: Utilities
-        bf = tk.LabelFrame(rp, text=" Log Utilities ", bg="#f0f0f0", font=("Arial", 10, "bold")); bf.pack(fill="x", padx=5, pady=5)
-        tk.Button(bf, text="Open Logs Folder", command=lambda: os.startfile(os.path.abspath("logs")), bg="#607D8B", fg="white", pady=5).pack(fill="x", padx=10, pady=5)
-        tk.Button(bf, text="Open Latest Chat Log", command=self.open_latest_log, bg="#4CAF50", fg="white", pady=5).pack(fill="x", padx=10, pady=5)
-
     def refresh_log_list(self):
         """Populates the log file list from the logs directory."""
         if not os.path.exists("logs"): 
@@ -383,25 +520,6 @@ class M59Dashboard(tk.Tk):
         self.log_file_list['values'] = files
         if files:
             self.log_file_list.current(0)
-            self.load_historical_log()
-
-    def load_historical_log(self, event=None):
-        """Loads the content of the selected log file into the viewer."""
-        filename = self.log_file_list.get()
-        if not filename: return
-        
-        path = os.path.join("logs", filename)
-        try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-            
-            self.history_view.config(state="normal")
-            self.history_view.delete("1.0", tk.END)
-            self.history_view.insert(tk.END, content)
-            self.history_view.see(tk.END) # Scroll to bottom of history
-            self.history_view.config(state="disabled")
-        except Exception as e:
-            logger.error(f"Failed to load log {filename}: {e}")
 
     def trigger_pk_alert(self):
         if not self.pk_alert_enabled.get(): return
@@ -550,14 +668,21 @@ class M59Dashboard(tk.Tk):
                             with open(log_path, "a", encoding="utf-8") as f:
                                 for l in new:
                                     f.write(f"{ts} {l}\n")
-                                    self.after(0, lambda ln=l: self.append_chat_line(ln))
+                                    
+                                    # Unified routing for all lines to the Comms Hub
+                                    self.after(0, lambda ln=l: self.append_comms_line(ln))
+                                    
                                     try:
+                                        # 1. Gain Tracking
                                         g = tr.process_line(l)
                                         if g: self.after(0, lambda gn=g: self.on_gain_detected(gn))
-                                        r = co.process_line(l)
-                                        if r:
-                                            if r["type"] == "KILL": self.after(0, lambda res=r: self.on_kill_detected(res))
-                                            elif r["type"] == "PK_ALERT": self.after(0, self.trigger_pk_alert)
+                                        
+                                        # 2. Combat Logic (Internal processing)
+                                        if self.is_combat_line(l):
+                                            r = co.process_line(l)
+                                            if r:
+                                                if r["type"] == "KILL": self.after(0, lambda res=r: self.on_kill_detected(res))
+                                                elif r["type"] == "PK_ALERT": self.after(0, self.trigger_pk_alert)
                                     except: pass
                                 f.flush()
                         except: pass
@@ -585,11 +710,6 @@ class M59Dashboard(tk.Tk):
         if self.target_pid:
             release_pid(self.target_pid)
         self.destroy()
-
-    def append_chat_line(self, line):
-        self.chat_view.config(state="normal"); self.chat_view.insert(tk.END, f"[{datetime.now().strftime('%H:%M:%S')}] {line}\n"); self.chat_view.see(tk.END); self.chat_view.config(state="disabled")
-        if int(self.chat_view.index('end-1c').split('.')[0]) > 500:
-            self.chat_view.config(state="normal"); self.chat_view.delete("1.0", "2.0"); self.chat_view.config(state="disabled")
 
     def trigger_sync(self):
         self.sync_btn.config(state="disabled"); threading.Thread(target=self.perform_sync, daemon=True).start()

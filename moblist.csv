@@ -21,7 +21,8 @@ Spider is Monster,spider
 Spider is Monster,dead spider
 StoneTroll is Monster,Guardian of Zjiria
 StoneTroll is Monster,ha'humoch
-StoneTroll is Monster,dead stonetroll
+StoneTroll is Monster,dead stone troll
+StoneTroll is Monster,stone troll
 Council is Monster,Councilor
 SnowRat is Monster,snow rat
 SnowRat is Monster,shonapyijoa
@@ -165,7 +166,8 @@ DukeTroop is FactionTroop,soldier of the Duke's army
 NecromancerTroop is FactionTroop,necromancer
 PrincessTroop is FactionTroop,soldier of the Princess' army
 RebelTroop is FactionTroop,rebel soldier
-Zombie is Monster,zombiebattered skeleton,battered skeleton
+Zombie is Monster,zombie
+battered skeleton,battered skeleton
 dead battered skeleton,dead battered skeleton
 tusked skeleton,tusked skeleton
 dead tusked skeleton,dead tusked skeleton

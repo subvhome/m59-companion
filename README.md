@@ -33,26 +33,44 @@ A lightweight, multi-instance companion tool for Meridian 59 designed to automat
 *   **Static Attributes:** Instant view of Might, Intellect, Stamina, Agility, Mysticism, Aim, and Karma.
 *   **Session Gains:** Real-time list of every skill improved during your current session.
 *   **Quick Kills:** Dedicated column for monster and player kills in the current run.
+*   **Stable Layout:** A persistent footer status bar and reinforced UI that maintains visibility even when shrinking the window.
 
-### 2. The Kill Book (Eternal Trophies)
+### 2. Unified Communications Center
+*   **Combat Subtraction Filter:** Uses high-efficiency logic (derived from the official Blakod source) to strip battle spam from your social feed.
+*   **Real-time Channels:** Automatic sorting of incoming text into dedicated channels:
+    *   **Clean Feed:** Social and System messages only.
+    *   **Tells:** Dedicated Private Message tracker.
+    *   **Broadcasts:** Global chat and Yells.
+    *   **Social:** Local 'Says' and Emotes.
+*   **Historical Log Browser:** Integrated directly into the comms center; switch between live feeds and your entire log library without leaving the tab.
+
+### 3. The Kill Book (Eternal Trophies)
 *   **Historical Tally:** Persistent tracking of every creature and player you've ever slain.
 *   **Dual Pane:** Separate lists for Monsters vs. Players & Notables.
-*   **Smart Re-Sorting:** Automatically categorizes kills based on the latest server mob lists.
+*   **Comprehensive Database:** Includes rare variants (Xeochicatls, Skeletons, etc.) and "dead state" detection.
 
-### 3. School Progression (Calculator)
+### 4. School Progression (Calculator)
 *   **Target Sums:** Uses the standard server advancement formula to show exactly what % sum you need for your next rank.
 *   **Tab Dance:** One-click automation to cycle your in-game tabs and refresh all knowledge.
 *   **Intellect Scaling:** Dynamically adjusts "Points Needed" based on your character's current Intellect.
 
-### 4. Vault Management
+### 5. Vault Management
 *   **Automated Scanning:** Sends 'withdraw' commands and clicks through your vault to refresh quantities.
 *   **Dual Storage:** Dedicated support for Barloque and Hungry Vaults.
 *   **Instant Filter:** Search through large inventories instantly as you type.
 
-### 5. Logs & History
-*   **Chat Mirror:** A high-contrast terminal view of your in-game chat with timestamps.
-*   **Combat Ticker:** A filtered list of just the "big events" (Kills, Gains, and PK Alerts).
-*   **Log Browser:** One-click access to your historical log files.
+---
+
+## UI & Customization
+*   **Draggable Tabs:** A fully modular interface—click and drag any tab header to rearrange the dashboard layout to fit your workflow.
+*   **Orderly Startup:** A prioritized initialization sequence that handles updates and identity verification before loading heavy profile data, ensuring a lag-free experience.
+*   **Persistent Monitoring:** The chat and stat monitors automatically re-bind to the game client even after character logouts or reloads.
+
+---
+
+## Diagnostic & Alert Tools
+*   **PK Alert System:** Configurable alarms (Sound + Visual Red Frame) that trigger when non-mob entities attack you. Now immune to fake '/emote' pranks via color-intent filtering.
+*   **Verbose Debug Mode:** A toggleable developer console that logs raw scraper data and internal progression calculations to both the terminal and `logs/companion_debug.log`.
 
 ---
 
