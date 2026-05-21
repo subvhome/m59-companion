@@ -57,6 +57,8 @@ class SchoolCalculator:
             lvl_key = f"Level_{i}"
             if lvl_key not in levels: continue
             
+            # Check for any skill at this level in a case-insensitive way
+            # Special Rule: Blink doesn't count toward Riija level progress as everyone gets it
             skills = [s.lower() for s in levels[lvl_key] if s.lower() != "blink"]
             if any(s in knowledge_cache for s in skills):
                 max_lvl = i
@@ -88,27 +90,36 @@ class SchoolCalculator:
         point_values = {0: 0, 1: 1, 2: 2, 3: 4, 4: 6, 5: 8, 6: 10}
 
         for name, school_data in self.schools.items():
-            # Check if player knows anything in this school
             current_lvl = school_stats.get(name, 0)
-            
-            # Determine the target level we are working towards
-            target_lvl = 1
-            if current_lvl > 0:
-                # Count skills at current highest level
-                skills_at_lvl = [s.lower() for s in school_data.get(f"Level_{current_lvl}", [])]
-                known_at_lvl = sum(1 for s in skills_at_lvl if s in knowledge_cache)
-                
-                # Rule: Level > 2 or 2+ skills known means you've "passed" this level
-                if current_lvl > 2 or known_at_lvl >= 2:
-                    target_lvl = current_lvl + 1
-                else:
-                    target_lvl = current_lvl
+            if current_lvl == 0: continue # Skip schools with no progress
 
-            if target_lvl > 6:
+            # Handle Mastered Schools (Level 6)
+            if current_lvl == 6:
+                results.append({
+                    'name': name,
+                    'current_lvl': 6,
+                    'target_lvl': 6,
+                    'current_sum': 0,
+                    'target_sum': 0,
+                    'needed': 0,
+                    'mastered': True
+                })
                 continue
 
-            # --- Calculate iNeed for target_lvl ---
+            # Determine the target level we are working towards
+            skills_at_lvl = [s.lower() for s in school_data.get(f"Level_{current_lvl}", [])]
+            known_at_lvl = sum(1 for s in skills_at_lvl if s in knowledge_cache)
             
+            # Rule: Level > 2 or 2+ skills known means you've "passed" this level
+            if current_lvl > 2 or known_at_lvl >= 2:
+                target_lvl = current_lvl + 1
+            else:
+                target_lvl = current_lvl
+
+            if target_lvl > 6:
+                target_lvl = 6 # Cap at 6
+
+            # --- Calculate iNeed for target_lvl ---
             # iPoints calculation: Sum of other schools' max points + target level's points
             i_points = total_base_points - point_values.get(current_lvl, 0) + point_values.get(target_lvl, 0)
             
@@ -117,10 +128,9 @@ class SchoolCalculator:
                     (297 - (max_points * points_slope)) - \
                     ((intellect * 2.0 * points_slope) / 5.0)
             
-            # MIN_NEEDED_TO_ADVANCE is 75 in player.kod
             t_sum = max(75, t_sum)
             
-            # Scarcity adjustment: Check number of skills in PREVIOUS level
+            # Scarcity adjustment
             if target_lvl > 1:
                 prev_lvl_skills = [s.lower() for s in school_data.get(f"Level_{target_lvl-1}", [])]
                 num_in_prev = len(prev_lvl_skills)
@@ -129,7 +139,6 @@ class SchoolCalculator:
                 elif num_in_prev == 2:
                     t_sum = (t_sum * 2.0) / 3.0
             else:
-                # Level 1 always has iNeed = 297, and iHave is set to 297 by default
                 t_sum = 297
             
             # --- Calculate iHave (Sum of top 3 of target_lvl - 1) ---
@@ -140,25 +149,21 @@ class SchoolCalculator:
                 percents = sorted([knowledge_cache.get(s, 0) for s in prev_lvl_skills], reverse=True)
                 c_sum = sum(percents[:3])
             
-            # Calculate display current level (what the user "is")
-            # If they are working on getting the 2nd skill of L2, they are "Level 2 (1/2)"
             display_lvl = current_lvl
-            if target_lvl > current_lvl:
-                display_lvl = current_lvl
-            else:
-                # They are working on the current level (getting 2nd skill)
-                display_lvl = current_lvl - 1 if current_lvl > 0 else 0
+            if target_lvl <= current_lvl:
+                display_lvl = current_lvl - 1
 
-            # Only add to results if they have some knowledge or are close to Level 1
-            if current_lvl > 0 or (target_lvl == 1 and any(s in knowledge_cache for s in [sk.lower() for sk in school_data.get("Level_1", [])])):
-                results.append({
-                    'name': name,
-                    'current_lvl': display_lvl,
-                    'target_lvl': target_lvl,
-                    'current_sum': int(c_sum),
-                    'target_sum': int(t_sum),
-                    'needed': max(0, int(t_sum - c_sum))
-                })
+            results.append({
+                'name': name,
+                'current_lvl': display_lvl,
+                'target_lvl': target_lvl,
+                'current_sum': int(c_sum),
+                'target_sum': int(t_sum),
+                'needed': max(0, int(t_sum - c_sum)),
+                'mastered': False
+            })
+        
+        return results
         
         return results
 

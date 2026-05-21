@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("m59.dashboard")
 
-# Import FROZEN modules
+# Import modules
 from m59_bridge import establish_bridge, release_pid, find_available_instance, claim_pid
 from m59_scraper import capture_identity, get_blakgraph_stats, cycle_tabs_and_scrape, get_text_from_hwnd, MemoryReader
 from m59_tracker import SessionTracker
@@ -30,6 +30,7 @@ from m59_combat import CombatMonitor
 from m59_calculator import SchoolCalculator
 from m59_vault import perform_vault_scan
 from m59_updater import check_for_updates
+from m59_gps import GPSManager
 
 SETTINGS_FILE = "gui_settings.json"
 
@@ -50,7 +51,6 @@ class DraggableNotebook(ttk.Notebook):
         self.bind("<B1-Motion>", self.on_drag_motion, add=True)
 
     def on_start_drag(self, event):
-        """Identify which tab is being dragged."""
         try:
             index = self.index(f"@{event.x},{event.y}")
             self._drag_index = index
@@ -58,7 +58,6 @@ class DraggableNotebook(ttk.Notebook):
             self._drag_index = None
 
     def on_drag_motion(self, event):
-        """Reorder tabs as the mouse moves."""
         if self._drag_index is None: return
         try:
             index = self.index(f"@{event.x},{event.y}")
@@ -69,14 +68,12 @@ class DraggableNotebook(ttk.Notebook):
         except: pass
 
 class PKFrame(tk.Toplevel):
-    """Refined Strategy: 4 separate windows that form a frame around the GAME window."""
     def __init__(self, parent, target_hwnd):
         super().__init__(parent)
         self.target_hwnd = target_hwnd
         self.withdraw()
         self.overrideredirect(True)
         self.attributes("-topmost", True)
-        
         self.bars = []
         for _ in range(4):
             b = tk.Toplevel(self)
@@ -91,40 +88,46 @@ class PKFrame(tk.Toplevel):
             rect = win32gui.GetWindowRect(self.target_hwnd)
             x, y, x2, y2 = rect
             w, h = x2 - x, y2 - y
-            t = 10 # Thickness
+            t = 10
             self.bars[0].geometry(f"{w}x{t}+{x}+{y}") # Top
             self.bars[1].geometry(f"{w}x{t}+{x}+{y2-t}") # Bottom
             self.bars[2].geometry(f"{t}x{h}+{x}+{y}") # Left
             self.bars[3].geometry(f"{t}x{h}+{x2-t}+{y}") # Right
-            for b in self.bars: b.deiconify()
-            def hide():
-                for b in self.bars: b.withdraw()
-            self.after(duration * 1000, hide)
-        except: pass
+            for b in self.bars:
+                b.deiconify()
+            self.after(duration * 1000, self.hide_bars)
+        except:
+            pass
+
+    def hide_bars(self):
+        for b in self.bars:
+            b.withdraw()
 
 class M59Dashboard(tk.Tk):
     def __init__(self):
         super().__init__()
-        
         self.version = "0.00"
         try:
-            v_path = resource_path("VERSION")
-            if os.path.exists(v_path):
-                with open(v_path, "r") as f: self.version = f.read().strip()
-        except: pass
+            v_p = resource_path("VERSION")
+            if os.path.exists(v_p):
+                with open(v_p, "r") as f:
+                    self.version = f.read().strip()
+        except:
+            pass
         
         self.title(f"M59 Companion v{self.version}")
         self.geometry("1100x850")
         
-        # --- Persistent Settings ---
+        # --- Settings ---
         self.pk_alert_enabled = tk.BooleanVar(value=True)
         self.pk_sound_enabled = tk.BooleanVar(value=True)
         self.pk_frame_enabled = tk.BooleanVar(value=True)
         self.pk_sound_path = tk.StringVar(value="SystemExclamation")
         self.debug_enabled = tk.BooleanVar(value=False)
+        self.gps_discovery_enabled = tk.BooleanVar(value=False)
         self.load_settings()
         
-        # --- Internal State ---
+        # --- State ---
         self.target_pid = None
         self.pm_obj = None
         self.char_name = "Unknown"
@@ -133,12 +136,11 @@ class M59Dashboard(tk.Tk):
         self.pk_frame = None
         self.alert_active = False
         self.comms_data = {"all": [], "tells": [], "broadcasts": [], "social": [], "clean": []}
+        self.gps_manager = GPSManager()
         
-        # Pre-compile social regex patterns
+        # Patterns & Subtraction List
         import re
         self.re_speech = re.compile(r'^(.*?) (?:broadcasts?|tells?|says?|yells?|sends?), "(.*)"$', re.I)
-        
-        # Combat Filter (Subtraction logic from Blakod source)
         self.combat_verbs = {
             "wounds", "damages", "slays", "burns", "sears", "disfigures", "dissolves",
             "incinerates", "scorches", "chars", "singes", "electrocutes", "fries",
@@ -152,7 +154,6 @@ class M59Dashboard(tk.Tk):
             "blocks", "dodges", "parries", "avoids", "nicks", "fails to damage"
         }
 
-        # Tracking State
         self.session_kills = {"monsters": {}, "players": {}}
         self.all_time_kills = {"monsters": {}, "players": {}}
         self.last_tail = []
@@ -162,7 +163,7 @@ class M59Dashboard(tk.Tk):
         self.vault_data = {"barloque": [], "hungry": []}
         self.calculator = SchoolCalculator()
 
-        # --- UI Layout ---
+        # --- Layout ---
         self.status_var = tk.StringVar(value="Initializing...")
         self.status_frame = tk.Frame(self, bd=1, relief=tk.SUNKEN)
         self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
@@ -172,42 +173,30 @@ class M59Dashboard(tk.Tk):
         self.notebook = DraggableNotebook(self)
         self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
         
-        self.tab_dash = tk.Frame(self.notebook, bg="#f0f0f0")
-        self.tab_comms = tk.Frame(self.notebook, bg="#f0f0f0")
-        self.tab_prog = tk.Frame(self.notebook, bg="#f0f0f0")
-        self.tab_vault = tk.Frame(self.notebook, bg="#f0f0f0")
-        self.tab_book = tk.Frame(self.notebook, bg="#f0f0f0") 
-        self.tab_settings = tk.Frame(self.notebook, bg="#f0f0f0")
-        
-        self.notebook.add(self.tab_dash, text=" Dashboard ")
-        self.notebook.add(self.tab_comms, text=" Communications ")
-        self.notebook.add(self.tab_prog, text=" Progression ")
-        self.notebook.add(self.tab_vault, text=" Vault ")
-        self.notebook.add(self.tab_book, text=" Kill Book ")
-        self.notebook.add(self.tab_settings, text=" Settings ")
+        # Tab Creation
+        tabs = [("Dashboard", "dash"), ("Communications", "comms"), ("GPS", "gps"), ("Progression", "prog"), ("Vault", "vault"), ("Kill Book", "book"), ("Settings", "settings")]
+        for name, key in tabs:
+            f = tk.Frame(self.notebook, bg="#f0f0f0")
+            setattr(self, f"tab_{key}", f)
+            self.notebook.add(f, text=f" {name} ")
         
         self.setup_tab_dashboard()
         self.setup_tab_communications()
+        self.setup_tab_gps()
         self.setup_tab_progression()
         self.setup_tab_vault()
         self.setup_tab_book()
         self.setup_tab_settings()
         
-        # Set a more permissive minimum size
         self.minsize(400, 300)
-        
-        # Priority 1: Check for updates before touching the game
         self.after(100, self.background_update_check)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def is_combat_line(self, line):
-        """Returns True if the line matches any known Blakod combat patterns."""
         l = line.lower()
-        # Check for verbs in the line
         for verb in self.combat_verbs:
             if f" {verb} " in l or l.endswith(f" {verb}."):
                 return True
-        # Check for specific 'You' patterns
         if l.startswith("you ") and any(v in l for v in ["block", "dodge", "parry", "avoid"]):
             return True
         return False
@@ -217,14 +206,16 @@ class M59Dashboard(tk.Tk):
             try:
                 with open(SETTINGS_FILE, "r") as f:
                     s = json.load(f)
-                    geo = s.get("geometry")
-                    if geo: self.geometry(geo)
+                    if s.get("geometry"):
+                        self.geometry(s["geometry"])
                     self.pk_alert_enabled.set(s.get("pk_alert_enabled", True))
                     self.pk_sound_enabled.set(s.get("pk_sound_enabled", True))
                     self.pk_frame_enabled.set(s.get("pk_frame_enabled", True))
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
                     self.debug_enabled.set(s.get("debug_enabled", False))
-            except: pass
+                    self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
+            except:
+                pass
 
     def save_settings(self):
         try:
@@ -235,130 +226,54 @@ class M59Dashboard(tk.Tk):
                     "pk_sound_enabled": self.pk_sound_enabled.get(),
                     "pk_frame_enabled": self.pk_frame_enabled.get(),
                     "pk_sound_path": self.pk_sound_path.get(),
-                    "debug_enabled": self.debug_enabled.get()
+                    "debug_enabled": self.debug_enabled.get(),
+                    "gps_discovery_enabled": self.gps_discovery_enabled.get()
                 }, f)
-        except: pass
+        except:
+            pass
 
     def debug_log(self, category, message):
-        """Helper to print high-visibility debug info to terminal and file if enabled."""
         if self.debug_enabled.get():
             ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            log_line = f"[{ts}] [DEBUG:{category}] {message}"
-            print(log_line)
+            line = f"[{ts}] [DEBUG:{category}] {message}"
+            print(line)
             try:
-                if not os.path.exists("logs"): os.makedirs("logs")
+                if not os.path.exists("logs"):
+                    os.makedirs("logs")
                 with open("logs/companion_debug.log", "a", encoding="utf-8") as f:
-                    f.write(log_line + "\n")
-            except: pass
+                    f.write(line + "\n")
+            except:
+                pass
 
-    def setup_tab_book(self):
-        """Creates the Kill Book tab."""
-        header = tk.Frame(self.tab_book, bg="#f0f0f0"); header.pack(fill="x", padx=10, pady=5)
-        tk.Label(header, text="The Eternal Kill Book", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
-        cont = tk.Frame(self.tab_book, bg="#f0f0f0"); cont.pack(fill="both", expand=True, padx=5, pady=5)
-        self.book_widgets = {}
-        for kt in ["monsters", "players"]:
-            title = " Monsters Slain " if kt == "monsters" else " Players & Notables "
-            f = tk.LabelFrame(cont, text=f" {title} ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-            f.pack(side="left", fill="both", expand=True, padx=5)
-            row = tk.Frame(f, bg="#f0f0f0"); row.pack(fill="x", padx=5, pady=5)
-            tk.Label(row, text="Filter:", bg="#f0f0f0", font=("Arial", 8)).pack(side="left")
-            fv = tk.StringVar(); fv.trace_add("write", lambda *a, k=kt: self.update_book_tree(k))
-            tk.Entry(row, textvariable=fv, width=15).pack(side="left", padx=2)
-            tr = ttk.Treeview(f, columns=("Name", "AllTime", "Session"), show="headings", height=15)
-            tr.heading("Name", text="Victim"); tr.heading("AllTime", text="Total"); tr.heading("Session", text="Session")
-            tr.column("Name", width=150); tr.column("AllTime", width=60, anchor="center"); tr.column("Session", width=60, anchor="center")
-            tr.pack(fill="both", expand=True, padx=5, pady=2)
-            self.book_widgets[kt] = {"tree": tr, "filter_var": fv}
-
-    def update_book_tree(self, ktype):
-        w = self.book_widgets[ktype]; tr = w["tree"]; fv = w["filter_var"]
-        for i in tr.get_children(): tr.delete(i)
-        ft = fv.get().lower()
-        victims = set(self.all_time_kills[ktype].keys()) | set(self.session_kills[ktype].keys())
-        for v in sorted(list(victims)):
-            if ft in v.lower():
-                at = self.all_time_kills[ktype].get(v, 0); se = self.session_kills[ktype].get(v, 0)
-                tr.insert("", "end", values=(v, max(at, se), f"+{se}" if se > 0 else ""))
-
-    def load_kill_book(self):
-        if self.char_name == "Unknown": return
-        p = f"logs/{self.char_name.replace(' ', '_')}_kills.json"
-        if os.path.exists(p):
-            try:
-                with open(p, "r") as f:
-                    d = json.load(f); from m59_combat import CombatMonitor; tm = CombatMonitor(self.char_name)
-                    self.all_time_kills = {"monsters": {}, "players": {}}
-                    for cat in ["monsters", "players"]:
-                        for v, c in d.get(cat, {}).items():
-                            l = v.lower(); is_m = l in tm.mob_set or (l.startswith("the ") and l[4:] in tm.mob_set) or (l.startswith("a ") and l[2:] in tm.mob_set)
-                            nc = "monsters" if is_m else "players"; self.all_time_kills[nc][v] = self.all_time_kills[nc].get(v, 0) + c
-                self.update_book_tree("monsters"); self.update_book_tree("players")
-            except: pass
-
-    def setup_tab_settings(self):
-        container = tk.Frame(self.tab_settings, bg="#f0f0f0"); container.pack(fill="both", expand=True, padx=20, pady=20)
-        tk.Label(container, text="Companion Settings", font=("Arial", 14, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(0, 20))
-        pk_group = tk.LabelFrame(container, text=" Player Killer (PK) Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15); pk_group.pack(fill="x")
-        tk.Checkbutton(pk_group, text="Enable Global PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0", font=("Arial", 10)).pack(anchor="w")
-        sub = tk.Frame(pk_group, bg="#f0f0f0", padx=20); sub.pack(fill="x", pady=10)
-        tk.Checkbutton(sub, text="Play Alert Sound", variable=self.pk_sound_enabled, bg="#f0f0f0").grid(row=0, column=0, sticky="w")
-        sbf = tk.Frame(sub, bg="#f0f0f0"); sbf.grid(row=0, column=1, padx=20)
-        tk.Entry(sbf, textvariable=self.pk_sound_path, width=40, state="readonly").pack(side="left")
-        tk.Button(sbf, text="Browse...", command=self.browse_sound).pack(side="left", padx=5); tk.Button(sbf, text="▶", command=self.test_sound).pack(side="left")
-        tk.Checkbutton(sub, text="Show In-Game Red Frame (Visual)", variable=self.pk_frame_enabled, bg="#f0f0f0").grid(row=1, column=0, sticky="w", pady=5)
-        
-        # Developer/Debug Group
-        dev_group = tk.LabelFrame(container, text=" Developer & Diagnostic Tools ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15); dev_group.pack(fill="x", pady=10)
-        tk.Checkbutton(dev_group, text="Enable Verbose Debug Mode (Terminal Output)", variable=self.debug_enabled, bg="#f0f0f0", font=("Arial", 10)).pack(anchor="w")
-        tk.Label(dev_group, text="Outputs internal scraper data and school calculations to the console.", font=("Arial", 8, "italic"), bg="#f0f0f0", fg="gray").pack(anchor="w", padx=20)
-
-        tk.Button(container, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
-
-    def browse_sound(self):
-        p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
-        if p: self.pk_sound_path.set(p)
-
-    def test_sound(self):
-        p = self.pk_sound_path.get()
-        try:
-            if p == "SystemExclamation": winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
-            else: winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
-        except: messagebox.showerror("Error", "Could not play sound.")
+    def gps_log(self, message):
+        if self.debug_enabled.get() or self.gps_discovery_enabled.get():
+            self.debug_log("GPS", message)
 
     def setup_tab_communications(self):
-        """Creates a unified Communications Hub for live chat and historical logs."""
         paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
         paned.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # --- Left Sidebar: Channels & History ---
         sidebar = tk.Frame(paned, bg="#f0f0f0")
         paned.add(sidebar, weight=1)
         
-        # 1. Live Channels Section
-        tk.Label(sidebar, text=" LIVE CHANNELS ", font=("Arial", 9, "bold"), bg="#ddd", fg="#333").pack(fill="x", pady=(0, 5))
+        tk.Label(sidebar, text=" LIVE CHANNELS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
         for cat in ["All Chat", "Clean Feed", "Tells", "Broadcasts", "Social"]:
-            btn = tk.Button(sidebar, text=cat, command=lambda c=cat: self.show_comms_channel(c), font=("Arial", 8), anchor="w", padx=10)
-            btn.pack(fill="x", padx=5, pady=1)
-
-        # 2. History Section
-        tk.Label(sidebar, text=" HISTORICAL LOGS ", font=("Arial", 9, "bold"), bg="#ddd", fg="#333").pack(fill="x", pady=(15, 5))
-        
-        list_frame = tk.Frame(sidebar, bg="#f0f0f0")
-        list_frame.pack(fill="x", padx=5)
-        self.log_file_list = ttk.Combobox(list_frame, state="readonly", font=("Arial", 8))
-        self.log_file_list.pack(side="left", fill="x", expand=True)
+            tk.Button(sidebar, text=cat, command=lambda c=cat: self.show_comms_channel(c),
+                      font=("Arial", 8), anchor="w", padx=10).pack(fill="x", padx=5, pady=1)
+            
+        tk.Label(sidebar, text=" HISTORICAL LOGS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
+        self.log_file_list = ttk.Combobox(sidebar, state="readonly", font=("Arial", 8))
+        self.log_file_list.pack(fill="x", padx=5)
         self.log_file_list.bind("<<ComboboxSelected>>", self.load_historical_log)
         
         btn_row = tk.Frame(sidebar, bg="#f0f0f0")
         btn_row.pack(fill="x", padx=5, pady=5)
-        tk.Button(btn_row, text="Refresh List", command=self.refresh_log_list, font=("Arial", 7)).pack(side="left", fill="x", expand=True)
-        tk.Button(btn_row, text="Open Folder", command=lambda: os.startfile(os.path.abspath("logs")), font=("Arial", 7)).pack(side="left", fill="x", expand=True, padx=2)
-
-        # --- Right Side: The Unified Feed ---
+        tk.Button(btn_row, text="Refresh", command=self.refresh_log_list, font=("Arial", 7)).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("logs")),
+                  font=("Arial", 7)).pack(side="left", fill="x", expand=True, padx=2)
+        
         right = tk.Frame(paned, bg="#f0f0f0")
         paned.add(right, weight=4)
-        
         self.comms_header_lbl = tk.Label(right, text="All Chat (Live Stream)", font=("Arial", 11, "bold"), bg="#f0f0f0")
         self.comms_header_lbl.pack(pady=5)
         
@@ -371,464 +286,633 @@ class M59Dashboard(tk.Tk):
         self.comms_header_lbl.config(text=channel)
         self.comms_view.config(state="normal")
         self.comms_view.delete("1.0", tk.END)
-        
-        # Map channel names to data keys
-        key_map = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}
-        key = key_map.get(channel, "all")
-        
+        key = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}.get(channel, "all")
         for line in self.comms_data[key]:
             self.comms_view.insert(tk.END, line + "\n")
-        
         self.comms_view.see(tk.END)
         self.comms_view.config(state="disabled")
 
     def load_historical_log(self, event=None):
-        """Loads historical log into the same view as live chat."""
-        filename = self.log_file_list.get()
-        if not filename: return
-        
-        self.current_comms_channel = f"History: {filename}"
-        self.comms_header_lbl.config(text=f"Viewing Log: {filename}")
-        
-        path = os.path.join("logs", filename)
+        fn = self.log_file_list.get()
+        if not fn:
+            return
+        self.current_comms_channel = f"History: {fn}"
+        self.comms_header_lbl.config(text=f"Viewing Log: {fn}")
+        path = os.path.join("logs", fn)
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            
             self.comms_view.config(state="normal")
             self.comms_view.delete("1.0", tk.END)
             self.comms_view.insert(tk.END, content)
             self.comms_view.see(tk.END)
             self.comms_view.config(state="disabled")
         except Exception as e:
-            logger.error(f"Failed to load log {filename}: {e}")
+            logger.error(f"Failed to load {fn}: {e}")
 
     def append_comms_line(self, line):
-        """Unified entry point for all chat. Routes to internal buffers and updates live view."""
-        ts_str = f"[{datetime.now().strftime('%H:%M:%S')}] {line}"
+        ts = f"[{datetime.now().strftime('%H:%M:%S')}] {line}"
+        self.comms_data["all"].append(ts)
+        if len(self.comms_data["all"]) > 500:
+            self.comms_data["all"].pop(0)
         
-        # 1. Always add to 'All Chat'
-        self.comms_data["all"].append(ts_str)
-        if len(self.comms_data["all"]) > 500: self.comms_data["all"].pop(0)
+        is_c = self.is_combat_line(line)
+        t_k = "social"
+        if not is_c:
+            self.comms_data["clean"].append(ts)
+            if len(self.comms_data["clean"]) > 500:
+                self.comms_data["clean"].pop(0)
+            l = line.lower()
+            if "broadcasts," in l or "broadcasts:" in l:
+                t_k = "broadcasts"
+            elif "tells you," in l or "you tell" in l or "sends," in l:
+                t_k = "tells"
+            self.comms_data[t_k].append(ts)
+            if len(self.comms_data[t_k]) > 500:
+                self.comms_data[t_k].pop(0)
         
-        # 2. Check if it's combat
-        is_combat = self.is_combat_line(line)
-        target_key = None
-        
-        if not is_combat:
-            # 2a. Clean Feed (Social + System)
-            self.comms_data["clean"].append(ts_str)
-            if len(self.comms_data["clean"]) > 500: self.comms_data["clean"].pop(0)
-            
-            # 2b. Specific Social Channels
-            l_lower = line.lower()
-            target_key = "social"
-            if "broadcasts," in l_lower or "broadcasts:" in l_lower: target_key = "broadcasts"
-            elif "tells you," in l_lower or "you tell" in l_lower or "sends," in l_lower: target_key = "tells"
-            
-            self.comms_data[target_key].append(ts_str)
-            if len(self.comms_data[target_key]) > 500: self.comms_data[target_key].pop(0)
-        
-        # 3. Live Update the UI if viewing a live channel
-        key_map = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}
-        current_view_key = key_map.get(self.current_comms_channel)
-        
-        if current_view_key == "all" or (not is_combat and current_view_key in ["clean", target_key]):
+        v_k = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}.get(self.current_comms_channel)
+        if v_k == "all" or (not is_c and v_k in ["clean", t_k]):
             self.comms_view.config(state="normal")
-            self.comms_view.insert(tk.END, ts_str + "\n")
+            self.comms_view.insert(tk.END, ts + "\n")
             self.comms_view.see(tk.END)
             self.comms_view.config(state="disabled")
 
+    def setup_tab_gps(self):
+        """Creates the GPS Discovery tab."""
+        header = tk.Frame(self.tab_gps, bg="#f0f0f0")
+        header.pack(fill="x", padx=10, pady=5)
+        tk.Label(header, text="World Map & GPS Discovery", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
+        
+        # --- Under Construction Banner ---
+        banner = tk.Frame(self.tab_gps, bg="#FFF9C4", bd=1, relief=tk.SOLID)
+        banner.pack(fill="x", padx=10, pady=5)
+        tk.Label(banner, text="🚧 FEATURE UNDER CONSTRUCTION 🚧", font=("Arial", 10, "bold"), bg="#FFF9C4", fg="#F57F17").pack(pady=5)
+        tk.Label(banner, text="This module is currently in development and is not yet ready for public testing.", 
+                 font=("Arial", 8, "italic"), bg="#FFF9C4", fg="#F57F17").pack(pady=(0, 5))
+        
+        cont = tk.Frame(self.tab_gps, bg="#f0f0f0")
+        cont.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        loc_f = tk.LabelFrame(cont, text=" Current Location ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        loc_f.pack(fill="x", padx=5, pady=5)
+        self.gps_loc_lbl = tk.Label(loc_f, text="Detecting...", font=("Consolas", 14, "bold"), fg="#1565C0", bg="#f0f0f0", pady=10)
+        self.gps_loc_lbl.pack(fill="x")
+        
+        stat_f = tk.Frame(cont, bg="#f0f0f0")
+        stat_f.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        left = tk.LabelFrame(stat_f, text=" Discovered Rooms ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        left.pack(side="left", fill="both", expand=True, padx=5)
+        self.gps_room_list = tk.Listbox(left, font=("Arial", 9), bg="white")
+        self.gps_room_list.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        right = tk.LabelFrame(stat_f, text=" Fast Transitions ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        right.pack(side="left", fill="both", expand=True, padx=5)
+        self.gps_trans_view = scrolledtext.ScrolledText(right, font=("Consolas", 9), bg="#1e1e1e", fg="#00FF00")
+        self.gps_trans_view.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        self.update_gps_ui()
+
+    def update_gps_ui(self):
+        """Refreshes the GPS tab with current map data."""
+        self.gps_room_list.delete(0, tk.END)
+        for room in sorted(self.gps_manager.m59_map.keys()):
+            self.gps_room_list.insert(tk.END, room)
+        
+        self.gps_trans_view.config(state="normal")
+        self.gps_trans_view.delete("1.0", tk.END)
+        for room, data in sorted(self.gps_manager.m59_map.items()):
+            for conn, dur in data.get("connections", {}).items():
+                self.gps_trans_view.insert(tk.END, f"{room} -> {conn.split(':')[1]}: {dur}s\n")
+        self.gps_trans_view.config(state="disabled")
+
     def setup_tab_dashboard(self):
-        top = tk.Frame(self.tab_dash, bg="#f0f0f0"); top.pack(fill="x", padx=10, pady=5)
+        top = tk.Frame(self.tab_dash, bg="#f0f0f0")
+        top.pack(fill="x", padx=10, pady=5)
         self.hud_values = {}
         for s in ["HP", "MP", "VG"]:
-            f = tk.Frame(top, bg="#f0f0f0"); f.pack(side="left", padx=20)
+            f = tk.Frame(top, bg="#f0f0f0")
+            f.pack(side="left", padx=20)
             tk.Label(f, text=f"{s}:", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
             val = tk.Label(f, text="---", font=("Arial", 12), bg="#f0f0f0", width=4, anchor="w")
-            val.pack(side="left", padx=5); self.hud_values[s] = val
-        self.countdown_lbl = tk.Label(top, text="10s", font=("Arial", 8), bg="#f0f0f0", fg="gray"); self.countdown_lbl.pack(side="right", padx=10)
-        grid = tk.Frame(self.tab_dash, bg="#f0f0f0"); grid.pack(fill="both", expand=True, padx=10, pady=5)
+            val.pack(side="left", padx=5)
+            self.hud_values[s] = val
+        self.countdown_lbl = tk.Label(top, text="10s", font=("Arial", 8), bg="#f0f0f0", fg="gray")
+        self.countdown_lbl.pack(side="right", padx=10)
+        grid = tk.Frame(self.tab_dash, bg="#f0f0f0")
+        grid.pack(fill="both", expand=True, padx=10, pady=5)
         attr_col = tk.LabelFrame(grid, text=" Attributes ", bg="#f0f0f0", font=("Arial", 10, "bold"))
         attr_col.pack(side="left", fill="both", expand=False, padx=5)
         self.attr_labels = {}
         for a in ["Might", "Intellect", "Stamina", "Agility", "Mysticism", "Aim", "Karma"]:
-            f = tk.Frame(attr_col, bg="#f0f0f0"); f.pack(fill="x", pady=4, padx=5)
+            f = tk.Frame(attr_col, bg="#f0f0f0")
+            f.pack(fill="x", pady=4, padx=5)
             tk.Label(f, text=f"{a}:", font=("Arial", 10), bg="#f0f0f0", width=10, anchor="w").pack(side="left")
             v = tk.Label(f, text="--", font=("Arial", 10, "bold"), bg="#f0f0f0", width=5, anchor="e")
-            v.pack(side="right"); self.attr_labels[a] = v
+            v.pack(side="right")
+            self.attr_labels[a] = v
         gains_col = tk.LabelFrame(grid, text=" Session Improves ", bg="#f0f0f0", font=("Arial", 10, "bold"))
         gains_col.pack(side="left", fill="both", expand=True, padx=5)
         self.gains_tree = ttk.Treeview(gains_col, columns=("Name", "Count", "Delta"), show="headings", height=10)
         for c, w in [("Name", 120), ("Count", 50), ("Delta", 80)]:
-            self.gains_tree.heading(c, text=c); self.gains_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
+            self.gains_tree.heading(c, text=c)
+            self.gains_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
         self.gains_tree.pack(fill="both", expand=True)
         kills_col = tk.LabelFrame(grid, text=" Session Kills ", bg="#f0f0f0", font=("Arial", 10, "bold"))
         kills_col.pack(side="left", fill="both", expand=True, padx=5)
         self.kills_tree = ttk.Treeview(kills_col, columns=("Name", "Count"), show="headings", height=10)
         for c, w in [("Name", 120), ("Count", 60)]:
-            self.kills_tree.heading(c, text=c); self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
+            self.kills_tree.heading(c, text=c)
+            self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
         self.kills_tree.pack(fill="both", expand=True)
 
     def setup_tab_progression(self):
-        ctrl = tk.Frame(self.tab_prog, bg="#f0f0f0"); ctrl.pack(fill="x", padx=10, pady=10)
+        ctrl = tk.Frame(self.tab_prog, bg="#f0f0f0")
+        ctrl.pack(fill="x", padx=10, pady=10)
         tk.Label(ctrl, text="Real-time School Progression Goals", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
-        self.sync_btn = tk.Button(ctrl, text="Sync All (Tab Dance)", command=self.trigger_sync, bg="#2196F3", fg="white", font=("Arial", 10, "bold"), padx=15); self.sync_btn.pack(side="right")
-        
-        # Use a treeview that supports expansion (show="tree headings")
-        # Column #0 will be the "School / Ability" column
+        self.sync_btn = tk.Button(ctrl, text="Sync All (Tab Dance)", command=self.trigger_sync, bg="#2196F3", fg="white", font=("Arial", 10, "bold"), padx=15)
+        self.sync_btn.pack(side="right")
         self.prog_tree = ttk.Treeview(self.tab_prog, columns=("Level", "Sum", "Goal", "Needed"), show="tree headings")
         self.prog_tree.heading("#0", text="School / Ability")
         self.prog_tree.column("#0", width=220)
-        
         for c, w in [("Level", 80), ("Sum", 100), ("Goal", 100), ("Needed", 100)]:
             self.prog_tree.heading(c, text=c)
             self.prog_tree.column(c, width=w, anchor="center")
-            
         self.prog_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
     def setup_tab_vault(self):
-        header = tk.Frame(self.tab_vault, bg="#f0f0f0"); header.pack(fill="x", padx=10, pady=5)
-        tk.Label(header, text="Vault Inventory Tracker", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
-        cont = tk.Frame(self.tab_vault, bg="#f0f0f0"); cont.pack(fill="both", expand=True, padx=5, pady=5)
+        cont = tk.Frame(self.tab_vault, bg="#f0f0f0")
+        cont.pack(fill="both", expand=True, padx=5, pady=5)
         self.vault_widgets = {}
         for vt in ["barloque", "hungry"]:
-            f = tk.LabelFrame(cont, text=f" {vt.title()} Vault ", bg="#f0f0f0", font=("Arial", 10, "bold")); f.pack(side="left", fill="both", expand=True, padx=5)
-            row = tk.Frame(f, bg="#f0f0f0"); row.pack(fill="x", padx=5, pady=5)
+            f = tk.LabelFrame(cont, text=f" {vt.title()} Vault ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+            f.pack(side="left", fill="both", expand=True, padx=5)
+            row = tk.Frame(f, bg="#f0f0f0")
+            row.pack(fill="x", padx=5, pady=5)
             tk.Label(row, text="Filter:", bg="#f0f0f0", font=("Arial", 8)).pack(side="left")
-            fv = tk.StringVar(); fv.trace_add("write", lambda *a, v=vt: self.update_vault_tree(v))
+            fv = tk.StringVar()
+            fv.trace_add("write", lambda *a, v=vt: self.update_vault_tree(v))
             tk.Entry(row, textvariable=fv, width=15).pack(side="left", padx=2)
-            btn = tk.Button(row, text="↻", command=lambda v=vt: self.trigger_vault_scan(v), bg="#FF9800" if vt=="barloque" else "#607D8B", fg="white", font=("Arial", 10, "bold"), padx=5)
+            btn = tk.Button(row, text="Scan Vault", command=lambda v=vt: self.trigger_vault_scan(v), bg="#2E7D32" if vt=="barloque" else "#1565C0", fg="white", font=("Arial", 8, "bold"), padx=10)
             btn.pack(side="right")
-            if vt == "hungry":
-                btn.config(state="disabled")
             tr = ttk.Treeview(f, columns=("Name", "Qty"), show="headings", height=15)
-            tr.heading("Name", text="Item"); tr.heading("Qty", text="Qty"); tr.column("Name", width=150); tr.column("Qty", width=50, anchor="center")
+            tr.heading("Name", text="Item")
+            tr.heading("Qty", text="Qty")
+            tr.column("Name", width=150)
+            tr.column("Qty", width=50, anchor="center")
             tr.pack(fill="both", expand=True, padx=5, pady=2)
-            sl = tk.Label(f, text="No scan data", font=("Arial", 7, "italic"), bg="#f0f0f0", fg="gray"); sl.pack(side="bottom", fill="x")
+            sl = tk.Label(f, text="No scan data", font=("Arial", 7, "italic"), bg="#f0f0f0", fg="gray")
+            sl.pack(side="bottom", fill="x")
             self.vault_widgets[vt] = {"tree": tr, "filter_var": fv, "status_lbl": sl, "sync_btn": btn}
 
+    def setup_tab_book(self):
+        cont = tk.Frame(self.tab_book, bg="#f0f0f0")
+        cont.pack(fill="both", expand=True, padx=5, pady=5)
+        self.book_widgets = {}
+        for kt in ["monsters", "players"]:
+            f = tk.LabelFrame(cont, text=f" {kt.title()} ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+            f.pack(side="left", fill="both", expand=True, padx=5)
+            row = tk.Frame(f, bg="#f0f0f0")
+            row.pack(fill="x", padx=5, pady=5)
+            fv = tk.StringVar()
+            fv.trace_add("write", lambda *a, k=kt: self.update_book_tree(k))
+            tk.Label(row, text="Filter:", bg="#f0f0f0", font=("Arial", 8)).pack(side="left")
+            tk.Entry(row, textvariable=fv, width=15).pack(side="left", padx=2)
+            tr = ttk.Treeview(f, columns=("Name", "AllTime", "Session"), show="headings", height=15)
+            tr.heading("Name", text="Victim")
+            tr.heading("AllTime", text="Total")
+            tr.heading("Session", text="Session")
+            tr.column("Name", width=150)
+            tr.column("AllTime", width=60, anchor="center")
+            tr.column("Session", width=60, anchor="center")
+            tr.pack(fill="both", expand=True, padx=5, pady=2)
+            self.book_widgets[kt] = {"tree": tr, "filter_var": fv}
+
+    def setup_tab_settings(self):
+        c = tk.Frame(self.tab_settings, bg="#f0f0f0")
+        c.pack(fill="both", expand=True, padx=20, pady=20)
+        tk.Label(c, text="Companion Settings", font=("Arial", 14, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(0, 20))
+        pg = tk.LabelFrame(c, text=" Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        pg.pack(fill="x")
+        tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
+        gg = tk.LabelFrame(c, text=" GPS & Navigation ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        gg.pack(fill="x", pady=10)
+        tk.Checkbutton(gg, text="Enable GPS Discovery", variable=self.gps_discovery_enabled, bg="#f0f0f0").pack(anchor="w")
+        dg = tk.LabelFrame(c, text=" Diagnostics ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        dg.pack(fill="x")
+        tk.Checkbutton(dg, text="Verbose Debug Mode", variable=self.debug_enabled, bg="#f0f0f0").pack(anchor="w")
+        tk.Button(c, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
+
     def refresh_log_list(self):
-        """Populates the log file list from the logs directory."""
-        if not os.path.exists("logs"): 
+        if not os.path.exists("logs"):
             os.makedirs("logs", exist_ok=True)
-        
-        # Filter out the debug log so it's not visible in the UI viewer
         files = [f for f in os.listdir("logs") if f.endswith(".log") and "debug" not in f.lower()]
-        # Sort by modification time, newest first
         files.sort(key=lambda x: os.path.getmtime(os.path.join("logs", x)), reverse=True)
         self.log_file_list['values'] = files
         if files:
             self.log_file_list.current(0)
 
     def trigger_pk_alert(self):
-        if not self.pk_alert_enabled.get(): return
+        if not self.pk_alert_enabled.get():
+            return
         self.alert_active = True
+        self.debug_log("ALERT", "PVP Alert Triggered!")
         if self.pk_sound_enabled.get():
             p = self.pk_sound_path.get()
             try:
-                if p == "SystemExclamation": winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
-                else: winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
-            except: pass
-        if self.pk_frame_enabled.get() and self.pk_frame: self.pk_frame.flash()
+                if p == "SystemExclamation":
+                    winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                else:
+                    winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            except Exception as e:
+                self.debug_log("ALERT", f"Sound error: {e}")
+        if self.pk_frame_enabled.get() and self.pk_frame:
+            self.pk_frame.flash()
         self.after(5000, self.reset_pk_alert)
 
     def reset_pk_alert(self):
-        self.alert_active = False; self.tab_dash.config(bg="#f0f0f0"); self.status_bar.config(bg="SystemButtonFace")
+        self.alert_active = False
 
     def establish_connection(self):
         self.status_var.set("Scanning for game...")
+        self.debug_log("CONN", "Starting connection handshake...")
         try:
             insts = self.find_all_instances()
             if not insts:
-                if messagebox.askretrycancel("Error", "No game found."): self.establish_connection()
-                else: self.destroy(); return
-            
-            if len(insts) == 1: 
+                if messagebox.askretrycancel("Error", "No game found."):
+                    self.establish_connection()
+                else:
+                    self.destroy()
+                    return
+            if len(insts) == 1:
                 self.pm_obj, self.target_pid = establish_bridge()
                 self.main_hwnd = insts[0]["hwnd"]
+                self.debug_log("CONN", f"Bridge established - PID: {self.target_pid}")
             else:
                 from tkinter import Toplevel, Listbox
-                sel_win = Toplevel(self); sel_win.title("Select Instance"); sel_win.geometry("400x300")
-                lb = Listbox(sel_win, width=50); lb.pack(padx=20, pady=10, fill="both", expand=True)
-                for i in insts: lb.insert("end", f"PID: {i['pid']} | {i['title']}")
+                sel = Toplevel(self)
+                lb = Listbox(sel, width=50)
+                lb.pack(padx=20, pady=10)
+                for i in insts:
+                    lb.insert("end", f"PID: {i['pid']} | {i['title']}")
                 def on_sel():
                     s = lb.curselection()
                     if s:
                         self.target_pid = int(lb.get(s[0]).split("|")[0].replace("PID:", "").strip())
-                        self.main_hwnd = next(x["hwnd"] for x in insts if x["pid"] == self.target_pid); sel_win.destroy()
-                tk.Button(sel_win, text="Connect", command=on_sel).pack(pady=10)
-                self.wait_window(sel_win)
-                if not self.target_pid: self.destroy(); return
-                import pymem; self.pm_obj = pymem.Pymem(self.target_pid); claim_pid(self.target_pid)
+                        self.main_hwnd = next(x["hwnd"] for x in insts if x["pid"] == self.target_pid)
+                        sel.destroy()
+                tk.Button(sel, text="Connect", command=on_sel).pack()
+                self.wait_window(sel)
+                import pymem
+                self.pm_obj = pymem.Pymem(self.target_pid)
+                claim_pid(self.target_pid)
+                self.debug_log("CONN", f"Manual bridge established - PID: {self.target_pid}")
             
-            # Step 1: Lightweight capture of identity
             self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
+            self.debug_log("CONN", f"Identity captured: {self.char_name}")
             self.title(f"M59 Companion v{self.version} - {self.char_name}")
             self.status_var.set(f"Connected: {self.char_name}")
-            
-            # Step 2: Delay the heavy profile loading to allow UI to breathe
             self.after(500, self._post_connection_init)
-            
         except Exception as e:
-            self.debug_log("CONN", f"Connection error: {e}")
+            self.debug_log("CONN", f"Error: {e}")
             self.destroy()
 
     def _post_connection_init(self):
-        """Heavy lifting: Load history, start monitors, and perform first sync."""
-        if not self.is_running: return
+        if not self.is_running:
+            return
         self.debug_log("INIT", "Starting heavy profile initialization...")
         try:
             self.load_vault_cache()
             self.load_kill_book()
             self.refresh_log_list()
             self.pk_frame = PKFrame(self, self.main_hwnd)
-            
-            # Start asynchronous background loops
             self.update_hud()
             self.start_chat_monitor()
-            
-            # Perform first full data capture
+            self.debug_log("INIT", "Starting automatic startup sync...")
             threading.Thread(target=self.perform_sync, daemon=True).start()
-            
-            self.debug_log("INIT", "Profile initialization complete.")
         except Exception as e:
             self.debug_log("INIT", f"Post-connection error: {e}")
 
     def update_hud(self):
-        if not self.main_hwnd or not self.is_running: return
+        if not self.main_hwnd or not self.is_running:
+            return
         self.refresh_counter -= 1
         if self.refresh_counter <= 0:
             self.refresh_counter = 10
             try:
                 st = get_blakgraph_stats(self.main_hwnd)
                 if st:
-                    for k, l in self.hud_values.items():
-                        if k in st: l.config(text=str(st[k]))
-                    for k, l in self.attr_labels.items():
-                        if k in st: self.current_attributes[k] = st[k]; l.config(text=str(st[k]))
-                    # Progression now only updates on Sync (Tab Dance) or Startup
-            except: pass
-        self.countdown_lbl.config(text=f"{self.refresh_counter}s"); self.after(1000, self.update_hud)
+                    # Log raw stats in high debug
+                    self.debug_log("DATA", f"Raw stats from memory: {list(st.keys())}")
+                    for k, v in st.items():
+                        if k in self.hud_values:
+                            self.hud_values[k].config(text=str(v))
+                        if k in self.attr_labels:
+                            self.current_attributes[k] = v
+                            self.attr_labels[k].config(text=str(v))
+                if self.gps_discovery_enabled.get():
+                    self.monitor_gps_discovery()
+            except Exception as e:
+                self.debug_log("HUD", f"Update error: {e}")
+        self.countdown_lbl.config(text=f"{self.refresh_counter}s")
+        self.after(1000, self.update_hud)
 
-    def manage_rotation(self, log_path):
-        """Handles 24-hour rotation with unique timestamps."""
-        if not os.path.exists(log_path): return
-        creation_time = os.path.getctime(log_path)
-        if time.time() - creation_time > 86400: # 24 hours
-            safe_name = self.char_name.replace(" ", "_")
-            now_ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-            rotated_path = os.path.join("logs", f"{safe_name}_chat_{now_ts}.log")
-            try:
-                os.rename(log_path, rotated_path)
-                logger.info(f"ROTATION: Moved old log to {os.path.basename(rotated_path)}")
-                self.after(0, self.refresh_log_list)
-            except: pass
+    def monitor_gps_discovery(self):
+        cur = self.get_current_room()
+        if cur == "Unknown Location":
+            return
+        self.gps_loc_lbl.config(text=cur)
+        was_t, msg = self.gps_manager.process_room_update(cur)
+        if msg:
+            self.gps_log(msg)
+            self.update_gps_ui()
 
     def start_chat_monitor(self):
         def loop():
-            tr = SessionTracker(); co = CombatMonitor(self.char_name)
+            tr = SessionTracker()
+            co = CombatMonitor(self.char_name)
+            self.debug_log("CHAT", "Monitor thread started.")
             ch = win32gui.GetDlgItem(self.main_hwnd, 1005)
-            if not ch: return
-            
-            safe_name = self.char_name.replace(" ", "_")
-            log_path = os.path.join("logs", f"{safe_name}_chat.log")
-            
-            cur = get_text_from_hwnd(ch); lines = [l.strip() for l in cur.splitlines() if l.strip()]
+            if not ch:
+                self.debug_log("CHAT", "ERROR: Chat control (1005) not found.")
+                return
+            safe_n = self.char_name.replace(" ", "_")
+            log_p = os.path.join("logs", f"{safe_n}_chat.log")
+            cur = get_text_from_hwnd(ch)
+            lines = [l.strip() for l in cur.splitlines() if l.strip()]
             self.last_tail = lines[-50:] if lines else []
-            
             while self.is_running:
                 try:
                     self.pm_obj.read_int(self.pm_obj.base_address)
-                    self.manage_rotation(log_path)
-                    
-                    # Re-validate chat handle (ID 1005) to handle logout/login recreation
-                    ch_current = win32gui.GetDlgItem(self.main_hwnd, 1005)
-                    if ch_current and ch_current != ch:
-                        self.debug_log("CHAT", f"Chat handle changed from {ch} to {ch_current}. Re-binding...")
-                        ch = ch_current
-
+                    c_c = win32gui.GetDlgItem(self.main_hwnd, 1005)
+                    if c_c and c_c != ch:
+                        self.debug_log("CHAT", "Re-binding to new chat handle...")
+                        ch = c_c
                     if not ch:
-                        time.sleep(1); continue
-
-                    cur = get_text_from_hwnd(ch); lines = [l.strip() for l in cur.splitlines() if l.strip()]
-                    new = []; found = -1; tail = list(self.last_tail)
+                        time.sleep(1)
+                        continue
+                    cur = get_text_from_hwnd(ch)
+                    lines = [l.strip() for l in cur.splitlines() if l.strip()]
+                    new = []
+                    found = -1
+                    tail = list(self.last_tail)
                     while tail:
-                        tl = len(tail); search = lines[-100-tl:] if len(lines) > 100 else lines; off = len(lines) - len(search)
+                        tl = len(tail)
+                        search = lines[-100-tl:] if len(lines) > 100 else lines
+                        off = len(lines) - len(search)
                         for i in range(len(search) - tl, -1, -1):
-                            if search[i:i+tl] == tail: found = off + i + tl; break
-                        if found != -1: break
+                            if search[i:i+tl] == tail:
+                                found = off + i + tl
+                                break
+                        if found != -1:
+                            break
                         tail.pop(0)
-                    if found != -1: new = lines[found:]
-                    elif lines: self.last_tail = lines[-50:]
-                    
+                    if found != -1:
+                        new = lines[found:]
                     if new:
                         ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
                         try:
-                            with open(log_path, "a", encoding="utf-8") as f:
+                            with open(log_p, "a", encoding="utf-8") as f:
                                 for l in new:
                                     f.write(f"{ts} {l}\n")
-                                    
-                                    # Unified routing for all lines to the Comms Hub
                                     self.after(0, lambda ln=l: self.append_comms_line(ln))
-                                    
                                     try:
-                                        # 1. Gain Tracking
                                         g = tr.process_line(l)
-                                        if g: self.after(0, lambda gn=g: self.on_gain_detected(gn))
-                                        
-                                        # 2. Combat Logic (Internal processing)
+                                        if g:
+                                            self.debug_log("GAIN", f"Skill improvement: {g['name']}")
+                                            self.after(0, lambda gn=g: self.on_gain_detected(gn))
                                         if self.is_combat_line(l):
                                             r = co.process_line(l)
                                             if r:
-                                                if r["type"] == "KILL": self.after(0, lambda res=r: self.on_kill_detected(res))
-                                                elif r["type"] == "PK_ALERT": self.after(0, self.trigger_pk_alert)
-                                    except: pass
+                                                if r["type"] == "KILL":
+                                                    self.debug_log("KILL", f"Detected: {r['name']}")
+                                                    self.after(0, lambda res=r: self.on_kill_detected(res))
+                                                elif r["type"] == "PK_ALERT":
+                                                    self.after(0, self.trigger_pk_alert)
+                                    except:
+                                        pass
                                 f.flush()
-                        except: pass
-                        for l in new: self.last_tail.append(l)
+                        except:
+                            pass
+                        for l in new:
+                            self.last_tail.append(l)
                         self.last_tail = self.last_tail[-50:]
                 except:
-                    try: self.pm_obj.read_int(self.pm_obj.base_address)
-                    except: break
+                    break
                 time.sleep(1)
         threading.Thread(target=loop, daemon=True).start()
 
     def on_gain_detected(self, g):
-        if self.gains_tree.exists(g['name']): self.gains_tree.item(g['name'], values=(g['name'], g['count'], g['delta']))
-        else: self.gains_tree.insert("", "end", iid=g['name'], values=(g['name'], g['count'], "---"))
+        if self.gains_tree.exists(g['name']):
+            self.gains_tree.item(g['name'], values=(g['name'], g['count'], g['delta']))
+        else:
+            self.gains_tree.insert("", "end", iid=g['name'], values=(g['name'], g['count'], "---"))
 
     def on_kill_detected(self, r):
-        self.session_kills[r['category']][r['name']] = self.session_kills[r['category']].get(r['name'], 0) + 1
-        count = self.session_kills[r['category']][r['name']]
-        if self.kills_tree.exists(r['name']): self.kills_tree.item(r['name'], values=(r['name'], count))
-        else: self.kills_tree.insert("", "end", iid=r['name'], values=(r['name'], count))
-        self.update_book_tree(r['category'])
+        cat = r['category']
+        name = r['name']
+        self.session_kills[cat][name] = self.session_kills[cat].get(name, 0) + 1
+        count = self.session_kills[cat][name]
+        if self.kills_tree.exists(name):
+            self.kills_tree.item(name, values=(name, count))
+        else:
+            self.kills_tree.insert("", "end", iid=name, values=(name, count))
+        self.update_book_tree(cat)
+
+    def update_book_tree(self, ktype):
+        w = self.book_widgets[ktype]
+        tr = w["tree"]
+        fv = w["filter_var"]
+        ft = fv.get().lower()
+        for i in tr.get_children():
+            tr.delete(i)
+        vics = set(self.all_time_kills[ktype].keys()) | set(self.session_kills[ktype].keys())
+        for v in sorted(list(vics)):
+            if ft in v.lower():
+                at = self.all_time_kills[ktype].get(v, 0)
+                se = self.session_kills[ktype].get(v, 0)
+                tr.insert("", "end", values=(v, max(at, se), f"+{se}" if se > 0 else ""))
 
     def on_closing(self):
-        self.is_running = False; self.save_settings()
+        self.is_running = False
+        self.save_settings()
         if self.target_pid:
             release_pid(self.target_pid)
         self.destroy()
 
     def trigger_sync(self):
-        self.sync_btn.config(state="disabled"); threading.Thread(target=self.perform_sync, daemon=True).start()
+        self.sync_btn.config(state="disabled")
+        self.debug_log("SYNC", "Starting manual sync cycle...")
+        threading.Thread(target=self.perform_sync, daemon=True).start()
 
     def perform_sync(self):
-        self.debug_log("SYNC", "Starting manual synchronization cycle...")
         try:
-            mr = MemoryReader(self.pm_obj); kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
-            if kn or st: self.after(0, lambda: self._apply_sync_results(kn, st))
+            mr = MemoryReader(self.pm_obj)
+            kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
+            if kn or st:
+                self.after(0, lambda: self._apply_sync_results(kn, st))
         except Exception as e:
-            self.debug_log("SYNC", f"Sync failed: {e}")
-        finally: self.after(0, lambda: self.sync_btn.config(state="normal"))
+            self.debug_log("SYNC", f"Sync error: {e}")
+        finally:
+            self.after(0, lambda: self.sync_btn.config(state="normal"))
 
     def _apply_sync_results(self, kn, st):
-        self.debug_log("SYNC", f"Received data - Knowledge count: {len(kn)}, Stats count: {len(st)}")
-        if st: self._apply_initial_stats(st)
-        if kn: self.knowledge_cache.update(kn)
+        self.debug_log("SYNC", f"Data received - Skills: {len(kn) if kn else 0}, Stats: {len(st) if st else 0}")
+        
+        if st:
+            # High-Verbosity Data Dump
+            if self.debug_enabled.get():
+                dump = ", ".join([f"{k}:{v}" for k, v in st.items()])
+                self.debug_log("DATA", f"Full Stat Dump: {dump}")
+
+            for k, v in st.items():
+                # 1. Update HUD Vitals (HP/MP/VG)
+                if k in self.hud_values:
+                    self.hud_values[k].config(text=str(v))
+                
+                # 2. Update Attributes (Might/Int/etc)
+                if k in self.attr_labels:
+                    self.current_attributes[k] = v
+                    self.attr_labels[k].config(text=str(v))
+
+        if kn:
+            self.knowledge_cache.update(kn)
+        
         self.update_progression_tab()
 
     def update_progression_tab(self):
-        if not self.knowledge_cache: return
-        
-        # Save which items were expanded to restore them after refresh
-        expanded_schools = {self.prog_tree.item(i)['text'] for i in self.prog_tree.get_children() if self.prog_tree.item(i, 'open')}
+        if not self.knowledge_cache:
+            return
         
         intellect = self.current_attributes.get("Intellect", 25)
-        self.debug_log("CALC", f"Calculating progression with Intellect: {intellect}")
-        
+        self.debug_log("CALC", f"Calculating progression (Intellect: {intellect})")
         if self.debug_enabled.get():
-            self.debug_log("DATA", f"Full Knowledge Cache: {self.knowledge_cache}")
-        
+            self.debug_log("DATA", f"Knowledge Cache: {self.knowledge_cache}")
+
+        exp = {self.prog_tree.item(i)['text'] for i in self.prog_tree.get_children() if self.prog_tree.item(i, 'open')}
         res = self.calculator.calculate_progression(self.knowledge_cache, intellect)
-        self.debug_log("CALC", f"Calculation returned {len(res)} active schools.")
         
-        if self.debug_enabled.get():
-            for r in res:
-                self.debug_log("CALC", f"SCHOOL:{r['name']} | L{r['current_lvl']}->L{r['target_lvl']} | Sum:{r['current_sum']}/{r['target_sum']}% | Need:{r['needed']}%")
-        
-        for i in self.prog_tree.get_children(): self.prog_tree.delete(i)
-        
+        self.debug_log("CALC", f"Calculated {len(res)} active schools.")
+        for i in self.prog_tree.get_children():
+            self.prog_tree.delete(i)
+            
         for r in res:
             name = r['name']
-            is_open = name in expanded_schools
-            parent = self.prog_tree.insert("", "end", text=name, 
-                                          values=(f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", f"{r['needed']}%"),
-                                          open=is_open)
-            
-            # Add child abilities for this school
-            school_data = self.calculator.schools.get(name, {})
-            for lvl_num in range(1, 7):
-                lvl_key = f"Level_{lvl_num}"
-                if lvl_key not in school_data: continue
-                for skill in school_data[lvl_key]:
-                    s_lower = skill.lower()
-                    if s_lower in self.knowledge_cache:
-                        val = self.knowledge_cache[s_lower]
-                        self.prog_tree.insert(parent, "end", text=f"  {skill}", 
-                                             values=(f"L{lvl_num}", f"{val}%", "", ""))
+            is_open = name in exp
+
+            # Handle Mastered Display
+            if r.get('mastered'):
+                val_tuple = ("Level 6", "MASTERED", "---", "---")
+            else:
+                val_tuple = (f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", f"{r['needed']}%")
+                self.debug_log("CALC", f"SCHOOL:{name} | {val_tuple[0]} -> {val_tuple[1]}/{val_tuple[2]} (Need: {val_tuple[3]})")
+
+            p = self.prog_tree.insert("", "end", text=name, values=val_tuple, open=is_open)
+
+            sd = self.calculator.schools.get(name, {})
+            for l in range(1, 7):
+                lk = f"Level_{l}"
+                if lk in sd:
+                    for s in sd[lk]:
+                        if s.lower() in self.knowledge_cache:
+                            self.prog_tree.insert(p, "end", text=f"  {s}", 
+                                                 values=(f"L{l}", f"{self.knowledge_cache[s.lower()]}%", "", ""))
 
     def trigger_vault_scan(self, vt):
-        if not messagebox.askyesno("Scan", f"Scan {vt} vault?"): return
-        w = self.vault_widgets[vt]; w["sync_btn"].config(state="disabled"); threading.Thread(target=self.perform_vault_scan_thread, args=(vt,), daemon=True).start()
+        rm = {"barloque": "Office of the Barloque Vaultman", "hungry": "The Hungry Vaults"}
+        cur = self.get_current_room()
+        self.debug_log("VAULT", f"Validating location for {vt} scan. Current: {cur}")
+        if rm.get(vt) and rm[vt].lower() not in cur.lower():
+            messagebox.showwarning("Location", f"Sync Blocked: Must be in '{rm[vt]}'.\nCurrent: '{cur}'")
+            return
+        if not messagebox.askyesno("Scan", f"Scan {vt} vault?"):
+            return
+        w = self.vault_widgets[vt]
+        w["sync_btn"].config(state="disabled")
+        threading.Thread(target=self.perform_vault_scan_thread, args=(vt,), daemon=True).start()
 
     def perform_vault_scan_thread(self, vt):
+        self.debug_log("VAULT", f"Starting automated scan of {vt} vault...")
         try:
             inv = perform_vault_scan(self.main_hwnd, self.char_name, vt, lambda c, t, i, q: self.after(0, lambda: self.status_var.set(f"Scan: {c}/{t}")))
-            if inv: self.after(0, lambda: self._apply_vault_results(vt, inv))
-        except: pass
-        finally: self.after(0, lambda: self.vault_widgets[vt]["sync_btn"].config(state="normal"))
+            if inv:
+                self.debug_log("VAULT", f"Scan complete. Found {len(inv)} items.")
+                self.after(0, lambda: self._apply_vault_results(vt, inv))
+        except Exception as e:
+            self.debug_log("VAULT", f"Scan error: {e}")
+        finally:
+            self.after(0, lambda: self.vault_widgets[vt]["sync_btn"].config(state="normal"))
 
     def _apply_vault_results(self, vt, inv):
-        self.vault_data[vt] = inv; self.update_vault_tree(vt)
+        self.vault_data[vt] = inv
+        self.update_vault_tree(vt)
         self.vault_widgets[vt]["status_lbl"].config(text=f"Last Scan: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     def update_vault_tree(self, vt):
-        w = self.vault_widgets[vt]; tr = w["tree"]; fv = w["filter_var"]
-        for i in tr.get_children(): tr.delete(i)
+        w = self.vault_widgets[vt]
+        tr = w["tree"]
+        fv = w["filter_var"]
+        for i in tr.get_children():
+            tr.delete(i)
         for i in self.vault_data[vt]:
-            if fv.get().lower() in i['item'].lower(): tr.insert("", "end", values=(i['item'], i['quantity']))
+            if fv.get().lower() in i['item'].lower():
+                tr.insert("", "end", values=(i['item'], i['quantity']))
 
     def load_vault_cache(self):
-        if self.char_name == "Unknown": return
+        if self.char_name == "Unknown":
+            return
         sn = self.char_name.replace(" ", "_")
         for vt in ["barloque", "hungry"]:
             p = next((x for x in [f"logs/{sn}_vault_{vt}.json", f"logs/{self.char_name}_vault_{vt}.json"] if os.path.exists(x)), None)
             if p:
                 try:
                     with open(p, "r") as f:
-                        d = json.load(f); self.vault_data[vt] = d.get("items", [])
+                        d = json.load(f)
+                        self.vault_data[vt] = d.get("items", [])
                         self.update_vault_tree(vt)
-                except: pass
+                except:
+                    pass
 
-    def _apply_initial_stats(self, st):
-        for k, l in self.attr_labels.items():
-            if k in st: self.current_attributes[k] = st[k]; l.config(text=str(st[k]))
-        for k, l in self.hud_values.items():
-            if k in st: l.config(text=str(st[k]))
+    def load_kill_book(self):
+        if self.char_name == "Unknown":
+            return
+        p = f"logs/{self.char_name.replace(' ', '_')}_kills.json"
+        if os.path.exists(p):
+            try:
+                with open(p, "r") as f:
+                    d = json.load(f)
+                    from m59_combat import CombatMonitor
+                    tm = CombatMonitor(self.char_name)
+                    self.all_time_kills = {"monsters": {}, "players": {}}
+                    for cat in ["monsters", "players"]:
+                        for v, c in d.get(cat, {}).items():
+                            l = v.lower()
+                            is_m = l in tm.mob_set or (l.startswith("the ") and l[4:] in tm.mob_set) or (l.startswith("a ") and l[2:] in tm.mob_set)
+                            nc = "monsters" if is_m else "players"
+                            self.all_time_kills[nc][v] = self.all_time_kills[nc].get(v, 0) + c
+                self.update_book_tree("monsters")
+                self.update_book_tree("players")
+            except:
+                pass
+
+    def get_current_room(self):
+        if not self.main_hwnd:
+            return "Unknown"
+        t = win32gui.GetWindowText(self.main_hwnd)
+        # Format: Meridian 59 --- [ROOM NAME]
+        return t.split(" --- ", 1)[1].strip() if " --- " in t else "Unknown Location"
 
     def background_update_check(self):
         def check():
             u, rv = check_for_updates(self.version)
             if not u: 
-                # No update found, proceed to game connection
                 self.after(0, self.establish_connection)
                 return
-            
             def show_prompt():
-                msg = f"A new version (v{rv}) is available!\n\n" \
-                      "Options:\n" \
-                      "1. 'Auto-Update' (Recommended): Downloads and swaps files automatically.\n" \
-                      "2. 'Open Browser': Opens the GitHub page for manual download.\n\n" \
-                      "Note: Auto-update may trigger a Windows SmartScreen warning. " \
-                      "If it does, click 'More Info' -> 'Run Anyway'."
-                
-                choice = messagebox.askquestion("Update Available", msg, icon="info", 
-                                               type="yesnocancel", # Yes=Auto, No=Browser, Cancel=Later
-                                               default="yes")
-                
-                if choice == "yes": # Auto-Update
+                msg = f"A new version (v{rv}) is available!\n\nOptions:\n1. 'Auto-Update'\n2. 'Open Browser'\n\nUpdate later?"
+                choice = messagebox.askquestion("Update Available", msg, icon="info", type="yesnocancel", default="yes")
+                if choice == "yes":
                     self.status_var.set("Downloading update...")
                     from m59_updater import download_update, apply_update
                     new_path = download_update()
@@ -836,15 +920,9 @@ class M59Dashboard(tk.Tk):
                         apply_update(new_path)
                     else:
                         messagebox.showerror("Error", "Download failed.")
-                        self.status_var.set("Update failed.")
-                        self.establish_connection() # Proceed after failure
-                elif choice == "no": # Browser
-                    from m59_updater import open_browser
-                    open_browser()
-                    self.establish_connection() # Proceed after browser open
-                else: # Cancel / Update Later
-                    self.establish_connection() # Proceed to game
-            
+                        self.after(0, self.establish_connection)
+                else:
+                    self.after(0, self.establish_connection)
             self.after(0, show_prompt)
         threading.Thread(target=check, daemon=True).start()
 
@@ -854,14 +932,28 @@ class M59Dashboard(tk.Tk):
             if win32gui.IsWindowVisible(h) and "Meridian 59" in win32gui.GetWindowText(h):
                 _, p = win32process.GetWindowThreadProcessId(h)
                 try:
-                    if psutil.Process(p).name().lower() == "meridian.exe": insts.append({"pid": p, "title": win32gui.GetWindowText(h), "hwnd": h})
-                except: pass
-        win32gui.EnumWindows(cb, None); return insts
+                    if psutil.Process(p).name().lower() == "meridian.exe":
+                        insts.append({"pid": p, "title": win32gui.GetWindowText(h), "hwnd": h})
+                except:
+                    pass
+        win32gui.EnumWindows(cb, None)
+        return insts
 
-    def open_latest_log(self):
-        if self.char_name == "Unknown": return
-        p = f"logs/{self.char_name.replace(' ', '_')}_chat.log"
-        if os.path.exists(p): os.startfile(os.path.abspath(p))
+    def browse_sound(self):
+        p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
+        if p:
+            self.pk_sound_path.set(p)
+
+    def test_sound(self):
+        p = self.pk_sound_path.get()
+        try:
+            if p == "SystemExclamation":
+                winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
+            else:
+                winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        except:
+            pass
 
 if __name__ == "__main__":
-    app = M59Dashboard(); app.mainloop()
+    app = M59Dashboard()
+    app.mainloop()
