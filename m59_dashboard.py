@@ -139,6 +139,7 @@ class M59Dashboard(tk.Tk):
         self.alert_active = False
         self.comms_data = {"all": [], "tells": [], "broadcasts": [], "social": [], "clean": []}
         self.gps_manager = GPSManager()
+        self.waiting_overlay = None
         
         # --- Lifecycle State ---
         self.initial_sync_done = False
@@ -350,7 +351,7 @@ class M59Dashboard(tk.Tk):
         # --- Under Construction Banner ---
         banner = tk.Frame(self.tab_gps, bg="#FFF9C4", bd=1, relief=tk.SOLID)
         banner.pack(fill="x", padx=10, pady=5)
-        tk.Label(banner, text="🚧 FEATURE UNDER CONSTRUCTION 🚧", font=("Arial", 10, "bold"), bg="#FFF9C4", fg="#F57F17").pack(pady=5)
+        tk.Label(banner, text="[!] FEATURE UNDER CONSTRUCTION [!]", font=("Arial", 10, "bold"), bg="#FFF9C4", fg="#F57F17").pack(pady=5)
         tk.Label(banner, text="This module is currently in development and is not yet ready for public testing.", 
                  font=("Arial", 8, "italic"), bg="#FFF9C4", fg="#F57F17").pack(pady=(0, 5))
         
@@ -434,9 +435,9 @@ class M59Dashboard(tk.Tk):
         sync_f = tk.Frame(self.tab_dash, bg="#f0f0f0")
         sync_f.pack(side="bottom", fill="x", padx=10, pady=10)
         self.manual_sync_btn = tk.Button(
-            sync_f, text=" 🔄 PERFORM FULL SYNC & IDENTITY ", 
+            sync_f, text=" ↻ FULL SYNC ", 
             command=self.trigger_manual_sync, 
-            bg="#FF9800", fg="white", font=("Arial", 10, "bold"), pady=8
+            state="disabled", font=("Arial", 13, "bold"), pady=10
         )
         self.manual_sync_btn.pack(fill="x")
 
@@ -506,6 +507,7 @@ class M59Dashboard(tk.Tk):
         c = tk.Frame(self.tab_settings, bg="#f0f0f0")
         c.pack(fill="both", expand=True, padx=20, pady=20)
         tk.Label(c, text="Companion Settings", font=("Arial", 14, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(0, 20))
+
         pg = tk.LabelFrame(c, text=" Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         pg.pack(fill="x")
         tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
@@ -550,16 +552,17 @@ class M59Dashboard(tk.Tk):
     def establish_connection(self):
         self.status_var.set("Scanning for game...")
         self.debug_log("CONN", "Starting Lifecycle Monitor...")
+        self.show_waiting_overlay()
         self.lifecycle.start()
 
     def on_game_connect(self, pm, pid):
         """Callback when InstanceManager attaches to a new game process."""
         logger.info(f"LifeCycle: New Game Instance Detected (PID {pid})")
-        is_first_run = (self.pm_obj is None)
         self.pm_obj = pm
         self.target_pid = pid
         
         # Find the HWND for this PID
+        self.main_hwnd = None
         def find_hwnd(h, l):
             _, p = win32process.GetWindowThreadProcessId(h)
             if p == pid and win32gui.IsWindowVisible(h) and "Meridian 59" in win32gui.GetWindowText(h):
@@ -570,16 +573,39 @@ class M59Dashboard(tk.Tk):
             logger.error(f"LifeCycle: Found PID {pid} but could not locate its window.")
             return
 
-        if is_first_run:
-            logger.info("LifeCycle: First run detected - performing full identity handshake.")
-            self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
-            logger.info(f"LifeCycle: Identity captured: {self.char_name}")
-            self.after(0, self._finalize_connection)
-        else:
-            logger.info(f"LifeCycle: Auto-reconnect detected - remaining passive for character: {self.char_name}")
-            self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
-            # Start Passive HUD and Chat
-            self._post_connection_init(passive=True)
+        # Transition overlay to 'Waiting for Login' state
+        self.show_waiting_overlay(mode="login")
+        self.after(500, self.check_for_login)
+
+    def check_for_login(self):
+        """Polls the window title to detect when a character has entered the world."""
+        if not self.main_hwnd or not self.is_running:
+            return
+            
+        try:
+            title = win32gui.GetWindowText(self.main_hwnd)
+            if " --- " in title:
+                logger.info(f"LifeCycle: Login detected via title: {title}")
+                self.hide_waiting_overlay()
+                
+                # Check if this is the first initialization of the session
+                is_first_init = (self.char_name == "Unknown")
+                
+                if is_first_init:
+                    logger.info("LifeCycle: Initializing first-run handshake.")
+                    self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
+                    self._finalize_connection()
+                else:
+                    logger.info(f"LifeCycle: Character {self.char_name} logged back in.")
+                    self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
+                    self.manual_sync_btn.config(state="normal", text=" ↻ FULL SYNC REQUIRED ")
+                    self._post_connection_init(passive=True)
+            else:
+                # Still at selection screen, check again in 1s
+                self.after(1000, self.check_for_login)
+        except Exception as e:
+            logger.debug(f"LifeCycle: Error checking for login: {e}")
+            self.after(2000, self.check_for_login)
 
     def trigger_manual_sync(self):
         """Action for the manual sync button on the Dashboard."""
@@ -587,7 +613,7 @@ class M59Dashboard(tk.Tk):
             messagebox.showwarning("Sync", "No active game process found to sync.")
             return
             
-        self.manual_sync_btn.config(state="disabled", text=" 🔄 SYNCING... PLEASE WAIT ")
+        self.manual_sync_btn.config(state="disabled", text=" ↻ SYNCING... PLEASE WAIT ")
         self.status_var.set("Performing Manual Identity & Full Sync...")
         
         def run_sync():
@@ -616,7 +642,7 @@ class M59Dashboard(tk.Tk):
                 logger.error(f"Manual sync error: {e}")
                 self.after(0, lambda: self.status_var.set("Manual Sync Failed."))
             finally:
-                self.after(0, lambda: self.manual_sync_btn.config(state="normal", text=" 🔄 PERFORM FULL SYNC & IDENTITY "))
+                self.after(0, lambda: self.manual_sync_btn.config(state="normal", text=" ↻ PERFORM FULL SYNC & IDENTITY "))
         
         threading.Thread(target=run_sync, daemon=True).start()
 
@@ -628,6 +654,7 @@ class M59Dashboard(tk.Tk):
     def on_game_disconnect(self, pid):
         """Callback when InstanceManager loses connection to a game process."""
         logger.info(f"LifeCycle: Game Instance Lost (PID {pid}). Entering search mode...")
+        self.show_waiting_overlay()
         self.status_var.set(f"Game Lost ({self.char_name}) - Searching...")
         self.title(f"M59 Companion v{self.version} - Waiting...")
         
@@ -689,6 +716,8 @@ class M59Dashboard(tk.Tk):
                     logger.info(f"Character detected back in-game at {room}.")
                     self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
                     self.title(f"M59 Companion v{self.version} - {self.char_name}")
+                    # Enable the sync button to indicate a refresh is needed
+                    self.manual_sync_btn.config(state="normal", text=" ↻ FULL SYNC REQUIRED ")
                 
                 self.gps_loc_lbl.config(text=room)
                 if self.gps_discovery_enabled.get():
@@ -729,13 +758,19 @@ class M59Dashboard(tk.Tk):
             co = CombatMonitor(self.char_name)
             logger.info("ChatMonitor: Thread started.")
             
-            # Initial handle grab
-            ch = win32gui.GetDlgItem(self.main_hwnd, 1005)
-            if not ch:
-                logger.error("ChatMonitor: Initial chat control (1005) not found.")
-                # We don't exit, we'll try to find it in the loop
-            else:
-                logger.info(f"ChatMonitor: Initialized with HWND {ch}")
+            # Initial handle grab - wrap in try/except to handle case where user isn't logged in yet
+            try:
+                ch = win32gui.GetDlgItem(self.main_hwnd, 1005)
+                if not ch:
+                    logger.info("ChatMonitor: Chat control (1005) not found yet.")
+                else:
+                    logger.info(f"ChatMonitor: Initialized with HWND {ch}")
+            except pywintypes.error as e:
+                if e.winerror == 1421:
+                    logger.info("ChatMonitor: Chat control (1005) not found yet. Waiting...")
+                    ch = None
+                else:
+                    raise
 
             safe_n = self.char_name.replace(" ", "_")
             log_p = os.path.join("logs", f"{safe_n}_chat.log")
@@ -1191,6 +1226,61 @@ class M59Dashboard(tk.Tk):
                 winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
         except:
             pass
+
+    def show_waiting_overlay(self, mode="searching"):
+        """Displays a non-blocking splash window when searching for game or waiting for login."""
+        if self.waiting_overlay and self.waiting_overlay.winfo_exists():
+            # Update existing overlay text
+            if mode == "login":
+                self.waiting_title_lbl.config(text=" ↻ WAITING FOR LOGIN... ", fg="#2196F3")
+                self.waiting_msg_lbl.config(text="Please select a character and enter the world.")
+                self.waiting_frame.config(highlightbackground="#2196F3")
+            else:
+                self.waiting_title_lbl.config(text=" ↻ SCANNING FOR GAME... ", fg="#4CAF50")
+                self.waiting_msg_lbl.config(text="Please launch Meridian 59 to continue.")
+                self.waiting_frame.config(highlightbackground="#4CAF50")
+            return
+            
+        logger.info(f"UI: Displaying 'Waiting' overlay (Mode: {mode}).")
+        overlay = tk.Toplevel(self)
+        overlay.title("Connecting...")
+        overlay.geometry("450x200")
+        overlay.resizable(False, False)
+        overlay.attributes("-topmost", True)
+        
+        # Center over main window
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - 225
+        y = self.winfo_y() + (self.winfo_height() // 2) - 100
+        overlay.geometry(f"+{max(0, x)}+{max(0, y)}")
+        overlay.overrideredirect(True)
+        
+        self.waiting_frame = tk.Frame(overlay, bg="#333333", highlightthickness=2)
+        self.waiting_frame.config(highlightbackground="#4CAF50" if mode == "searching" else "#2196F3")
+        self.waiting_frame.pack(fill="both", expand=True)
+        
+        title_text = " ↻ SCANNING FOR GAME... " if mode == "searching" else " ↻ WAITING FOR LOGIN... "
+        title_color = "#4CAF50" if mode == "searching" else "#2196F3"
+        msg_text = "Please launch Meridian 59 to continue." if mode == "searching" else "Please select a character and enter the world."
+        
+        self.waiting_title_lbl = tk.Label(self.waiting_frame, text=title_text, font=("Arial", 16, "bold"), fg=title_color, bg="#333333", pady=20)
+        self.waiting_title_lbl.pack()
+        self.waiting_msg_lbl = tk.Label(self.waiting_frame, text=msg_text, font=("Arial", 11), fg="white", bg="#333333")
+        self.waiting_msg_lbl.pack()
+        tk.Label(self.waiting_frame, text="The Companion will automatically connect once ready.", font=("Arial", 9, "italic"), fg="#aaaaaa", bg="#333333", pady=15).pack()
+        
+        self.waiting_overlay = overlay
+
+    def hide_waiting_overlay(self):
+        """Destroys the waiting overlay if it exists."""
+        if self.waiting_overlay:
+            try:
+                if self.waiting_overlay.winfo_exists():
+                    logger.info("UI: Hiding 'Waiting for Game' overlay.")
+                    self.waiting_overlay.destroy()
+            except:
+                pass
+            self.waiting_overlay = None
 
 if __name__ == "__main__":
     app = M59Dashboard()
