@@ -69,6 +69,22 @@ class SchoolCalculator:
     def calculate_progression(self, knowledge_cache, intellect=None):
         """
         The CORE ENGINE: Replicates the original Meridian 59 PlayerCanLearn logic.
+        
+        FORMULA REFERENCE (DO NOT CHANGE):
+        ----------------------------------
+        Target Sum (t_sum) is determined by:
+        1. iPoints = (Sum of points from all other schools) + (Points for target level of this school)
+           Points mapping: L1=1, L2=2, L3=4, L4=6, L5=8, L6=10
+        
+        2. Base Formula:
+           t_sum = (iPoints * points_slope) + (297 - (max_points * points_slope)) - ((intellect * 2.0 * points_slope) / 5.0)
+        
+        3. Scarcity Adjustment:
+           - If target school has only 1 skill in previous level: t_sum = t_sum / 3.0
+           - If target school has only 2 skills in previous level: t_sum = (t_sum * 2.0) / 3.0
+        
+        4. Minimum Cap: t_sum is always at least 75%.
+        ----------------------------------
         """
         if intellect is None:
             intellect = self.config.get("character", {}).get("intellect", 25)

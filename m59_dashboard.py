@@ -804,6 +804,8 @@ class M59Dashboard(tk.Tk):
             # Handle Mastered Display
             if r.get('mastered'):
                 val_tuple = ("Level 6", "MASTERED", "---", "---")
+            elif r['needed'] == 0:
+                val_tuple = (f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", "YOU QUALIFY!")
             else:
                 val_tuple = (f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", f"{r['needed']}%")
                 self.debug_log("CALC", f"SCHOOL:{name} | {val_tuple[0]} -> {val_tuple[1]}/{val_tuple[2]} (Need: {val_tuple[3]})")
