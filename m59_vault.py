@@ -6,9 +6,9 @@ import win32con
 import win32gui
 import win32process
 import array
-import logging
+from m59_logging import get_logger
 
-logger = logging.getLogger("m59.vault")
+logger = get_logger("vault")
 
 # Vault Specific Constants
 CHAT_CONTROL_ID = 1001
@@ -25,8 +25,10 @@ def find_nested_control(parent_hwnd, target_id):
             found_hwnd[0] = h
             return False
         return True
-    try: win32gui.EnumChildWindows(parent_hwnd, enum_cb, None)
-    except: pass
+    try: 
+        win32gui.EnumChildWindows(parent_hwnd, enum_cb, None)
+    except Exception as e: 
+        logger.debug(f"EnumChildWindows failed for parent {parent_hwnd}: {e}")
     return found_hwnd[0]
 
 def send_chat_command(main_hwnd, text):

@@ -14,13 +14,9 @@ import json
 import winsound
 from datetime import datetime
 
-# Configure Terminal Debug Logs
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger("m59.dashboard")
+# Import centralized logging
+from m59_logging import setup_logging, get_logger
+logger = get_logger("dashboard")
 
 # Import modules
 from m59_bridge import establish_bridge, release_pid, find_available_instance, claim_pid
@@ -124,8 +120,12 @@ class M59Dashboard(tk.Tk):
         self.pk_frame_enabled = tk.BooleanVar(value=True)
         self.pk_sound_path = tk.StringVar(value="SystemExclamation")
         self.debug_enabled = tk.BooleanVar(value=False)
+        self.debug_enabled.trace_add("write", lambda *a: setup_logging(self.debug_enabled.get()))
         self.gps_discovery_enabled = tk.BooleanVar(value=False)
         self.load_settings()
+        
+        # Initialize centralized logging with user preference
+        setup_logging(self.debug_enabled.get())
         
         # --- State ---
         self.target_pid = None
@@ -214,8 +214,8 @@ class M59Dashboard(tk.Tk):
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
                     self.debug_enabled.set(s.get("debug_enabled", False))
                     self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to load settings: {e}")
 
     def save_settings(self):
         try:
@@ -229,21 +229,12 @@ class M59Dashboard(tk.Tk):
                     "debug_enabled": self.debug_enabled.get(),
                     "gps_discovery_enabled": self.gps_discovery_enabled.get()
                 }, f)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to save settings: {e}")
 
     def debug_log(self, category, message):
-        if self.debug_enabled.get():
-            ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            line = f"[{ts}] [DEBUG:{category}] {message}"
-            print(line)
-            try:
-                if not os.path.exists("logs"):
-                    os.makedirs("logs")
-                with open("logs/companion_debug.log", "a", encoding="utf-8") as f:
-                    f.write(line + "\n")
-            except:
-                pass
+        """Wrapper for centralized logging, keeping the legacy category-based signature."""
+        logger.debug(f"[{category}] {message}")
 
     def gps_log(self, message):
         if self.debug_enabled.get() or self.gps_discovery_enabled.get():
@@ -313,14 +304,14 @@ class M59Dashboard(tk.Tk):
     def append_comms_line(self, line):
         ts = f"[{datetime.now().strftime('%H:%M:%S')}] {line}"
         self.comms_data["all"].append(ts)
-        if len(self.comms_data["all"]) > 500:
+        if len(self.comms_data["all"]) > 5000:
             self.comms_data["all"].pop(0)
         
         is_c = self.is_combat_line(line)
         t_k = "social"
         if not is_c:
             self.comms_data["clean"].append(ts)
-            if len(self.comms_data["clean"]) > 500:
+            if len(self.comms_data["clean"]) > 5000:
                 self.comms_data["clean"].pop(0)
             l = line.lower()
             if "broadcasts," in l or "broadcasts:" in l:
@@ -328,7 +319,7 @@ class M59Dashboard(tk.Tk):
             elif "tells you," in l or "you tell" in l or "sends," in l:
                 t_k = "tells"
             self.comms_data[t_k].append(ts)
-            if len(self.comms_data[t_k]) > 500:
+            if len(self.comms_data[t_k]) > 5000:
                 self.comms_data[t_k].pop(0)
         
         v_k = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}.get(self.current_comms_channel)

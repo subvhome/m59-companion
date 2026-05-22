@@ -5,6 +5,9 @@ import win32con
 import win32process
 import pymem
 from m59_bridge import establish_bridge, release_pid
+from m59_logging import get_logger
+
+logger = get_logger("scraper")
 
 class MemoryReader:
     def __init__(self, pm):
@@ -15,9 +18,16 @@ class MemoryReader:
             target_addr = base_address + 16
             val = self.pm.read_int(target_addr)
             return val if 0 <= val <= 100 else 0
-        except: return 0
+        except Exception as e:
+            logger.debug(f"Failed to read skill percent at {base_address}: {e}")
+            return 0
 
 def get_text_from_hwnd(hwnd):
+    """
+    Reads text from a window control. 
+    Note: Meridian 59 chat controls (ID 1005) have a ~29,998 character buffer limit.
+    After this limit is reached, older characters are truncated from the top.
+    """
     try:
         length = win32gui.SendMessage(hwnd, win32con.WM_GETTEXTLENGTH, 0, 0)
         if length > 0:
@@ -26,7 +36,8 @@ def get_text_from_hwnd(hwnd):
             buffer = array.array('H', [0] * (length + 1))
             win32gui.SendMessage(hwnd, win32con.WM_GETTEXT, length + 1, buffer)
             return buffer.tobytes().decode('utf-16le').rstrip('\x00')
-    except: pass
+    except Exception as e:
+        logger.error(f"Failed to get text from HWND {hwnd}: {e}")
     return ""
 
 def capture_identity(hwnd, target_pid):
