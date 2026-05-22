@@ -1,195 +1,203 @@
-Brambles is Monster,patch of bramble
-Brambles is Monster,the ruins of some bramble
-Frogman is Monster,yozotz
-Frogman is Monster,frogman
-Frogman is Monster,dead frogman
-DuskRat is Monster,teotnapyijoa
-DuskRat is Monster,dusk rat
+Ant is Monster,ant
+Iceperson is Monster,atzmoch
+Avar is Monster,avar
+avar chieftain,avar chieftain
+avar leader of the bone faction,avar leader of the bone faction
+avar shaman,avar shaman
+AvarShaman is Monster,avarya
+SpiderBaby is Monster,baby spider
+battered skeleton,battered skeleton
+DeathSpider is Monster,black spider
+OrcPitBossBody is Monster,body of the orc pit boss
+bone faction shaman,bone faction shaman
+CaveOrc is Monster,cave orc
+Centipede is Monster,centipede
+Skeleton is Monster,chaleoc
+chyup-tewee faction warrior,chyup-tewee faction warrior
+Council is Monster,Councilor
+Cow is Monster,cow
+LivingStatue is Monster,crumbled living statue
+daemon skeleton,daemon skeleton
+DarkAngel is Monster,dark angel
+Ant is Monster,dead ant
+AvarShaman is Monster,dead avar shaman
+SpiderBaby is Monster,dead baby spider
+dead battered skeleton,dead battered skeleton
+CaveOrc is Monster,dead cave orc
+Centipede is Monster,dead centipede
+Cow is Monster,dead cow
+dead daemon skeleton,dead daemon skeleton
+DarkAngel is Monster,dead dark angel
+DragonFly is Monster,dead dragonfly
+DragonFlyQueen is Monster,dead dragonfly queen
 DuskRat is Monster,dead dusk rat
-Guard is Monster,guard cow
-Guard is Monster,tanahyijoa
+EvilTwin is Monster,dead evil twin
+FactionTroop is Monster,dead faction troop
+EvilFairy is Monster,dead fey
+Fairy is Monster,dead fey
+Frogman is Monster,dead frogman
+FungusBeast is Monster,dead fungus beast
+Ghost is Monster,dead ghost
+GiantRat is Monster,dead giant rat
+dead groundworm larva,dead groundworm larva
+dead groundworm queen,dead groundworm queen
 Guard is Monster,dead guard cow
-Revenant is Monster,revenant
-Troll is Monster,troll
-Troll is Monster,humoch
-Troll is Monster,dead troll
-OrcWizard is Monster,utomya
-OrcWizard is Monster,orc wizard
+Lupogg is Monster,dead lupogg
+LupoggKing is Monster,dead lupogg king
+dead ma'xeochicatl,dead ma'xeochicatl
+Mummy is Monster,dead mummy
+RedAnt is Monster,dead mutant ant
+NarthylWorm is Monster,dead narthyl worm
+dead necromancer,dead necromancer
+Orc is Monster,dead orc
 OrcWizard is Monster,dead orc
-Spider is Monster,teotkauilkinich
-Spider is Monster,spider
+OrcPitBoss is Monster,dead orc pit boss
+DragonFlyPet is Monster,dead pet dragonfly
+SpiderQueen is Monster,dead queen spider
+dead rebel soldier,dead rebel soldier
+Reflection is Monster,dead reflection
+EvilEnt is Monster,dead remains of diseased tree
+Ent is Monster,dead remains of living tree
+dead ro'xeochicatl,dead ro'xeochicatl
+Scorpion is Monster,dead scorpion
+dead shadow mummy,dead shadow mummy
+Slime is Monster,dead slime
+SnowRat is Monster,dead snow rat
+dead soldier,dead soldier
+SpectralMummy is Monster,dead spectral mummy
+DeathSpider is Monster,dead spider
 Spider is Monster,dead spider
+StoneTroll is Monster,dead stone troll
+dead te'xeochicatl,dead te'xeochicatl
+Thrasher is Monster,dead thrasher
+dead town guard,dead town guard
+Troll is Monster,dead troll
+dead tusked skeleton,dead tusked skeleton
+dead ve'xeochicatl,dead ve'xeochicatl
+Yeti is Monster,dead yeti
+EvilEnt is Monster,diseased tree
+DragonFly is Monster,dragonfly
+DragonFlyQueen is Monster,dragonfly queen
+DuskRat is Monster,dusk rat
+EvilTwin is Monster,evil twin
+FactionTroop is Monster,faction troop
+Ghost is Monster,far'nohl kotezleoc
+EvilFairy is Monster,fey dirhai
+Fairy is Monster,fey elhai
+AvarChieftain is Monster,former avar chieftain
+Frogman is Monster,frogman
+FungusBeast is Monster,fungus beast
+Ghost is Monster,ghost
+Ghost is Monster,ghost of Far'Nohl
+DeadLich is Monster,ghostly remains of Queen Venya'cyr
+GiantRat is Monster,giant rat
+Scorpion is Monster,giant scorpion
+GroundWorm is Monster,groundworm
+groundworm larva,groundworm larva
+groundworm queen,groundworm queen
+Guard is Monster,guard cow
 StoneTroll is Monster,Guardian of Zjiria
 StoneTroll is Monster,ha'humoch
-StoneTroll is Monster,dead stone troll
-StoneTroll is Monster,stone troll
-Council is Monster,Councilor
-SnowRat is Monster,snow rat
-SnowRat is Monster,shonapyijoa
-SnowRat is Monster,dead snow rat
-OrcPitBossBody is Monster,body of the orc pit boss
 OrcPitBossBody is Monster,headless orc pit boss body
-FactionTroop is Monster,faction troop
-FactionTroop is Monster,dead faction troop
-DragonFlyPet is Monster,vo'huzotz
-DragonFlyPet is Monster,pet dragonfly
-DragonFlyPet is Monster,dead pet dragonfly
-Centipede is Monster,puuckinich
-Centipede is Monster,centipede
-Centipede is Monster,dead centipede
-CaveOrc is Monster,utom
-CaveOrc is Monster,cave orc
-CaveOrc is Monster,dead cave orc
-Iceperson is Monster,atzmoch
-Iceperson is Monster,ice creature
-Iceperson is Monster,melting ice
-LivingStatue is Monster,statue
-LivingStatue is Monster,living statue
-LivingStatue is Monster,crumbled living statue
-DragonFly is Monster,huzotz
-DragonFly is Monster,dragonfly
-DragonFly is Monster,dead dragonfly
-Lich is Monster,Queen Venya'cyr
-Lich is Monster,Queen Venya'cyr
-Lich is Monster,The ghost of Queen Venya'cyr
-Ent is Monster,tezmecya
-Ent is Monster,living tree
-Ent is Monster,dead remains of living tree
-Cow is Monster,nahyijoa
-Cow is Monster,cow
-Cow is Monster,dead cow
-Ghost is Monster,far'nohl kotezleoc
-Ghost is Monster,ghost of Far'Nohl
-Ghost is Monster,ghost
-Ghost is Monster,dead ghost
-SpiderQueen is Monster,queen spider
-SpiderQueen is Monster,kokinich
-SpiderQueen is Monster,dead queen spider
-Lupogg is Monster,tez
-Lupogg is Monster,lupogg
-Lupogg is Monster,dead lupogg
-flytrap is Monster,Man-eating Plant
 flytrap is Monster,hedged man-eating plant
-Thrasher is Monster,teotixleoc
-Thrasher is Monster,thrasher
-Thrasher is Monster,dead thrasher
-RedAnt is Monster,kawilkinich
-RedAnt is Monster,mutant ant
-RedAnt is Monster,dead mutant ant
-Fairy is Monster,kinimixlal
-Fairy is Monster,fey elhai
-Fairy is Monster,dead fey
-DeathSpider is Monster,na'arkinich
-DeathSpider is Monster,black spider
-DeathSpider is Monster,dead spider
-DragonFlyQueen is Monster,kohuzotz
-DragonFlyQueen is Monster,dragonfly queen
-DragonFlyQueen is Monster,dead dragonfly queen
-Reflection is Monster,reflection
-Reflection is Monster,dead reflection
-EvilTwin is Monster,evil twin
-EvilTwin is Monster,dead evil twin
-Slime is Monster,kinachot
-Slime is Monster,slime
-Slime is Monster,dead slime
-FungusBeast is Monster,puucmecmoch
-FungusBeast is Monster,fungus beast
-FungusBeast is Monster,dead fungus beast
+Troll is Monster,humoch
+DragonFly is Monster,huzotz
+Iceperson is Monster,ice creature
 SpiderBaby is Monster,imixkinich
-SpiderBaby is Monster,baby spider
-SpiderBaby is Monster,dead baby spider
-Orc is Monster,utomca
-Orc is Monster,orc
-Orc is Monster,dead orc
-GiantRat is Monster,napyijoa
-GiantRat is Monster,giant rat
-GiantRat is Monster,dead giant rat
-Yeti is Monster,yeti
-Yeti is Monster,tezatzmoch
-Yeti is Monster,dead yeti
-OrcPitBoss is Monster,koutom
-OrcPitBoss is Monster,orc pit boss
-OrcPitBoss is Monster,dead orc pit boss
-AvarShaman is Monster,avarya
-AvarShaman is Monster,peet-seeeep avar shaman
-AvarShaman is Monster,dead avar shaman
-GroundWorm is Monster,groundworm
-GroundWorm is Monster,slithic
-GroundWorm is Monster,slain groundworm
-EvilFairy is Monster,teotimixlal
-EvilFairy is Monster,fey dirhai
-EvilFairy is Monster,dead fey
+RedAnt is Monster,kawilkinich
+Slime is Monster,kinachot
+Fairy is Monster,kinimixlal
 Scorpion is Monster,kinkauikinich
-Scorpion is Monster,giant scorpion
-Scorpion is Monster,dead scorpion
-Priestess is Monster,priestess
-Shadowbeast is Monster,teotkriipa
-Shadowbeast is Monster,shadowbeast
-Shadowbeast is Monster,slain shadowbeast
-Thief is Monster,Thief
-Skeleton is Monster,chaleoc
-Skeleton is Monster,skeleton
-Skeleton is Monster,pile of bones
-SpectralMummy is Monster,kosnapleoc
-SpectralMummy is Monster,spectral mummy
-SpectralMummy is Monster,dead spectral mummy
-NarthylWorm is Monster,tepna'arthyl
-NarthylWorm is Monster,narthyl worm
-NarthylWorm is Monster,dead narthyl worm
-Ant is Monster,yokinich
-Ant is Monster,ant
-Ant is Monster,dead ant
 AvarChieftain is Monster,koavar
-AvarChieftain is Monster,peet-seeeep avar chieftain
-AvarChieftain is Monster,former avar chieftain
-Mummy is Monster,napleoc
-Mummy is Monster,mummy
-Mummy is Monster,dead mummy
+DragonFlyQueen is Monster,kohuzotz
+SpiderQueen is Monster,kokinich
 MolluskMonster is Monster,kolisith
-MolluskMonster is Monster,mollusk creature
-MolluskMonster is Monster,slain mollusk creature
-Avar is Monster,avar
-Avar is Monster,peet-seeeep avar warrior
-Avar is Monster,slain avar
+SpectralMummy is Monster,kosnapleoc
+OrcPitBoss is Monster,koutom
 Kriipa is Monster,kriipa
-Kriipa is Monster,slain Kriipa
-DeadLich is Monster,ghostly remains of Queen Venya'cyr
+kyip-kyip-kreeet avar chieftain,kyip-kyip-kreeet avar chieftain
+kyip-kyip-kreeet avar shaman,kyip-kyip-kreeet avar shaman
+kyip-kyip-kreeet avar warrior,kyip-kyip-kreeet avar warrior
+LivingStatue is Monster,living statue
+Ent is Monster,living tree
+Lupogg is Monster,lupogg
 LupoggKing is Monster,lupogg king
-LupoggKing is Monster,dead lupogg king
-DarkAngel is Monster,ozangelis
-DarkAngel is Monster,dark angel
-DarkAngel is Monster,dead dark angel
-EvilEnt is Monster,teotezmecya
-EvilEnt is Monster,diseased tree
-EvilEnt is Monster,dead remains of diseased tree
-DukeTroop is FactionTroop,soldier of the Duke's army
-NecromancerTroop is FactionTroop,necromancer
-PrincessTroop is FactionTroop,soldier of the Princess' army
-RebelTroop is FactionTroop,rebel soldier
-Zombie is Monster,zombie
-battered skeleton,battered skeleton
-dead battered skeleton,dead battered skeleton
-tusked skeleton,tusked skeleton
-dead tusked skeleton,dead tusked skeleton
-daemon skeleton,daemon skeleton
-dead daemon skeleton,dead daemon skeleton
-groundworm larva,groundworm larva
-dead groundworm larva,dead groundworm larva
-groundworm queen,groundworm queen
-dead groundworm queen,dead groundworm queen
-te'xeochicatl,te'xeochicatl
-dead te'xeochicatl,dead te'xeochicatl
+flytrap is Monster,Man-eating Plant
 ma'xeochicatl,ma'xeochicatl
-dead ma'xeochicatl,dead ma'xeochicatl
+Iceperson is Monster,melting ice
+MolluskMonster is Monster,mollusk creature
+Mummy is Monster,mummy
+RedAnt is Monster,mutant ant
+DeathSpider is Monster,na'arkinich
+Cow is Monster,nahyijoa
+Mummy is Monster,napleoc
+GiantRat is Monster,napyijoa
+NarthylWorm is Monster,narthyl worm
+NecromancerTroop is FactionTroop,necromancer
+Orc is Monster,orc
+OrcPitBoss is Monster,orc pit boss
+OrcWizard is Monster,orc wizard
+DarkAngel is Monster,ozangelis
+Brambles is Monster,patch of bramble
+AvarChieftain is Monster,peet-seeeep avar chieftain
+AvarShaman is Monster,peet-seeeep avar shaman
+Avar is Monster,peet-seeeep avar warrior
+DragonFlyPet is Monster,pet dragonfly
+Skeleton is Monster,pile of bones
+Priestess is Monster,priestess
+Centipede is Monster,puuckinich
+FungusBeast is Monster,puucmecmoch
+SpiderQueen is Monster,queen spider
+Lich is Monster,Queen Venya'cyr
+Lich is Monster,Queen Venya'cyr
+RebelTroop is FactionTroop,rebel soldier
+Reflection is Monster,reflection
+Revenant is Monster,revenant
 ro'xeochicatl,ro'xeochicatl
-dead ro'xeochicatl,dead ro'xeochicatl
-ve'xeochicatl,ve'xeochicatl
-dead ve'xeochicatl,dead ve'xeochicatl
 shadow mummy,shadow mummy
-dead shadow mummy,dead shadow mummy
-dead soldier,dead soldier
-dead rebel soldier,dead rebel soldier
-dead necromancer,dead necromancer
-town guard,town guard
-dead town guard,dead town guard
+Shadowbeast is Monster,shadowbeast
+SnowRat is Monster,shonapyijoa
+Skeleton is Monster,skeleton
+Avar is Monster,slain avar
+GroundWorm is Monster,slain groundworm
+Kriipa is Monster,slain Kriipa
+MolluskMonster is Monster,slain mollusk creature
+Shadowbeast is Monster,slain shadowbeast
+Slime is Monster,slime
+GroundWorm is Monster,slithic
+SnowRat is Monster,snow rat
+DukeTroop is FactionTroop,soldier of the Duke's army
+PrincessTroop is FactionTroop,soldier of the Princess' army
+SpectralMummy is Monster,spectral mummy
+Spider is Monster,spider
+LivingStatue is Monster,statue
+StoneTroll is Monster,stone troll
+Guard is Monster,tanahyijoa
+EvilEnt is Monster,teotezmecya
+EvilFairy is Monster,teotimixlal
+Thrasher is Monster,teotixleoc
+Spider is Monster,teotkauilkinich
+Shadowbeast is Monster,teotkriipa
+DuskRat is Monster,teotnapyijoa
+NarthylWorm is Monster,tepna'arthyl
+te'xeochicatl,te'xeochicatl
+Lupogg is Monster,tez
+Yeti is Monster,tezatzmoch
+Ent is Monster,tezmecya
+Lich is Monster,The ghost of Queen Venya'cyr
+Brambles is Monster,the ruins of some bramble
 the town guard,the town guard
+Thief is Monster,Thief
+Thrasher is Monster,thrasher
+town guard,town guard
+Troll is Monster,troll
+tusked skeleton,tusked skeleton
+CaveOrc is Monster,utom
+Orc is Monster,utomca
+OrcWizard is Monster,utomya
+ve'xeochicatl,ve'xeochicatl
+DragonFlyPet is Monster,vo'huzotz
+Yeti is Monster,yeti
+Ant is Monster,yokinich
+Frogman is Monster,yozotz
+Zombie is Monster,zombie
