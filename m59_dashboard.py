@@ -642,7 +642,8 @@ class M59Dashboard(tk.Tk):
                 logger.error(f"Manual sync error: {e}")
                 self.after(0, lambda: self.status_var.set("Manual Sync Failed."))
             finally:
-                self.after(0, lambda: self.manual_sync_btn.config(state="normal", text=" ↻ PERFORM FULL SYNC & IDENTITY "))
+                # Disable the button and reset text until the next login/reconnect event
+                self.after(0, lambda: self.manual_sync_btn.config(state="disabled", text=" ↻ FULL SYNC "))
         
         threading.Thread(target=run_sync, daemon=True).start()
 
