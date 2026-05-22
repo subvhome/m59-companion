@@ -8,6 +8,7 @@ import win32gui
 import win32process
 import win32con
 import win32api
+import pywintypes
 import logging
 import sys
 import json
@@ -27,6 +28,7 @@ from m59_calculator import SchoolCalculator
 from m59_vault import perform_vault_scan
 from m59_updater import check_for_updates
 from m59_gps import GPSManager
+from m59_lifecycle import InstanceManager
 
 SETTINGS_FILE = "gui_settings.json"
 
@@ -137,6 +139,16 @@ class M59Dashboard(tk.Tk):
         self.alert_active = False
         self.comms_data = {"all": [], "tells": [], "broadcasts": [], "social": [], "clean": []}
         self.gps_manager = GPSManager()
+        
+        # --- Lifecycle State ---
+        self.initial_sync_done = False
+        
+        # --- Lifecycle Manager ---
+        self.lifecycle = InstanceManager(
+            on_connect_cb=self.on_game_connect,
+            on_disconnect_cb=self.on_game_disconnect,
+            on_multiple_found=self.show_instance_selection_ui
+        )
         
         # Patterns & Subtraction List
         import re
@@ -418,6 +430,16 @@ class M59Dashboard(tk.Tk):
             self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
         self.kills_tree.pack(fill="both", expand=True)
 
+        # --- Manual Sync Section ---
+        sync_f = tk.Frame(self.tab_dash, bg="#f0f0f0")
+        sync_f.pack(side="bottom", fill="x", padx=10, pady=10)
+        self.manual_sync_btn = tk.Button(
+            sync_f, text=" 🔄 PERFORM FULL SYNC & IDENTITY ", 
+            command=self.trigger_manual_sync, 
+            bg="#FF9800", fg="white", font=("Arial", 10, "bold"), pady=8
+        )
+        self.manual_sync_btn.pack(fill="x")
+
     def setup_tab_progression(self):
         ctrl = tk.Frame(self.tab_prog, bg="#f0f0f0")
         ctrl.pack(fill="x", padx=10, pady=10)
@@ -527,61 +549,119 @@ class M59Dashboard(tk.Tk):
 
     def establish_connection(self):
         self.status_var.set("Scanning for game...")
-        self.debug_log("CONN", "Starting connection handshake...")
-        try:
-            insts = self.find_all_instances()
-            if not insts:
-                if messagebox.askretrycancel("Error", "No game found."):
-                    self.establish_connection()
-                else:
-                    self.destroy()
-                    return
-            if len(insts) == 1:
-                self.pm_obj, self.target_pid = establish_bridge()
-                self.main_hwnd = insts[0]["hwnd"]
-                self.debug_log("CONN", f"Bridge established - PID: {self.target_pid}")
-            else:
-                from tkinter import Toplevel, Listbox
-                sel = Toplevel(self)
-                lb = Listbox(sel, width=50)
-                lb.pack(padx=20, pady=10)
-                for i in insts:
-                    lb.insert("end", f"PID: {i['pid']} | {i['title']}")
-                def on_sel():
-                    s = lb.curselection()
-                    if s:
-                        self.target_pid = int(lb.get(s[0]).split("|")[0].replace("PID:", "").strip())
-                        self.main_hwnd = next(x["hwnd"] for x in insts if x["pid"] == self.target_pid)
-                        sel.destroy()
-                tk.Button(sel, text="Connect", command=on_sel).pack()
-                self.wait_window(sel)
-                import pymem
-                self.pm_obj = pymem.Pymem(self.target_pid)
-                claim_pid(self.target_pid)
-                self.debug_log("CONN", f"Manual bridge established - PID: {self.target_pid}")
-            
-            self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
-            self.debug_log("CONN", f"Identity captured: {self.char_name}")
-            self.title(f"M59 Companion v{self.version} - {self.char_name}")
-            self.status_var.set(f"Connected: {self.char_name}")
-            self.after(500, self._post_connection_init)
-        except Exception as e:
-            self.debug_log("CONN", f"Error: {e}")
-            self.destroy()
+        self.debug_log("CONN", "Starting Lifecycle Monitor...")
+        self.lifecycle.start()
 
-    def _post_connection_init(self):
+    def on_game_connect(self, pm, pid):
+        """Callback when InstanceManager attaches to a new game process."""
+        logger.info(f"LifeCycle: New Game Instance Detected (PID {pid})")
+        is_first_run = (self.pm_obj is None)
+        self.pm_obj = pm
+        self.target_pid = pid
+        
+        # Find the HWND for this PID
+        def find_hwnd(h, l):
+            _, p = win32process.GetWindowThreadProcessId(h)
+            if p == pid and win32gui.IsWindowVisible(h) and "Meridian 59" in win32gui.GetWindowText(h):
+                self.main_hwnd = h
+        win32gui.EnumWindows(find_hwnd, None)
+        
+        if not self.main_hwnd:
+            logger.error(f"LifeCycle: Found PID {pid} but could not locate its window.")
+            return
+
+        if is_first_run:
+            logger.info("LifeCycle: First run detected - performing full identity handshake.")
+            self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
+            logger.info(f"LifeCycle: Identity captured: {self.char_name}")
+            self.after(0, self._finalize_connection)
+        else:
+            logger.info(f"LifeCycle: Auto-reconnect detected - remaining passive for character: {self.char_name}")
+            self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
+            # Start Passive HUD and Chat
+            self._post_connection_init(passive=True)
+
+    def trigger_manual_sync(self):
+        """Action for the manual sync button on the Dashboard."""
+        if not self.main_hwnd:
+            messagebox.showwarning("Sync", "No active game process found to sync.")
+            return
+            
+        self.manual_sync_btn.config(state="disabled", text=" 🔄 SYNCING... PLEASE WAIT ")
+        self.status_var.set("Performing Manual Identity & Full Sync...")
+        
+        def run_sync():
+            try:
+                # Mark as initially synced now
+                self.initial_sync_done = True
+                
+                # 1. Identity
+                logger.info("Sync: Performing manual identity capture...")
+                new_name = capture_identity(self.main_hwnd, self.target_pid)
+                if new_name:
+                    logger.info(f"Sync: New identity found: {new_name}")
+                    self.char_name = new_name
+                    self.after(0, lambda: self.title(f"M59 Companion v{self.version} - {self.char_name}"))
+                
+                # 2. Tab Dance & Scrape
+                logger.info("Sync: Starting Tab Dance & Scrape...")
+                mr = MemoryReader(self.pm_obj)
+                kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
+                if kn or st:
+                    self.after(0, lambda: self._apply_sync_results(kn, st))
+                
+                self.after(0, lambda: self.status_var.set(f"Sync Complete: {self.char_name}"))
+                logger.info("Sync: Manual sync complete.")
+            except Exception as e:
+                logger.error(f"Manual sync error: {e}")
+                self.after(0, lambda: self.status_var.set("Manual Sync Failed."))
+            finally:
+                self.after(0, lambda: self.manual_sync_btn.config(state="normal", text=" 🔄 PERFORM FULL SYNC & IDENTITY "))
+        
+        threading.Thread(target=run_sync, daemon=True).start()
+
+    def _finalize_connection(self):
+        self.title(f"M59 Companion v{self.version} - {self.char_name}")
+        self.status_var.set(f"Connected: {self.char_name}")
+        self._post_connection_init()
+
+    def on_game_disconnect(self, pid):
+        """Callback when InstanceManager loses connection to a game process."""
+        logger.info(f"LifeCycle: Game Instance Lost (PID {pid}). Entering search mode...")
+        self.status_var.set(f"Game Lost ({self.char_name}) - Searching...")
+        self.title(f"M59 Companion v{self.version} - Waiting...")
+        
+        # Clear Vitals visually
+        for v in self.hud_values.values():
+            v.config(text="---")
+            
+        self.main_hwnd = None
+        self.pm_obj = None
+        self.target_pid = None
+        # PK Frame might be invalid now
+        if self.pk_frame:
+            try: self.pk_frame.destroy()
+            except: pass
+            self.pk_frame = None
+
+    def _post_connection_init(self, passive=False):
         if not self.is_running:
             return
-        self.debug_log("INIT", "Starting heavy profile initialization...")
+        self.debug_log("INIT", f"Initializing profile (Passive: {passive})...")
         try:
             self.load_vault_cache()
             self.load_kill_book()
             self.refresh_log_list()
-            self.pk_frame = PKFrame(self, self.main_hwnd)
+            
+            if not self.pk_frame:
+                self.pk_frame = PKFrame(self, self.main_hwnd)
+                
             self.update_hud()
             self.start_chat_monitor()
-            self.debug_log("INIT", "Starting automatic startup sync...")
-            threading.Thread(target=self.perform_sync, daemon=True).start()
+            
+            if not passive:
+                self.debug_log("INIT", "Starting automatic startup sync...")
+                threading.Thread(target=self.perform_sync, daemon=True).start()
         except Exception as e:
             self.debug_log("INIT", f"Post-connection error: {e}")
 
@@ -589,6 +669,34 @@ class M59Dashboard(tk.Tk):
         if not self.main_hwnd or not self.is_running:
             return
         self.refresh_counter -= 1
+        
+        # --- Title-based Login/Logout Detection ---
+        try:
+            current_title = win32gui.GetWindowText(self.main_hwnd)
+            is_logged_in = " --- " in current_title
+            
+            if not is_logged_in and self.initial_sync_done:
+                # STATE: User just logged out (window still open)
+                if "Logged Out" not in self.status_var.get():
+                    logger.info(f"Character {self.char_name} logged out (Select Screen).")
+                    self.status_var.set(f"Logged Out ({self.char_name})")
+                    self.title(f"M59 Companion v{self.version} - Logged Out")
+            
+            elif is_logged_in:
+                room = current_title.split(" --- ", 1)[1].strip()
+                if "Logged Out" in self.status_var.get():
+                    # STATE: User just logged back in
+                    logger.info(f"Character detected back in-game at {room}.")
+                    self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
+                    self.title(f"M59 Companion v{self.version} - {self.char_name}")
+                
+                self.gps_loc_lbl.config(text=room)
+                if self.gps_discovery_enabled.get():
+                    self.monitor_gps_discovery(room)
+
+        except Exception as e:
+            logger.debug(f"Title tracking error: {e}")
+
         if self.refresh_counter <= 0:
             self.refresh_counter = 10
             try:
@@ -602,18 +710,14 @@ class M59Dashboard(tk.Tk):
                         if k in self.attr_labels:
                             self.current_attributes[k] = v
                             self.attr_labels[k].config(text=str(v))
-                if self.gps_discovery_enabled.get():
-                    self.monitor_gps_discovery()
             except Exception as e:
                 self.debug_log("HUD", f"Update error: {e}")
         self.countdown_lbl.config(text=f"{self.refresh_counter}s")
         self.after(1000, self.update_hud)
 
-    def monitor_gps_discovery(self):
-        cur = self.get_current_room()
+    def monitor_gps_discovery(self, cur):
         if cur == "Unknown Location":
             return
-        self.gps_loc_lbl.config(text=cur)
         was_t, msg = self.gps_manager.process_room_update(cur)
         if msg:
             self.gps_log(msg)
@@ -623,31 +727,73 @@ class M59Dashboard(tk.Tk):
         def loop():
             tr = SessionTracker()
             co = CombatMonitor(self.char_name)
-            self.debug_log("CHAT", "Monitor thread started.")
+            logger.info("ChatMonitor: Thread started.")
+            
+            # Initial handle grab
             ch = win32gui.GetDlgItem(self.main_hwnd, 1005)
             if not ch:
-                self.debug_log("CHAT", "ERROR: Chat control (1005) not found.")
-                return
+                logger.error("ChatMonitor: Initial chat control (1005) not found.")
+                # We don't exit, we'll try to find it in the loop
+            else:
+                logger.info(f"ChatMonitor: Initialized with HWND {ch}")
+
             safe_n = self.char_name.replace(" ", "_")
             log_p = os.path.join("logs", f"{safe_n}_chat.log")
-            cur = get_text_from_hwnd(ch)
-            lines = [l.strip() for l in cur.splitlines() if l.strip()]
+            
+            # Initial baseline
+            cur_text = get_text_from_hwnd(ch) if ch else ""
+            lines = [l.strip() for l in cur_text.splitlines() if l.strip()]
             self.last_tail = lines[-50:] if lines else []
+            logger.info(f"ChatMonitor: Baseline set with {len(self.last_tail)} lines.")
+
+            last_heartbeat_log = 0
+
             while self.is_running:
                 try:
+                    # 1. Process Heartbeat
                     self.pm_obj.read_int(self.pm_obj.base_address)
-                    c_c = win32gui.GetDlgItem(self.main_hwnd, 1005)
-                    if c_c and c_c != ch:
-                        self.debug_log("CHAT", "Re-binding to new chat handle...")
-                        ch = c_c
+                    
+                    # Log heartbeat every 60 seconds for debugging
+                    if time.time() - last_heartbeat_log > 60:
+                        logger.debug("ChatMonitor: Heartbeat OK.")
+                        last_heartbeat_log = time.time()
+
+                    # 2. Control Handle Validation
+                    try:
+                        c_c = win32gui.GetDlgItem(self.main_hwnd, 1005)
+                        if c_c and c_c != ch:
+                            logger.info(f"ChatMonitor: Game control changed. Re-binding HWND {ch} -> {c_c}")
+                            ch = c_c
+                    except pywintypes.error as e:
+                        # Error 1421 = Control ID not found (User is likely at select screen)
+                        if e.winerror == 1421:
+                            if ch:
+                                logger.info("ChatMonitor: Chat control disappeared (Logout). Waiting...")
+                                ch = None
+                            time.sleep(2)
+                            continue
+                        raise # Re-raise other win32 errors to be caught by the outer loop
+                    
                     if not ch:
                         time.sleep(1)
                         continue
-                    cur = get_text_from_hwnd(ch)
-                    lines = [l.strip() for l in cur.splitlines() if l.strip()]
+
+                    # 3. Read and Process
+                    cur_text = get_text_from_hwnd(ch)
+                    lines = [l.strip() for l in cur_text.splitlines() if l.strip()]
+                    
+                    if not lines:
+                        # Chat was likely cleared (Logout)
+                        if self.last_tail:
+                            logger.info("ChatMonitor: Chat buffer appears empty. Resetting fingerprint.")
+                            self.last_tail = []
+                        time.sleep(1)
+                        continue
+
                     new = []
                     found = -1
                     tail = list(self.last_tail)
+                    
                     while tail:
                         tl = len(tail)
                         search = lines[-100-tl:] if len(lines) > 100 else lines
@@ -659,39 +805,66 @@ class M59Dashboard(tk.Tk):
                         if found != -1:
                             break
                         tail.pop(0)
+
                     if found != -1:
                         new = lines[found:]
+                    else:
+                        # Fingerprint not found - buffer was likely cleared and refilled (Relog)
+                        if self.last_tail:
+                            logger.info(f"ChatMonitor: Fingerprint not found in {len(lines)} lines. Assuming buffer reset.")
+                        new = lines # Capture everything in the "new" buffer
+                        # Ensure combat monitor has latest name
+                        co.char_name = self.char_name
+
                     if new:
                         ts = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
                         try:
-                            with open(log_p, "a", encoding="utf-8") as f:
+                            # Use char_name for logging path in case it changed
+                            current_safe_n = self.char_name.replace(" ", "_")
+                            current_log_p = os.path.join("logs", f"{current_safe_n}_chat.log")
+                            
+                            with open(current_log_p, "a", encoding="utf-8") as f:
                                 for l in new:
                                     f.write(f"{ts} {l}\n")
                                     self.after(0, lambda ln=l: self.append_comms_line(ln))
                                     try:
                                         g = tr.process_line(l)
                                         if g:
-                                            self.debug_log("GAIN", f"Skill improvement: {g['name']}")
+                                            logger.info(f"ChatMonitor: Skill improvement: {g['name']}")
                                             self.after(0, lambda gn=g: self.on_gain_detected(gn))
                                         if self.is_combat_line(l):
                                             r = co.process_line(l)
                                             if r:
                                                 if r["type"] == "KILL":
-                                                    self.debug_log("KILL", f"Detected: {r['name']}")
+                                                    logger.info(f"ChatMonitor: Kill Detected: {r['name']}")
                                                     self.after(0, lambda res=r: self.on_kill_detected(res))
                                                 elif r["type"] == "PK_ALERT":
+                                                    logger.info("ChatMonitor: PK ALERT TRIGGERED!")
                                                     self.after(0, self.trigger_pk_alert)
                                     except:
                                         pass
                                 f.flush()
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.error(f"ChatMonitor: Failed to write to log file: {e}")
+                        
+                        # Update fingerprint
                         for l in new:
                             self.last_tail.append(l)
                         self.last_tail = self.last_tail[-50:]
-                except:
-                    break
+
+                except Exception as e:
+                    # Handle temporary access issues during login transitions
+                    if "Access is denied" in str(e) or "The handle is invalid" in str(e) or (isinstance(e, pywintypes.error) and e.winerror == 1421):
+                        logger.warn(f"ChatMonitor: Game state transition ({e}). Waiting...")
+                        time.sleep(2)
+                    else:
+                        logger.error(f"ChatMonitor: Critical loop error: {e}")
+                        break
+                
                 time.sleep(1)
+            
+            logger.info("ChatMonitor: Thread exiting.")
+            
         threading.Thread(target=loop, daemon=True).start()
 
     def on_gain_detected(self, g):
@@ -732,6 +905,78 @@ class M59Dashboard(tk.Tk):
             release_pid(self.target_pid)
         self.destroy()
 
+    def show_instance_selection_ui(self, instances):
+        """Displays a modal popup when multiple unclaimed games are found."""
+        logger.info(f"UI: Prompting user for instance selection from {len(instances)} options.")
+        
+        popup = tk.Toplevel(self)
+        popup.title("Select Game Instance")
+        popup.geometry("500x350")
+        popup.attributes("-topmost", True)
+        popup.grab_set() # Modal
+        
+        tk.Label(popup, text="Multiple unclaimed games detected.", font=("Arial", 11, "bold"), pady=10).pack()
+        tk.Label(popup, text="Please select the instance you want this Companion to control:", font=("Arial", 9)).pack(pady=(0, 10))
+        
+        frame = tk.Frame(popup)
+        frame.pack(fill="both", expand=True, padx=20, pady=5)
+        
+        # Treeview for selection
+        tree = ttk.Treeview(frame, columns=("PID", "Character", "Location"), show="headings", height=8)
+        tree.heading("PID", text="PID")
+        tree.heading("Character", text="Character")
+        tree.heading("Location", text="Location")
+        tree.column("PID", width=70, anchor="center")
+        tree.column("Character", width=150, anchor="w")
+        tree.column("Location", width=250, anchor="w")
+        tree.pack(side="left", fill="both", expand=True)
+        
+        sb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        sb.pack(side="right", fill="y")
+        tree.configure(yscrollcommand=sb.set)
+        
+        for inst in instances:
+            # Parse location from title if possible
+            title = inst["title"]
+            location = title.split(" --- ", 1)[1] if " --- " in title else "Select Screen"
+            char_name = inst.get("char_name", "Unknown")
+            tree.insert("", "end", iid=str(inst["pid"]), values=(inst["pid"], char_name, location))
+            
+        def on_select():
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning("Selection", "Please select an instance from the list.", parent=popup)
+                return
+            
+            selected_pid = int(selected[0])
+            logger.info(f"UI: User selected PID {selected_pid}.")
+            
+            if self.lifecycle.assign_instance(selected_pid):
+                popup.destroy()
+            else:
+                messagebox.showerror("Error", "Could not attach to that instance. It might have been claimed or closed.", parent=popup)
+                # Refresh list if it failed
+                unclaimed = get_unclaimed_instances()
+                if not unclaimed:
+                    popup.destroy()
+                else:
+                    for i in tree.get_children(): tree.delete(i)
+                    for i in unclaimed: tree.insert("", "end", iid=str(i["pid"]), values=(i["pid"], i["title"]))
+        
+        btn_f = tk.Frame(popup)
+        btn_f.pack(fill="x", pady=20)
+        
+        tk.Button(btn_f, text=" CONNECT TO SELECTED ", command=on_select, 
+                  bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), padx=20, pady=5).pack()
+        
+        # If the popup is closed without selection, we resume auto-searching
+        def on_popup_close():
+            logger.info("UI: Instance selection cancelled by user.")
+            self.lifecycle.pause_auto_attach = False
+            popup.destroy()
+            
+        popup.protocol("WM_DELETE_WINDOW", on_popup_close)
+
     def trigger_sync(self):
         self.sync_btn.config(state="disabled")
         self.debug_log("SYNC", "Starting manual sync cycle...")
@@ -742,14 +987,16 @@ class M59Dashboard(tk.Tk):
             mr = MemoryReader(self.pm_obj)
             kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
             if kn or st:
+                # Mark as initially synced now that we have data
+                self.initial_sync_done = True
                 self.after(0, lambda: self._apply_sync_results(kn, st))
         except Exception as e:
-            self.debug_log("SYNC", f"Sync error: {e}")
+            logger.error(f"Sync: Automatic sync error: {e}")
         finally:
             self.after(0, lambda: self.sync_btn.config(state="normal"))
 
     def _apply_sync_results(self, kn, st):
-        self.debug_log("SYNC", f"Data received - Skills: {len(kn) if kn else 0}, Stats: {len(st) if st else 0}")
+        logger.info(f"Sync: Data received - Skills: {len(kn) if kn else 0}, Stats: {len(st) if st else 0}")
         
         if st:
             # High-Verbosity Data Dump
@@ -777,14 +1024,13 @@ class M59Dashboard(tk.Tk):
             return
         
         intellect = self.current_attributes.get("Intellect", 25)
-        self.debug_log("CALC", f"Calculating progression (Intellect: {intellect})")
+        logger.debug(f"Calc: Processing progression (Intellect: {intellect})")
         if self.debug_enabled.get():
             self.debug_log("DATA", f"Knowledge Cache: {self.knowledge_cache}")
 
         exp = {self.prog_tree.item(i)['text'] for i in self.prog_tree.get_children() if self.prog_tree.item(i, 'open')}
         res = self.calculator.calculate_progression(self.knowledge_cache, intellect)
         
-        self.debug_log("CALC", f"Calculated {len(res)} active schools.")
         for i in self.prog_tree.get_children():
             self.prog_tree.delete(i)
             
@@ -799,7 +1045,6 @@ class M59Dashboard(tk.Tk):
                 val_tuple = (f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", "YOU QUALIFY!")
             else:
                 val_tuple = (f"Level {r['current_lvl']}", f"{r['current_sum']}%", f"{r['target_sum']}%", f"{r['needed']}%")
-                self.debug_log("CALC", f"SCHOOL:{name} | {val_tuple[0]} -> {val_tuple[1]}/{val_tuple[2]} (Need: {val_tuple[3]})")
 
             p = self.prog_tree.insert("", "end", text=name, values=val_tuple, open=is_open)
 
@@ -815,7 +1060,7 @@ class M59Dashboard(tk.Tk):
     def trigger_vault_scan(self, vt):
         rm = {"barloque": "Office of the Barloque Vaultman", "hungry": "The Hungry Vaults"}
         cur = self.get_current_room()
-        self.debug_log("VAULT", f"Validating location for {vt} scan. Current: {cur}")
+        logger.info(f"Vault: Validating location for {vt} scan. Current: {cur}")
         if rm.get(vt) and rm[vt].lower() not in cur.lower():
             messagebox.showwarning("Location", f"Sync Blocked: Must be in '{rm[vt]}'.\nCurrent: '{cur}'")
             return
@@ -826,14 +1071,14 @@ class M59Dashboard(tk.Tk):
         threading.Thread(target=self.perform_vault_scan_thread, args=(vt,), daemon=True).start()
 
     def perform_vault_scan_thread(self, vt):
-        self.debug_log("VAULT", f"Starting automated scan of {vt} vault...")
+        logger.info(f"Vault: Starting automated scan of {vt} vault...")
         try:
             inv = perform_vault_scan(self.main_hwnd, self.char_name, vt, lambda c, t, i, q: self.after(0, lambda: self.status_var.set(f"Scan: {c}/{t}")))
             if inv:
-                self.debug_log("VAULT", f"Scan complete. Found {len(inv)} items.")
+                logger.info(f"Vault: Scan complete. Found {len(inv)} items.")
                 self.after(0, lambda: self._apply_vault_results(vt, inv))
         except Exception as e:
-            self.debug_log("VAULT", f"Scan error: {e}")
+            logger.error(f"Vault: Scan error: {e}")
         finally:
             self.after(0, lambda: self.vault_widgets[vt]["sync_btn"].config(state="normal"))
 

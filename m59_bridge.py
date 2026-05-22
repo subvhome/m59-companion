@@ -92,42 +92,52 @@ def claim_pid(pid):
         print(f"DEBUG: Lock error for {pid}: {e}")
         return False
 
-def find_available_instance(target_name):
-    """Finds all instances of target_name and returns the first one not already locked."""
+def get_unclaimed_instances(target_name="Meridian.exe"):
+    """
+    Returns a list of dictionaries containing {pid, title, hwnd, char_name} 
+    for all game instances that are not currently locked by another companion.
+    """
     cleanup_stale_locks()
-    
-    available_pids = []
+    all_instances = []
     
     def callback(hwnd, extra):
         if win32gui.IsWindowVisible(hwnd):
             text = win32gui.GetWindowText(hwnd)
-            # Use 'Meridian 59' for window title check, but also allow checking by process name
             if "Meridian 59" in text:
                 _, pid = win32process.GetWindowThreadProcessId(hwnd)
-                if pid not in available_pids:
-                    available_pids.append(pid)
+                # Check if it's actually the right process name
+                try:
+                    import psutil
+                    if psutil.Process(pid).name().lower() == target_name.lower():
+                        all_instances.append({"pid": pid, "title": text, "hwnd": hwnd})
+                except:
+                    pass
     
     win32gui.EnumWindows(callback, None)
     
-    if not available_pids:
-        print("DEBUG: No visible 'Meridian 59' windows found via EnumWindows.")
-        # Fallback: check all processes for the target executable name
-        try:
-            import psutil
-            for proc in psutil.process_iter(['pid', 'name']):
-                if proc.info['name'].lower() == target_name.lower():
-                    available_pids.append(proc.info['pid'])
-        except ImportError:
-            pass
+    # Filter only unclaimed ones and try to peek at character names
+    from m59_scraper import capture_identity
+    unclaimed = []
+    for i in all_instances:
+        if not is_pid_locked(i["pid"]):
+            # Try to peek at character name without claiming
+            try:
+                # We use capture_identity but note that this requires the window to be accessible
+                cname = capture_identity(i["hwnd"], i["pid"]) or "Unknown"
+                i["char_name"] = cname
+            except:
+                i["char_name"] = "Unknown"
+            unclaimed.append(i)
+            
+    return unclaimed
 
-    print(f"DEBUG: Found PIDs: {available_pids}")
-    
-    for pid in available_pids:
-        locked = is_pid_locked(pid)
-        print(f"DEBUG: Checking PID {pid} - Locked: {locked}")
-        if not locked:
-            if claim_pid(pid):
-                return pid
+def find_available_instance(target_name):
+    """Legacy wrapper for compatibility: Returns the first unclaimed PID found."""
+    instances = get_unclaimed_instances(target_name)
+    if instances:
+        pid = instances[0]["pid"]
+        if claim_pid(pid):
+            return pid
     return None
 
 def establish_bridge():
