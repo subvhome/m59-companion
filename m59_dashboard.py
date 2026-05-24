@@ -20,7 +20,7 @@ from m59_logging import setup_logging, get_logger
 logger = get_logger("dashboard")
 
 # Import modules
-from m59_bridge import establish_bridge, release_pid, find_available_instance, claim_pid
+from m59_bridge import establish_bridge, release_pid, find_available_instance, claim_pid, get_unclaimed_instances
 from m59_scraper import capture_identity, get_blakgraph_stats, cycle_tabs_and_scrape, get_text_from_hwnd, MemoryReader
 from m59_tracker import SessionTracker
 from m59_combat import CombatMonitor
@@ -124,6 +124,20 @@ class M59Dashboard(tk.Tk):
         self.debug_enabled = tk.BooleanVar(value=False)
         self.debug_enabled.trace_add("write", lambda *a: setup_logging(self.debug_enabled.get()))
         self.gps_discovery_enabled = tk.BooleanVar(value=False)
+        
+        # --- Chat Filtering State ---
+        self.static_filters = {
+            "Combat": tk.BooleanVar(value=True),
+            "Kills": tk.BooleanVar(value=True),
+            "Spells": tk.BooleanVar(value=True),
+            "Social": tk.BooleanVar(value=True),
+            "Private": tk.BooleanVar(value=True),
+            "Broadcasts": tk.BooleanVar(value=True),
+            "Improves": tk.BooleanVar(value=True),
+            "System": tk.BooleanVar(value=True)
+        }
+        self.custom_filters = [] # List of dicts: {"label": str, "keywords": list, "var": BooleanVar}
+        
         self.load_settings()
         
         # Initialize centralized logging with user preference
@@ -137,23 +151,11 @@ class M59Dashboard(tk.Tk):
         self.is_running = True
         self.pk_frame = None
         self.alert_active = False
-        self.comms_data = {"all": [], "tells": [], "broadcasts": [], "social": [], "clean": []}
         self.all_lines = [] # Master list for live filtering
+        self.history_buffer = [] # Buffer for historical log filtering
+        self.comms_mode = "live" # 'live' or 'history'
         self.gps_manager = GPSManager()
         self.waiting_overlay = None
-        
-        # --- Chat Filtering State ---
-        self.static_filters = {
-            "Combat": tk.BooleanVar(value=True),
-            "Kills": tk.BooleanVar(value=True),
-            "Spells": tk.BooleanVar(value=True),
-            "Loot": tk.BooleanVar(value=True),
-            "Private": tk.BooleanVar(value=True),
-            "Broadcasts": tk.BooleanVar(value=True),
-            "Improves": tk.BooleanVar(value=True),
-            "System": tk.BooleanVar(value=True)
-        }
-        self.custom_filters = [] # List of dicts: {"label": str, "keywords": list, "var": BooleanVar}
         
         # --- Lifecycle State ---
         self.initial_sync_done = False
@@ -307,26 +309,25 @@ class M59Dashboard(tk.Tk):
         # --- Static Filters Section ---
         tk.Label(sidebar, text=" CHAT FILTERS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
         f_scroll_f = tk.Frame(sidebar, bg="#f0f0f0")
-        f_scroll_f.pack(fill="both", expand=True)
+        f_scroll_f.pack(fill="x")
         
-        # We'll use a canvas for custom filters if they get long, but for now just a frame
         static_f = tk.Frame(f_scroll_f, bg="#f0f0f0")
         static_f.pack(fill="x", padx=5)
         
         for name, var in self.static_filters.items():
             cb = tk.Checkbutton(static_f, text=name, variable=var, bg="#f0f0f0", anchor="w", 
-                                command=self.refresh_live_view)
+                                command=self.refresh_comms_view)
             cb.pack(fill="x")
             
         # --- Custom Filters Section ---
         tk.Label(sidebar, text=" CUSTOM KEYWORDS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
         self.custom_filters_frame = tk.Frame(sidebar, bg="#f0f0f0")
-        self.custom_filters_frame.pack(fill="both", expand=True, padx=5)
+        self.custom_filters_frame.pack(fill="x", padx=5)
         self.rebuild_custom_filters_ui()
         
         # --- Add Filter Input ---
         add_f = tk.Frame(sidebar, bg="#f0f0f0")
-        add_f.pack(side="bottom", fill="x", padx=5, pady=10)
+        add_f.pack(fill="x", padx=5, pady=5)
         
         row1 = tk.Frame(add_f, bg="#f0f0f0")
         row1.pack(fill="x")
@@ -336,24 +337,44 @@ class M59Dashboard(tk.Tk):
         tk.Button(row1, text=" ⓘ ", command=self.show_filter_info, font=("Arial", 9)).pack(side="left")
 
         # --- Historical Logs ---
-        tk.Label(sidebar, text=" HISTORICAL LOGS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
-        self.log_file_list = ttk.Combobox(sidebar, state="readonly", font=("Arial", 8))
-        self.log_file_list.pack(fill="x", padx=5)
-        self.log_file_list.bind("<<ComboboxSelected>>", self.load_historical_log)
+        tk.Label(sidebar, text=" LOG BROWSER ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
+        
+        # Return to Live Button
+        self.live_feed_btn = tk.Button(sidebar, text=" 🟢 RETURN TO LIVE FEED ", command=self.return_to_live,
+                                       bg="#E8F5E9", font=("Arial", 8, "bold"), pady=5)
+        self.live_feed_btn.pack(fill="x", padx=5, pady=5)
+
+        # Scrollable Listbox for logs
+        list_f = tk.Frame(sidebar, bg="#f0f0f0")
+        list_f.pack(fill="both", expand=True, padx=5)
+        
+        self.log_file_list = tk.Listbox(list_f, font=("Arial", 8), height=10)
+        self.log_file_list.pack(side="left", fill="both", expand=True)
+        self.log_file_list.bind("<<ListboxSelect>>", self.load_historical_log)
+        
+        sb = ttk.Scrollbar(list_f, orient="vertical", command=self.log_file_list.yview)
+        sb.pack(side="right", fill="y")
+        self.log_file_list.config(yscrollcommand=sb.set)
         
         btn_row = tk.Frame(sidebar, bg="#f0f0f0")
         btn_row.pack(fill="x", padx=5, pady=5)
-        tk.Button(btn_row, text="Refresh", command=self.refresh_log_list, font=("Arial", 7)).pack(side="left", fill="x", expand=True)
-        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("logs")),
+        tk.Button(btn_row, text="Refresh List", command=self.refresh_log_list, font=("Arial", 7)).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="Open Folder", command=lambda: os.startfile(os.path.abspath("logs")),
                   font=("Arial", 7)).pack(side="left", fill="x", expand=True, padx=2)
         
         right = tk.Frame(paned, bg="#f0f0f0")
         paned.add(right, weight=4)
-        self.comms_header_lbl = tk.Label(right, text="Filtered Live Stream", font=("Arial", 11, "bold"), bg="#f0f0f0")
+        self.comms_header_lbl = tk.Label(right, text="🟢 LIVE STREAM", font=("Arial", 11, "bold"), fg="#2E7D32", bg="#f0f0f0")
         self.comms_header_lbl.pack(pady=5)
         
         self.comms_view = scrolledtext.ScrolledText(right, bg="black", fg="#00FFFF", font=("Consolas", 10), state="disabled")
         self.comms_view.pack(fill="both", expand=True, padx=5, pady=5)
+
+    def return_to_live(self):
+        self.comms_mode = "live"
+        self.comms_header_lbl.config(text="🟢 LIVE STREAM", fg="#2E7D32")
+        self.live_feed_btn.config(bg="#E8F5E9") # Subtle green
+        self.refresh_comms_view()
 
     def rebuild_custom_filters_ui(self):
         """Redraws the custom filters list in the sidebar."""
@@ -364,7 +385,7 @@ class M59Dashboard(tk.Tk):
             row = tk.Frame(self.custom_filters_frame, bg="#f0f0f0")
             row.pack(fill="x", pady=1)
             tk.Checkbutton(row, text=f["label"], variable=f["var"], bg="#f0f0f0", anchor="w",
-                           command=self.refresh_live_view).pack(side="left", fill="x", expand=True)
+                           command=self.refresh_comms_view).pack(side="left", fill="x", expand=True)
             tk.Button(row, text="✕", command=lambda idx=i: self.remove_custom_filter(idx),
                       fg="red", bg="#f0f0f0", bd=0, font=("Arial", 8, "bold")).pack(side="right", padx=5)
 
@@ -394,14 +415,14 @@ class M59Dashboard(tk.Tk):
         })
         self.new_filter_entry.delete(0, tk.END)
         self.rebuild_custom_filters_ui()
-        self.refresh_live_view()
+        self.refresh_comms_view()
         self.save_settings()
 
     def remove_custom_filter(self, index):
         if 0 <= index < len(self.custom_filters):
             self.custom_filters.pop(index)
             self.rebuild_custom_filters_ui()
-            self.refresh_live_view()
+            self.refresh_comms_view()
             self.save_settings()
 
     def show_filter_info(self):
@@ -413,14 +434,19 @@ class M59Dashboard(tk.Tk):
                "Note: Filters match ANY of your terms (OR logic) and are case-insensitive.")
         messagebox.showinfo("Filter Info", msg)
 
-    def refresh_live_view(self):
-        """Clears and repopulates the comms view based on current filters."""
+    def refresh_comms_view(self):
+        """Clears and repopulates the comms view based on current mode and filters."""
         self.comms_view.config(state="normal")
         self.comms_view.delete("1.0", tk.END)
-        # We only keep the last 1000 lines for the live view to keep it snappy
-        for ts, line in self.all_lines[-1000:]:
+        
+        # Determine data source based on current mode
+        source = self.all_lines if self.comms_mode == "live" else self.history_buffer
+        
+        # For performance, we limit display to last 2000 lines when filtering
+        for ts, line in source[-2000:]:
             if self.should_show_line(line):
                 self.comms_view.insert(tk.END, f"{ts} {line}\n")
+                
         self.comms_view.see(tk.END)
         self.comms_view.config(state="disabled")
 
@@ -428,19 +454,37 @@ class M59Dashboard(tk.Tk):
         """Core logic to determine if a line matches ANY enabled filter."""
         l = line.lower()
         
-        # 1. Check Static Filters
+        # 1. Combat & Kills
         if self.static_filters["Combat"].get() and self.is_combat_line(line): return True
         if self.static_filters["Kills"].get() and "you killed" in l: return True
-        if self.static_filters["Spells"].get() and ("you cast" in l or "spell fails" in l or "mana" in l): return True
-        if self.static_filters["Loot"].get() and ("you find" in l or "you pick up" in l or "transfer" in l): return True
-        if self.static_filters["Private"].get() and ("tells you" in l or "you tell" in l or "sends," in l): return True
-        if self.static_filters["Broadcasts"].get() and ("broadcasts," in l or "broadcasts:" in l): return True
-        if self.static_filters["Improves"].get() and "improved" in l: return True
-        if self.static_filters["System"].get():
-            if "meridian 59" in l or "server" in l or "you are in" in l or "you enter" in l:
+        
+        # 2. Spells (Include 3rd person emotes like 'murmurs' or 'makes a mystical')
+        if self.static_filters["Spells"].get():
+            if any(x in l for x in ["you cast", "spell fails", "mana", "murmur", "mystical gesture"]):
                 return True
+        
+        # 3. Social (Broadened to catch all speech variations)
+        if self.static_filters["Social"].get():
+            # Catch "Name says," "You say," "Name yells," etc.
+            if any(x in l for x in [" say", " says", " yell", " yells", " yelling", " whisper", " shouting"]):
+                return True
+            # Catch standard emotes and 3rd person actions
+            if any(x in l for x in [" smiles ", " waves ", " bows ", " laughs ", " at you.", " to you.", " nods."]):
+                return True
+            
+        # 4. Comms
+        if self.static_filters["Private"].get() and ("tells you" in l or "you tell" in l or "sends," in l): return True
+        if self.static_filters["Broadcasts"].get() and ("broadcasts," in l or "broadcasts:" in l or "shouts," in l or "shouting," in l): return True
+        
+        # 5. Progression
+        if self.static_filters["Improves"].get() and "improved" in l: return True
+        
+        # 6. System (Catch-all for everything else)
+        if self.static_filters["System"].get():
+            # If System is on, we show everything that wasn't already caught or excluded
+            return True
 
-        # 2. Check Custom Filters
+        # 7. Check Custom Filters
         for f in self.custom_filters:
             if f["var"].get():
                 for kw in f["keywords"]:
@@ -449,37 +493,61 @@ class M59Dashboard(tk.Tk):
         return False
 
     def load_historical_log(self, event=None):
-        fn = self.log_file_list.get()
-        if not fn:
-            return
-        self.current_comms_channel = f"History: {fn}"
-        self.comms_header_lbl.config(text=f"Viewing Log: {fn}")
+        selection = self.log_file_list.curselection()
+        if not selection: return
+        
+        fn = self.log_file_list.get(selection[0])
+        self.comms_mode = "history"
+        self.comms_header_lbl.config(text=f"📂 HISTORY: {fn}", fg="#1565C0")
+        self.live_feed_btn.config(bg="#f0f0f0") # Dim the live button
+        
         path = os.path.join("logs", fn)
         try:
+            self.history_buffer = []
             with open(path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-            self.comms_view.config(state="normal")
-            self.comms_view.delete("1.0", tk.END)
-            self.comms_view.insert(tk.END, content)
-            self.comms_view.see(tk.END)
-            self.comms_view.config(state="disabled")
+                for line in f:
+                    line = line.strip()
+                    if not line: continue
+                    # Parse timestamp if it exists [YYYY-MM-DD HH:MM:SS]
+                    if line.startswith("[") and "]" in line:
+                        parts = line.split("]", 1)
+                        ts = parts[0] + "]"
+                        msg = parts[1].strip()
+                        self.history_buffer.append((ts, msg))
+                    else:
+                        self.history_buffer.append(("", line))
+            
+            self.refresh_comms_view()
         except Exception as e:
-            logger.error(f"Failed to load {fn}: {e}")
+            logger.error(f"Failed to load historical log {fn}: {e}")
 
     def append_comms_line(self, line):
         ts = f"[{datetime.now().strftime('%H:%M:%S')}]"
         
+        if self.debug_enabled.get():
+            logger.debug(f"Comms: Received raw line: {line[:60]}...")
+
         # Save to master list
         self.all_lines.append((ts, line))
         if len(self.all_lines) > 5000:
             self.all_lines.pop(0)
         
-        # Update live view if the line passes filters
-        if self.should_show_line(line):
+        # Only update live view auto-scrolling if we are currently IN live mode
+        if self.comms_mode == "live" and self.should_show_line(line):
             self.comms_view.config(state="normal")
             self.comms_view.insert(tk.END, f"{ts} {line}\n")
             self.comms_view.see(tk.END)
             self.comms_view.config(state="disabled")
+
+    def refresh_log_list(self):
+        if not os.path.exists("logs"):
+            os.makedirs("logs", exist_ok=True)
+        files = [f for f in os.listdir("logs") if f.endswith(".log") and "debug" not in f.lower()]
+        files.sort(key=lambda x: os.path.getmtime(os.path.join("logs", x)), reverse=True)
+        
+        self.log_file_list.delete(0, tk.END)
+        for f in files:
+            self.log_file_list.insert(tk.END, f)
 
     def setup_tab_gps(self):
         """Creates the GPS Discovery tab."""
@@ -490,7 +558,7 @@ class M59Dashboard(tk.Tk):
         # --- Under Construction Banner ---
         banner = tk.Frame(self.tab_gps, bg="#FFF9C4", bd=1, relief=tk.SOLID)
         banner.pack(fill="x", padx=10, pady=5)
-        tk.Label(banner, text="[!] FEATURE UNDER CONSTRUCTION [!]", font=("Arial", 10, "bold"), bg="#FFF9C4", fg="#F57F17").pack(pady=5)
+        tk.Label(banner, text=" ⚠ FEATURE UNDER CONSTRUCTION ⚠ ", font=("Arial", 12, "bold"), bg="#FFF9C4", fg="#F57F17").pack(pady=5)
         tk.Label(banner, text="This module is currently in development and is not yet ready for public testing.", 
                  font=("Arial", 8, "italic"), bg="#FFF9C4", fg="#F57F17").pack(pady=(0, 5))
         
@@ -657,15 +725,6 @@ class M59Dashboard(tk.Tk):
         dg.pack(fill="x")
         tk.Checkbutton(dg, text="Verbose Debug Mode", variable=self.debug_enabled, bg="#f0f0f0").pack(anchor="w")
         tk.Button(c, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
-
-    def refresh_log_list(self):
-        if not os.path.exists("logs"):
-            os.makedirs("logs", exist_ok=True)
-        files = [f for f in os.listdir("logs") if f.endswith(".log") and "debug" not in f.lower()]
-        files.sort(key=lambda x: os.path.getmtime(os.path.join("logs", x)), reverse=True)
-        self.log_file_list['values'] = files
-        if files:
-            self.log_file_list.current(0)
 
     def trigger_pk_alert(self):
         if not self.pk_alert_enabled.get():
