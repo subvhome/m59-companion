@@ -138,8 +138,22 @@ class M59Dashboard(tk.Tk):
         self.pk_frame = None
         self.alert_active = False
         self.comms_data = {"all": [], "tells": [], "broadcasts": [], "social": [], "clean": []}
+        self.all_lines = [] # Master list for live filtering
         self.gps_manager = GPSManager()
         self.waiting_overlay = None
+        
+        # --- Chat Filtering State ---
+        self.static_filters = {
+            "Combat": tk.BooleanVar(value=True),
+            "Kills": tk.BooleanVar(value=True),
+            "Spells": tk.BooleanVar(value=True),
+            "Loot": tk.BooleanVar(value=True),
+            "Private": tk.BooleanVar(value=True),
+            "Broadcasts": tk.BooleanVar(value=True),
+            "Improves": tk.BooleanVar(value=True),
+            "System": tk.BooleanVar(value=True)
+        }
+        self.custom_filters = [] # List of dicts: {"label": str, "keywords": list, "var": BooleanVar}
         
         # --- Lifecycle State ---
         self.initial_sync_done = False
@@ -227,11 +241,39 @@ class M59Dashboard(tk.Tk):
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
                     self.debug_enabled.set(s.get("debug_enabled", False))
                     self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
+                    
+                    # Restore Static Filters
+                    sf = s.get("static_filters", {})
+                    for name, val in sf.items():
+                        if name in self.static_filters:
+                            self.static_filters[name].set(val)
+                            
+                    # Restore Custom Filters
+                    cf = s.get("custom_filters", [])
+                    self.custom_filters = []
+                    for f in cf:
+                        self.custom_filters.append({
+                            "label": f["label"],
+                            "keywords": f["keywords"],
+                            "var": tk.BooleanVar(value=f.get("enabled", True))
+                        })
             except Exception as e:
                 logger.error(f"Failed to load settings: {e}")
 
     def save_settings(self):
         try:
+            # Prepare Custom Filters for JSON
+            cf_save = []
+            for f in self.custom_filters:
+                cf_save.append({
+                    "label": f["label"],
+                    "keywords": f["keywords"],
+                    "enabled": f["var"].get()
+                })
+                
+            # Prepare Static Filters for JSON
+            sf_save = {name: var.get() for name, var in self.static_filters.items()}
+
             with open(SETTINGS_FILE, "w") as f:
                 json.dump({
                     "geometry": self.geometry(),
@@ -240,7 +282,9 @@ class M59Dashboard(tk.Tk):
                     "pk_frame_enabled": self.pk_frame_enabled.get(),
                     "pk_sound_path": self.pk_sound_path.get(),
                     "debug_enabled": self.debug_enabled.get(),
-                    "gps_discovery_enabled": self.gps_discovery_enabled.get()
+                    "gps_discovery_enabled": self.gps_discovery_enabled.get(),
+                    "static_filters": sf_save,
+                    "custom_filters": cf_save
                 }, f)
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
@@ -260,11 +304,38 @@ class M59Dashboard(tk.Tk):
         sidebar = tk.Frame(paned, bg="#f0f0f0")
         paned.add(sidebar, weight=1)
         
-        tk.Label(sidebar, text=" LIVE CHANNELS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
-        for cat in ["All Chat", "Clean Feed", "Tells", "Broadcasts", "Social"]:
-            tk.Button(sidebar, text=cat, command=lambda c=cat: self.show_comms_channel(c),
-                      font=("Arial", 8), anchor="w", padx=10).pack(fill="x", padx=5, pady=1)
+        # --- Static Filters Section ---
+        tk.Label(sidebar, text=" CHAT FILTERS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
+        f_scroll_f = tk.Frame(sidebar, bg="#f0f0f0")
+        f_scroll_f.pack(fill="both", expand=True)
+        
+        # We'll use a canvas for custom filters if they get long, but for now just a frame
+        static_f = tk.Frame(f_scroll_f, bg="#f0f0f0")
+        static_f.pack(fill="x", padx=5)
+        
+        for name, var in self.static_filters.items():
+            cb = tk.Checkbutton(static_f, text=name, variable=var, bg="#f0f0f0", anchor="w", 
+                                command=self.refresh_live_view)
+            cb.pack(fill="x")
             
+        # --- Custom Filters Section ---
+        tk.Label(sidebar, text=" CUSTOM KEYWORDS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
+        self.custom_filters_frame = tk.Frame(sidebar, bg="#f0f0f0")
+        self.custom_filters_frame.pack(fill="both", expand=True, padx=5)
+        self.rebuild_custom_filters_ui()
+        
+        # --- Add Filter Input ---
+        add_f = tk.Frame(sidebar, bg="#f0f0f0")
+        add_f.pack(side="bottom", fill="x", padx=5, pady=10)
+        
+        row1 = tk.Frame(add_f, bg="#f0f0f0")
+        row1.pack(fill="x")
+        self.new_filter_entry = tk.Entry(row1, font=("Arial", 9))
+        self.new_filter_entry.pack(side="left", fill="x", expand=True)
+        tk.Button(row1, text=" + ", command=self.add_custom_filter, bg="#4CAF50", fg="white", font=("Arial", 9, "bold")).pack(side="left", padx=2)
+        tk.Button(row1, text=" ⓘ ", command=self.show_filter_info, font=("Arial", 9)).pack(side="left")
+
+        # --- Historical Logs ---
         tk.Label(sidebar, text=" HISTORICAL LOGS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
         self.log_file_list = ttk.Combobox(sidebar, state="readonly", font=("Arial", 8))
         self.log_file_list.pack(fill="x", padx=5)
@@ -278,23 +349,104 @@ class M59Dashboard(tk.Tk):
         
         right = tk.Frame(paned, bg="#f0f0f0")
         paned.add(right, weight=4)
-        self.comms_header_lbl = tk.Label(right, text="All Chat (Live Stream)", font=("Arial", 11, "bold"), bg="#f0f0f0")
+        self.comms_header_lbl = tk.Label(right, text="Filtered Live Stream", font=("Arial", 11, "bold"), bg="#f0f0f0")
         self.comms_header_lbl.pack(pady=5)
         
         self.comms_view = scrolledtext.ScrolledText(right, bg="black", fg="#00FFFF", font=("Consolas", 10), state="disabled")
         self.comms_view.pack(fill="both", expand=True, padx=5, pady=5)
-        self.current_comms_channel = "All Chat"
 
-    def show_comms_channel(self, channel):
-        self.current_comms_channel = channel
-        self.comms_header_lbl.config(text=channel)
+    def rebuild_custom_filters_ui(self):
+        """Redraws the custom filters list in the sidebar."""
+        for widget in self.custom_filters_frame.winfo_children():
+            widget.destroy()
+            
+        for i, f in enumerate(self.custom_filters):
+            row = tk.Frame(self.custom_filters_frame, bg="#f0f0f0")
+            row.pack(fill="x", pady=1)
+            tk.Checkbutton(row, text=f["label"], variable=f["var"], bg="#f0f0f0", anchor="w",
+                           command=self.refresh_live_view).pack(side="left", fill="x", expand=True)
+            tk.Button(row, text="✕", command=lambda idx=i: self.remove_custom_filter(idx),
+                      fg="red", bg="#f0f0f0", bd=0, font=("Arial", 8, "bold")).pack(side="right", padx=5)
+
+    def add_custom_filter(self):
+        raw = self.new_filter_entry.get().strip()
+        if not raw: return
+        
+        from tkinter import simpledialog
+        label = simpledialog.askstring("Filter Label", "Enter a name for this filter:", parent=self)
+        if not label: return
+        
+        # Parse keywords: handle quotes and commas
+        import re
+        keywords = []
+        # Matches "quoted string" or word
+        matches = re.findall(r'"([^"]*)"|([^,]+)', raw)
+        for m in matches:
+            val = (m[0] or m[1]).strip()
+            if val: keywords.append(val.lower())
+            
+        if not keywords: return
+        
+        self.custom_filters.append({
+            "label": label,
+            "keywords": keywords,
+            "var": tk.BooleanVar(value=True)
+        })
+        self.new_filter_entry.delete(0, tk.END)
+        self.rebuild_custom_filters_ui()
+        self.refresh_live_view()
+        self.save_settings()
+
+    def remove_custom_filter(self, index):
+        if 0 <= index < len(self.custom_filters):
+            self.custom_filters.pop(index)
+            self.rebuild_custom_filters_ui()
+            self.refresh_live_view()
+            self.save_settings()
+
+    def show_filter_info(self):
+        msg = ("Filter Formatting Guide:\n\n"
+               "• Single words: gold\n"
+               "• Multiple words (OR): loot, gold, gems\n"
+               "• Specific phrases: \"you find\"\n"
+               "• Combinations: loot, \"the master\", gems\n\n"
+               "Note: Filters match ANY of your terms (OR logic) and are case-insensitive.")
+        messagebox.showinfo("Filter Info", msg)
+
+    def refresh_live_view(self):
+        """Clears and repopulates the comms view based on current filters."""
         self.comms_view.config(state="normal")
         self.comms_view.delete("1.0", tk.END)
-        key = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}.get(channel, "all")
-        for line in self.comms_data[key]:
-            self.comms_view.insert(tk.END, line + "\n")
+        # We only keep the last 1000 lines for the live view to keep it snappy
+        for ts, line in self.all_lines[-1000:]:
+            if self.should_show_line(line):
+                self.comms_view.insert(tk.END, f"{ts} {line}\n")
         self.comms_view.see(tk.END)
         self.comms_view.config(state="disabled")
+
+    def should_show_line(self, line):
+        """Core logic to determine if a line matches ANY enabled filter."""
+        l = line.lower()
+        
+        # 1. Check Static Filters
+        if self.static_filters["Combat"].get() and self.is_combat_line(line): return True
+        if self.static_filters["Kills"].get() and "you killed" in l: return True
+        if self.static_filters["Spells"].get() and ("you cast" in l or "spell fails" in l or "mana" in l): return True
+        if self.static_filters["Loot"].get() and ("you find" in l or "you pick up" in l or "transfer" in l): return True
+        if self.static_filters["Private"].get() and ("tells you" in l or "you tell" in l or "sends," in l): return True
+        if self.static_filters["Broadcasts"].get() and ("broadcasts," in l or "broadcasts:" in l): return True
+        if self.static_filters["Improves"].get() and "improved" in l: return True
+        if self.static_filters["System"].get():
+            if "meridian 59" in l or "server" in l or "you are in" in l or "you enter" in l:
+                return True
+
+        # 2. Check Custom Filters
+        for f in self.custom_filters:
+            if f["var"].get():
+                for kw in f["keywords"]:
+                    if kw in l: return True
+        
+        return False
 
     def load_historical_log(self, event=None):
         fn = self.log_file_list.get()
@@ -315,30 +467,17 @@ class M59Dashboard(tk.Tk):
             logger.error(f"Failed to load {fn}: {e}")
 
     def append_comms_line(self, line):
-        ts = f"[{datetime.now().strftime('%H:%M:%S')}] {line}"
-        self.comms_data["all"].append(ts)
-        if len(self.comms_data["all"]) > 5000:
-            self.comms_data["all"].pop(0)
+        ts = f"[{datetime.now().strftime('%H:%M:%S')}]"
         
-        is_c = self.is_combat_line(line)
-        t_k = "social"
-        if not is_c:
-            self.comms_data["clean"].append(ts)
-            if len(self.comms_data["clean"]) > 5000:
-                self.comms_data["clean"].pop(0)
-            l = line.lower()
-            if "broadcasts," in l or "broadcasts:" in l:
-                t_k = "broadcasts"
-            elif "tells you," in l or "you tell" in l or "sends," in l:
-                t_k = "tells"
-            self.comms_data[t_k].append(ts)
-            if len(self.comms_data[t_k]) > 5000:
-                self.comms_data[t_k].pop(0)
+        # Save to master list
+        self.all_lines.append((ts, line))
+        if len(self.all_lines) > 5000:
+            self.all_lines.pop(0)
         
-        v_k = {"All Chat": "all", "Clean Feed": "clean", "Tells": "tells", "Broadcasts": "broadcasts", "Social": "social"}.get(self.current_comms_channel)
-        if v_k == "all" or (not is_c and v_k in ["clean", t_k]):
+        # Update live view if the line passes filters
+        if self.should_show_line(line):
             self.comms_view.config(state="normal")
-            self.comms_view.insert(tk.END, ts + "\n")
+            self.comms_view.insert(tk.END, f"{ts} {line}\n")
             self.comms_view.see(tk.END)
             self.comms_view.config(state="disabled")
 
