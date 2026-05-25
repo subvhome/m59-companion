@@ -321,33 +321,51 @@ class M59Dashboard(tk.Tk):
             self.debug_log("GPS", message)
 
     def setup_who_list_panel(self):
-        self.who_list_panel = tk.Frame(self.main_container, bg="black", width=120)
+        # Premium dark slate themed container
+        self.who_list_panel = tk.Frame(self.main_container, bg="#2b2d31", bd=1, relief=tk.SOLID)
         
-        tk.Label(self.who_list_panel, text=" WHO LIST ", font=("Arial", 10, "bold"), 
-                 bg="#1a1a1a", fg="#4CAF50", pady=5).pack(fill="x")
+        # Polished Title Header (not all caps)
+        self.who_list_header = tk.Label(
+            self.who_list_panel, text="Online Players", font=("Segoe UI", 10, "bold"), 
+            bg="#1e1f22", fg="#4CAF50", pady=7, bd=0
+        )
+        self.who_list_header.pack(fill="x")
         
-        self.who_list_text = tk.Text(self.who_list_panel, bg="black", fg="white", 
-                                     font=("Consolas", 10), state="disabled", 
-                                     width=25, bd=0, padx=5, wrap="none")
+        # Bottom Count Label
+        self.who_list_count_lbl = tk.Label(
+            self.who_list_panel, text="0 Online", font=("Segoe UI", 9, "bold"), 
+            bg="#1e1f22", fg="#888", pady=5, bd=0
+        )
+        self.who_list_count_lbl.pack(side="bottom", fill="x")
+        
+        # Main text view with Discord-style dark background
+        self.who_list_text = tk.Text(
+            self.who_list_panel, bg="#2b2d31", fg="#e0e0e0", 
+            font=("Consolas", 10), state="disabled", 
+            width=25, bd=0, padx=8, pady=5, wrap="none"
+        )
         self.who_list_text.pack(side="left", fill="both", expand=True)
         
+        # Styled scrollbar
         sb = ttk.Scrollbar(self.who_list_panel, orient="vertical", command=self.who_list_text.yview)
         sb.pack(side="right", fill="y")
         self.who_list_text.config(yscrollcommand=sb.set)
         
-        # Color tags
-        self.who_list_text.tag_config("INNOCENT", foreground="white")
-        self.who_list_text.tag_config("OUTLAW", foreground="#FF9800") # Orange
-        self.who_list_text.tag_config("MURDERER", foreground="#F44336") # Red
-        self.who_list_text.tag_config("STAFF", foreground="#2196F3") # Blue
+        # High-legibility foreground tags tailored for the dark slate background
+        self.who_list_text.tag_config("INNOCENT", foreground="#e0e0e0")
+        self.who_list_text.tag_config("OUTLAW", foreground="#ff9f43")    # Rich Orange
+        self.who_list_text.tag_config("MURDERER", foreground="#ff6b6b")  # Soft bright Red
+        self.who_list_text.tag_config("STAFF", foreground="#48dbfb")     # Sky Blue
 
     def update_who_list_visibility(self):
         self.who_list_panel.pack_forget()
+        self.notebook.pack_forget()
         if self.who_list_enabled.get():
             side = self.who_list_side.get().lower()
-            self.who_list_panel.pack(side=side, fill="y")
+            self.who_list_panel.pack(side=side, fill="y", padx=2)
             if self.target_pid:
                 self.start_who_list_monitor()
+        self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
 
     def safe_refresh_who_list(self):
         """Sends a /who command to the game safely using Windows messages."""
@@ -557,7 +575,8 @@ class M59Dashboard(tk.Tk):
         self.who_list_text.config(state="normal")
         self.who_list_text.delete("1.0", tk.END)
         
-        sorted_names = sorted(self.who_list_players.keys())
+        # Sort alphabetically case-insensitively
+        sorted_names = sorted(self.who_list_players.keys(), key=str.lower)
         
         # Calculate dynamic width to prevent wrapping (min 15, max 40)
         max_len = 15
@@ -572,6 +591,10 @@ class M59Dashboard(tk.Tk):
             self.who_list_text.insert(tk.END, f" {name}\n", status)
             
         self.who_list_text.config(state="disabled")
+        
+        # Update dynamic player count at the bottom
+        count = len(sorted_names)
+        self.who_list_count_lbl.config(text=f"{count} Online", fg="#4CAF50" if count > 0 else "#888")
 
     def setup_tab_communications(self):
         paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
