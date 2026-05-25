@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext, filedialog
+from tkinter import ttk, messagebox, scrolledtext, filedialog, simpledialog
 import threading
 import time
 import os
@@ -25,7 +25,7 @@ from m59_scraper import capture_identity, get_blakgraph_stats, cycle_tabs_and_sc
 from m59_tracker import SessionTracker
 from m59_combat import CombatMonitor
 from m59_calculator import SchoolCalculator
-from m59_vault import perform_vault_scan
+from m59_vault import perform_vault_scan, find_nested_control
 from m59_updater import check_for_updates
 from m59_gps import GPSManager
 from m59_lifecycle import InstanceManager
@@ -125,6 +125,13 @@ class M59Dashboard(tk.Tk):
         self.debug_enabled.trace_add("write", lambda *a: setup_logging(self.debug_enabled.get()))
         self.gps_discovery_enabled = tk.BooleanVar(value=False)
         
+        # --- Who List State ---
+        self.who_list_enabled = tk.BooleanVar(value=True)
+        self.who_list_side = tk.StringVar(value="Right")
+        self.who_list_players = {} # Dict of {name: status}
+        self.frida_session = None
+        self.frida_script = None
+        
         # --- Chat Filtering State ---
         self.static_filters = {
             "Combat": tk.BooleanVar(value=True),
@@ -191,6 +198,7 @@ class M59Dashboard(tk.Tk):
         self.current_attributes = {}
         self.vault_data = {"barloque": [], "hungry": []}
         self.calculator = SchoolCalculator()
+        self.sync_in_progress = False
 
         # --- Layout ---
         self.status_var = tk.StringVar(value="Initializing...")
@@ -199,8 +207,14 @@ class M59Dashboard(tk.Tk):
         self.status_bar = tk.Label(self.status_frame, textvariable=self.status_var, anchor=tk.W, padx=5)
         self.status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self.notebook = DraggableNotebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=5, pady=5)
+        # Container for Side Panel + Notebook
+        self.main_container = tk.Frame(self)
+        self.main_container.pack(fill="both", expand=True)
+
+        self.setup_who_list_panel()
+
+        self.notebook = DraggableNotebook(self.main_container)
+        self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
         # Tab Creation
         tabs = [("Dashboard", "dash"), ("Communications", "comms"), ("GPS", "gps"), ("Progression", "prog"), ("Vault", "vault"), ("Kill Book", "book"), ("Settings", "settings")]
@@ -216,6 +230,9 @@ class M59Dashboard(tk.Tk):
         self.setup_tab_vault()
         self.setup_tab_book()
         self.setup_tab_settings()
+        
+        # Apply initial side panel state
+        self.update_who_list_visibility()
         
         self.minsize(400, 300)
         self.after(100, self.background_update_check)
@@ -243,6 +260,8 @@ class M59Dashboard(tk.Tk):
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
                     self.debug_enabled.set(s.get("debug_enabled", False))
                     self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
+                    self.who_list_enabled.set(s.get("who_list_enabled", True))
+                    self.who_list_side.set(s.get("who_list_side", "Right"))
                     
                     # Restore Static Filters
                     sf = s.get("static_filters", {})
@@ -285,6 +304,8 @@ class M59Dashboard(tk.Tk):
                     "pk_sound_path": self.pk_sound_path.get(),
                     "debug_enabled": self.debug_enabled.get(),
                     "gps_discovery_enabled": self.gps_discovery_enabled.get(),
+                    "who_list_enabled": self.who_list_enabled.get(),
+                    "who_list_side": self.who_list_side.get(),
                     "static_filters": sf_save,
                     "custom_filters": cf_save
                 }, f)
@@ -298,6 +319,259 @@ class M59Dashboard(tk.Tk):
     def gps_log(self, message):
         if self.debug_enabled.get() or self.gps_discovery_enabled.get():
             self.debug_log("GPS", message)
+
+    def setup_who_list_panel(self):
+        self.who_list_panel = tk.Frame(self.main_container, bg="black", width=120)
+        
+        tk.Label(self.who_list_panel, text=" WHO LIST ", font=("Arial", 10, "bold"), 
+                 bg="#1a1a1a", fg="#4CAF50", pady=5).pack(fill="x")
+        
+        self.who_list_text = tk.Text(self.who_list_panel, bg="black", fg="white", 
+                                     font=("Consolas", 10), state="disabled", 
+                                     width=25, bd=0, padx=5, wrap="none")
+        self.who_list_text.pack(side="left", fill="both", expand=True)
+        
+        sb = ttk.Scrollbar(self.who_list_panel, orient="vertical", command=self.who_list_text.yview)
+        sb.pack(side="right", fill="y")
+        self.who_list_text.config(yscrollcommand=sb.set)
+        
+        # Color tags
+        self.who_list_text.tag_config("INNOCENT", foreground="white")
+        self.who_list_text.tag_config("OUTLAW", foreground="#FF9800") # Orange
+        self.who_list_text.tag_config("MURDERER", foreground="#F44336") # Red
+        self.who_list_text.tag_config("STAFF", foreground="#2196F3") # Blue
+
+    def update_who_list_visibility(self):
+        self.who_list_panel.pack_forget()
+        if self.who_list_enabled.get():
+            side = self.who_list_side.get().lower()
+            self.who_list_panel.pack(side=side, fill="y")
+            if self.target_pid:
+                self.start_who_list_monitor()
+
+    def safe_refresh_who_list(self):
+        """Sends a /who command to the game safely using Windows messages."""
+        if not self.main_hwnd or not self.who_list_enabled.get():
+            return
+            
+        logger.debug("WhoList: Triggering safe refresh via /who command.")
+        edit_hwnd = find_nested_control(self.main_hwnd, 1001)
+        if not edit_hwnd:
+            logger.debug("WhoList: Chat edit control (1001) not found.")
+            return
+        
+        cmd = "/who\r"
+        for char in cmd:
+            win32gui.SendMessage(edit_hwnd, win32con.WM_CHAR, ord(char), 0)
+
+    def start_who_list_monitor(self):
+        """Initializes Frida hook for real-time population tracking using safe, passive interception."""
+        if not self.target_pid or not self.who_list_enabled.get():
+            return
+            
+        if self.frida_session:
+            return 
+            
+        def run_frida():
+            try:
+                import frida
+                logger.info(f"WhoList: Attaching Passive Listener to PID {self.target_pid}...")
+                session = frida.attach(self.target_pid)
+                self.frida_session = session
+                
+                # Dynamic ASLR-resilient interception + Safe RPC trigger (Robust Engine v1.6).
+                js_code = """
+                let baseAddress = null;
+                let moduleNameActual = "";
+
+                // Dynamically find the primary game module regardless of string casing
+                const modules = Process.enumerateModules();
+                for (let i = 0; i < modules.length; i++) {
+                    const nameLower = modules[i].name.toLowerCase();
+                    if (nameLower === "meridian.exe") {
+                        baseAddress = modules[i].base;
+                        moduleNameActual = modules[i].name;
+                        break;
+                    }
+                }
+
+                // Ultimate Fallback: if enumeration fails to filter, pick the first loaded module
+                if (!baseAddress && modules.length > 0) {
+                    baseAddress = modules[0].base;
+                    moduleNameActual = modules[0].name;
+                }
+
+                if (!baseAddress) {
+                    send({type: 'log', message: 'ERROR: Unable to determine target module base address.'});
+                } else {
+                    send({type: 'log', message: 'Target Module Found: ' + moduleNameActual + ' @ ' + baseAddress});
+                    
+                    // Offsets: LookupMessage = 0x277d0, ToServer = 0x74e0
+                    const addrLookup = baseAddress.add(0x277d0);
+                    const addrToServer = baseAddress.add(0x74e0);
+                    
+                    const PF_MASK = 0x0000C000;
+                    let playerCache = {}; 
+
+                    function getStatus(flags) {
+                        const playerFlags = flags & PF_MASK;
+                        if (playerFlags === 0xC000) return "STAFF";
+                        if (playerFlags === 0x8000) return "OUTLAW";
+                        if (playerFlags === 0x4000) return "MURDERER";
+                        return "INNOCENT";
+                    }
+
+                    try {
+                        Interceptor.attach(addrLookup, {
+                            onEnter: function (args) {
+                                try {
+                                    const buffer = args[0];
+                                    if (buffer.isNull()) return;
+                                    const packetType = buffer.readU8();
+
+                                    if (packetType === 136) { // Population List
+                                        const count = buffer.add(1).readU16();
+                                        let pos = buffer.add(3);
+                                        let players = [];
+                                        for (let i = 0; i < count; i++) {
+                                            try {
+                                                const objId = pos.readU32();
+                                                const nameLen = pos.add(8).readU16();
+                                                const name = pos.add(10).readUtf8String(nameLen);
+                                                const flags = pos.add(10 + nameLen).readU32();
+                                                const status = getStatus(flags);
+                                                if (name) {
+                                                    playerCache[objId] = { name: name, status: status };
+                                                    players.push({ name: name, status: status });
+                                                }
+                                                pos = pos.add(14 + nameLen);
+                                            } catch (e) { break; }
+                                        }
+                                        send({type: 'list', data: players});
+                                    } 
+                                    else if (packetType === 137) { // Logon
+                                        try {
+                                            const objId = buffer.add(1).readU32();
+                                            const nameLen = buffer.add(9).readU16();
+                                            const name = buffer.add(11).readUtf8String(nameLen);
+                                            const flags = buffer.add(11 + nameLen).readU32();
+                                            const status = getStatus(flags);
+                                            if (name) {
+                                                playerCache[objId] = { name: name, status: status };
+                                                send({type: 'logon', name: name, status: status});
+                                            }
+                                        } catch (e) {}
+                                    }
+                                    else if (packetType === 138) { // Logoff
+                                        try {
+                                            const objId = buffer.add(1).readU32();
+                                            if (playerCache[objId]) {
+                                                const p = playerCache[objId];
+                                                send({type: 'logoff', name: p.name});
+                                                delete playerCache[objId];
+                                            }
+                                        } catch (e) {}
+                                    }
+                                } catch (e) {}
+                            }
+                        });
+                        send({type: 'log', message: 'LookupMessage Interceptor hook active.'});
+                    } catch (err) {
+                        send({type: 'log', message: 'ERROR: Hooking LookupMessage failed: ' + err.message});
+                    }
+                    
+                    // Expose safe trigger via RPC (defined on the global scope)
+                    rpc.exports = {
+                        triggerupdate: function() {
+                            try {
+                                const fnToServer = new NativeFunction(addrToServer, 'void', ['uint8', 'pointer'], 'default');
+                                fnToServer(44, ptr(0));
+                                return true;
+                            } catch (e) {
+                                return false;
+                            }
+                        }
+                    };
+                }
+                """
+                
+                script = session.create_script(js_code)
+                self.frida_script = script
+                
+                def on_message(message, data):
+                    if message['type'] == 'send':
+                        payload = message['payload']
+                        if isinstance(payload, dict) and payload.get('type') == 'log':
+                            logger.error(f"FridaLog: {payload.get('message')}")
+                        else:
+                            self.after(0, lambda: self.process_who_list_message(payload))
+                            
+                script.on('message', on_message)
+                script.load()
+                logger.info("WhoList: Passive Listener active and RPC exported.")
+                
+                # Check if we are already logged in when the script finishes loading
+                if self.char_name != "Unknown":
+                    self.after(1500, self.trigger_silent_who_update)
+                
+            except Exception as e:
+                logger.error(f"WhoList: Frida Error: {e}")
+                self.frida_session = None
+
+        threading.Thread(target=run_frida, daemon=True).start()
+
+    def process_who_list_message(self, payload):
+        if not isinstance(payload, dict): return
+        
+        ptype = payload.get('type')
+        if ptype == 'list':
+            self.who_list_players = {p['name']: p['status'] for p in payload['data']}
+        elif ptype == 'logon':
+            self.who_list_players[payload['name']] = payload['status']
+        elif ptype == 'logoff':
+            self.who_list_players.pop(payload['name'], None)
+            
+        self.refresh_who_list_ui()
+
+    def trigger_silent_who_update(self):
+        """Triggers the silent population update via Frida RPC."""
+        if not self.who_list_enabled.get() or not self.frida_script:
+            return
+            
+        if getattr(self, "sync_in_progress", False):
+            logger.info("WhoList: Tab Dance Sync is running, deferring silent population update...")
+            self.after(1500, self.trigger_silent_who_update)
+            return
+            
+        def run():
+            try:
+                logger.info("WhoList: Sending safe native trigger for population update...")
+                self.frida_script.exports.triggerupdate()
+            except Exception as e:
+                logger.error(f"WhoList: Failed to invoke silent update: {e}")
+                
+        threading.Thread(target=run, daemon=True).start()
+
+    def refresh_who_list_ui(self):
+        if not self.who_list_enabled.get(): return
+        self.who_list_text.config(state="normal")
+        self.who_list_text.delete("1.0", tk.END)
+        
+        sorted_names = sorted(self.who_list_players.keys())
+        
+        # Calculate dynamic width to prevent wrapping (min 15, max 40)
+        max_len = 15
+        for name in sorted_names:
+            max_len = max(max_len, len(name) + 3) # Name + leading space + padding
+            
+        max_len = min(40, max_len)
+        self.who_list_text.config(width=max_len)
+        
+        for name in sorted_names:
+            status = self.who_list_players[name]
+            self.who_list_text.insert(tk.END, f" {name}\n", status)
+            
+        self.who_list_text.config(state="disabled")
 
     def setup_tab_communications(self):
         paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
@@ -393,18 +667,12 @@ class M59Dashboard(tk.Tk):
         raw = self.new_filter_entry.get().strip()
         if not raw: return
         
-        from tkinter import simpledialog
         label = simpledialog.askstring("Filter Label", "Enter a name for this filter:", parent=self)
         if not label: return
         
         # Parse keywords: handle quotes and commas
         import re
-        keywords = []
-        # Matches "quoted string" or word
-        matches = re.findall(r'"([^"]*)"|([^,]+)', raw)
-        for m in matches:
-            val = (m[0] or m[1]).strip()
-            if val: keywords.append(val.lower())
+        keywords = [val.lower() for val in [m[0] or m[1] for m in re.findall(r'"([^"]*)"|([^,]+)', raw)] if val.strip()]
             
         if not keywords: return
         
@@ -718,12 +986,28 @@ class M59Dashboard(tk.Tk):
         pg = tk.LabelFrame(c, text=" Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         pg.pack(fill="x")
         tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
+        
+        wr_g = tk.LabelFrame(c, text=" Who List Panel ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        wr_g.pack(fill="x", pady=10)
+        tk.Checkbutton(wr_g, text="Show Who List Side Panel", variable=self.who_list_enabled, 
+                       command=self.update_who_list_visibility, bg="#f0f0f0").pack(anchor="w")
+        
+        side_f = tk.Frame(wr_g, bg="#f0f0f0")
+        side_f.pack(fill="x", pady=5)
+        tk.Label(side_f, text="Panel Side:", bg="#f0f0f0").pack(side="left")
+        tk.Radiobutton(side_f, text="Left", variable=self.who_list_side, value="Left", 
+                       command=self.update_who_list_visibility, bg="#f0f0f0").pack(side="left", padx=10)
+        tk.Radiobutton(side_f, text="Right", variable=self.who_list_side, value="Right", 
+                       command=self.update_who_list_visibility, bg="#f0f0f0").pack(side="left")
+
         gg = tk.LabelFrame(c, text=" GPS & Navigation ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         gg.pack(fill="x", pady=10)
         tk.Checkbutton(gg, text="Enable GPS Discovery", variable=self.gps_discovery_enabled, bg="#f0f0f0").pack(anchor="w")
+        
         dg = tk.LabelFrame(c, text=" Diagnostics ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         dg.pack(fill="x")
         tk.Checkbutton(dg, text="Verbose Debug Mode", variable=self.debug_enabled, bg="#f0f0f0").pack(anchor="w")
+        
         tk.Button(c, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
 
     def trigger_pk_alert(self):
@@ -773,6 +1057,11 @@ class M59Dashboard(tk.Tk):
 
         # Transition overlay to 'Waiting for Login' state
         self.show_waiting_overlay(mode="login")
+        
+        # Start Who List if enabled
+        if self.who_list_enabled.get():
+            self.start_who_list_monitor()
+            
         self.after(500, self.check_for_login)
 
     def check_for_login(self):
@@ -798,6 +1087,9 @@ class M59Dashboard(tk.Tk):
                     self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
                     self.manual_sync_btn.config(state="normal", text=" ↻ FULL SYNC REQUIRED ")
                     self._post_connection_init(passive=True)
+                
+                # Trigger silent who update 1.5s after character is fully active in-game
+                self.after(1500, self.trigger_silent_who_update)
             else:
                 # Still at selection screen, check again in 1s
                 self.after(1000, self.check_for_login)
@@ -823,7 +1115,6 @@ class M59Dashboard(tk.Tk):
                 logger.info("Sync: Performing manual identity capture...")
                 new_name = capture_identity(self.main_hwnd, self.target_pid)
                 if new_name:
-                    logger.info(f"Sync: New identity found: {new_name}")
                     self.char_name = new_name
                     self.after(0, lambda: self.title(f"M59 Companion v{self.version} - {self.char_name}"))
                 
@@ -853,6 +1144,17 @@ class M59Dashboard(tk.Tk):
     def on_game_disconnect(self, pid):
         """Callback when InstanceManager loses connection to a game process."""
         logger.info(f"LifeCycle: Game Instance Lost (PID {pid}). Entering search mode...")
+        
+        # Stop Frida
+        if self.frida_session:
+            try: self.frida_session.detach()
+            except: pass
+            self.frida_session = None
+            self.frida_script = None
+            
+        self.who_list_players = {}
+        self.refresh_who_list_ui()
+        
         self.show_waiting_overlay()
         self.status_var.set(f"Game Lost ({self.char_name}) - Searching...")
         self.title(f"M59 Companion v{self.version} - Waiting...")
@@ -907,6 +1209,9 @@ class M59Dashboard(tk.Tk):
                     logger.info(f"Character {self.char_name} logged out (Select Screen).")
                     self.status_var.set(f"Logged Out ({self.char_name})")
                     self.title(f"M59 Companion v{self.version} - Logged Out")
+                    # Clear Who List on logout
+                    self.who_list_players = {}
+                    self.refresh_who_list_ui()
             
             elif is_logged_in:
                 room = current_title.split(" --- ", 1)[1].strip()
@@ -1195,7 +1500,7 @@ class M59Dashboard(tk.Tk):
                     popup.destroy()
                 else:
                     for i in tree.get_children(): tree.delete(i)
-                    for i in unclaimed: tree.insert("", "end", iid=str(i["pid"]), values=(i["pid"], i["title"]))
+                    for i in unclaimed: tree.insert("", "end", iid=str(i["pid"]), values=(i["pid"], i.get("char_name", "Unknown"), i["title"]))
         
         btn_f = tk.Frame(popup)
         btn_f.pack(fill="x", pady=20)
@@ -1217,6 +1522,7 @@ class M59Dashboard(tk.Tk):
         threading.Thread(target=self.perform_sync, daemon=True).start()
 
     def perform_sync(self):
+        self.sync_in_progress = True
         try:
             mr = MemoryReader(self.pm_obj)
             kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
@@ -1227,6 +1533,7 @@ class M59Dashboard(tk.Tk):
         except Exception as e:
             logger.error(f"Sync: Automatic sync error: {e}")
         finally:
+            self.sync_in_progress = False
             self.after(0, lambda: self.sync_btn.config(state="normal"))
 
     def _apply_sync_results(self, kn, st):
@@ -1382,16 +1689,14 @@ class M59Dashboard(tk.Tk):
                 self.after(0, self.establish_connection)
                 return
             def show_prompt():
-                msg = f"A new version (v{rv}) is available!\n\nOptions:\n1. 'Auto-Update'\n2. 'Open Browser'\n\nUpdate later?"
-                choice = messagebox.askquestion("Update Available", msg, icon="info", type="yesnocancel", default="yes")
+                choice = messagebox.askquestion("Update", f"v{rv} available. Update?", icon="info", type="yesnocancel")
                 if choice == "yes":
-                    self.status_var.set("Downloading update...")
+                    self.status_var.set("Updating...")
                     from m59_updater import download_update, apply_update
                     new_path = download_update()
                     if new_path:
                         apply_update(new_path)
                     else:
-                        messagebox.showerror("Error", "Download failed.")
                         self.after(0, self.establish_connection)
                 else:
                     self.after(0, self.establish_connection)
@@ -1460,7 +1765,7 @@ class M59Dashboard(tk.Tk):
         
         title_text = " ↻ SCANNING FOR GAME... " if mode == "searching" else " ↻ WAITING FOR LOGIN... "
         title_color = "#4CAF50" if mode == "searching" else "#2196F3"
-        msg_text = "Please launch Meridian 59 to continue." if mode == "searching" else "Please select a character and enter the world."
+        msg_text = "Please launch Meridian 59." if mode == "searching" else "Please enter the world."
         
         self.waiting_title_lbl = tk.Label(self.waiting_frame, text=title_text, font=("Arial", 16, "bold"), fg=title_color, bg="#333333", pady=20)
         self.waiting_title_lbl.pack()
