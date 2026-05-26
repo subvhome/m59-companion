@@ -1,0 +1,33 @@
+{
+    "Cor Noth": {
+        "connections": {
+            "Unknown:The Weapon Master's Abode": 10.08,
+            "Unknown:Main gate to Cor Noth": 10.08
+        }
+    },
+    "The Adventurer's Hall of Cor Noth": {
+        "connections": {
+            "Unknown:Cor Noth": 30.19
+        }
+    },
+    "Main gate to Cor Noth": {
+        "connections": {
+            "Unknown:The Flatlands": 10.08
+        }
+    },
+    "The Flatlands": {
+        "connections": {
+            "Unknown:The border of the Badlands": 20.14
+        }
+    },
+    "The border of the Badlands": {
+        "connections": {
+            "Unknown:Main gate to the city of Tos": 10.05
+        }
+    },
+    "Main gate to the city of Tos": {
+        "connections": {
+            "Unknown:The Streets of Tos": 10.09
+        }
+    }
+}

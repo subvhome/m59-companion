@@ -13,6 +13,7 @@ import logging
 import sys
 import json
 import winsound
+import re
 from datetime import datetime
 
 # Import centralized logging
@@ -134,8 +135,11 @@ class M59Dashboard(tk.Tk):
         
         # --- Chat Filtering State ---
         self.filters_enabled = tk.BooleanVar(value=True)
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *a: self.refresh_comms_view())
         self.filter_data = {}    # {Category: [keywords]}
         self.filter_vars = {}    # {Category: BooleanVar}
+        self.pill_buttons = {}   # {Category: Button}
         self.load_filters()
 
         self.load_settings()
@@ -152,7 +156,11 @@ class M59Dashboard(tk.Tk):
         self.pk_frame = None
         self.alert_active = False
         self.comms_mode = "live" # 'live' or 'history'
-        self.gps_manager = GPSManager()
+        # Initialize GPS with fallback logic
+        map_p = "m59_map.json"
+        if not os.path.exists(map_p):
+            map_p = resource_path("m59_map.json")
+        self.gps_manager = GPSManager(map_path=map_p)
         self.waiting_overlay = None
         
         # --- Lifecycle State ---
@@ -178,7 +186,8 @@ class M59Dashboard(tk.Tk):
             "stings", "irritates", "thrashes", "mangles", "pummels", "slaps", "cleaves",
             "maims", "slashes", "cuts", "brutalizes", "smashes", "crushes", "bashes",
             "runs through", "stabs", "pokes", "fells", "lacerates", "pierces", "grazes",
-            "blocks", "dodges", "parries", "avoids", "nicks", "fails to damage"
+            "blocks", "dodges", "parries", "avoids", "nicks", "fails to damage", 
+            "killed", "attacks", "misses"
         }
 
         self.session_kills = {"monsters": {}, "players": {}}
@@ -237,7 +246,11 @@ class M59Dashboard(tk.Tk):
         # Ensure 'Show All' is always the primary state
         self.filter_vars["Show All"] = tk.BooleanVar(value=True)
         
+        # Check local directory first, then fallback to bundled assets
         p = "m59_filters.json"
+        if not os.path.exists(p):
+            p = resource_path("m59_filters.json")
+
         if os.path.exists(p):
             try:
                 with open(p, "r") as f:
@@ -249,71 +262,231 @@ class M59Dashboard(tk.Tk):
             except Exception as e:
                 logger.error(f"Failed to load filters: {e}")
 
-    def setup_collapsible_filters(self, parent):
-        """Creates the collapsible filter section in the sidebar with dynamic checkboxes."""
-        self.filter_container = tk.Frame(parent, bg="#f0f0f0")
-        self.filter_container.pack(fill="x", padx=5, pady=5)
+    def setup_tab_communications(self):
+        paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
+        paned.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # Header with Toggle
-        header = tk.Frame(self.filter_container, bg="#ddd")
-        header.pack(fill="x")
+        sidebar = tk.Frame(paned, bg="#f0f0f0")
+        paned.add(sidebar, weight=1)
         
-        self.filter_toggle_btn = tk.Button(header, text="[-] CHAT FILTERS", font=("Arial", 8, "bold"), 
-                                           bg="#ddd", bd=0, command=self.toggle_filter_panel)
-        self.filter_toggle_btn.pack(side="left", padx=5)
+        # --- Sidebar Header ---
+        tk.Label(sidebar, text=" CHAT LOGS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
         
-        # Master Toggle (Enabled/Disabled)
-        tk.Checkbutton(header, variable=self.filters_enabled, bg="#ddd", 
-                       activebackground="#ddd", command=self.refresh_comms_view).pack(side="right")
-        
-        self.filter_list_frame = tk.Frame(self.filter_container, bg="#f0f0f0")
-        self.filter_list_frame.pack(fill="x", pady=2)
-        
-        # 1. Add "Show All" checkbox (Primary Override)
-        all_cb = tk.Checkbutton(self.filter_list_frame, text="Show All", 
-                                variable=self.filter_vars["Show All"],
-                                bg="#f0f0f0", font=("Arial", 8, "bold"), anchor="w",
-                                command=self.refresh_comms_view)
-        all_cb.pack(fill="x", padx=10)
+        # Return to Live Button
+        self.live_feed_btn = tk.Button(sidebar, text=" 🟢 LIVE STREAM ", command=self.return_to_live,
+                                       bg="#E8F5E9", font=("Arial", 8, "bold"), pady=8)
+        self.live_feed_btn.pack(fill="x", padx=5, pady=5)
 
-        # 2. Add dynamic checkboxes from m59_filters.json
+        # Scrollable Listbox for logs
+        list_f = tk.Frame(sidebar, bg="#f0f0f0")
+        list_f.pack(fill="both", expand=True, padx=5, pady=(10, 0))
+        
+        self.log_file_list = tk.Listbox(list_f, font=("Arial", 9), height=15)
+        self.log_file_list.pack(side="left", fill="both", expand=True)
+        self.log_file_list.bind("<<ListboxSelect>>", self.load_historical_log)
+        
+        sb = ttk.Scrollbar(list_f, orient="vertical", command=self.log_file_list.yview)
+        sb.pack(side="right", fill="y")
+        self.log_file_list.config(yscrollcommand=sb.set)
+        
+        btn_row = tk.Frame(sidebar, bg="#f0f0f0")
+        btn_row.pack(fill="x", padx=5, pady=5)
+        tk.Button(btn_row, text="Refresh", command=self.refresh_log_list, font=("Arial", 8)).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("logs")),
+                  font=("Arial", 8)).pack(side="left", fill="x", expand=True, padx=2)
+        
+        right_frame = tk.Frame(paned, bg="#f0f0f0")
+        paned.add(right_frame, weight=4)
+
+        # --- SMART CHAT RIBBON ---
+        self.ribbon_frame = tk.Frame(right_frame, bg="#e0e0e0", pady=2)
+        self.ribbon_frame.pack(fill="x", padx=5, pady=(0, 5))
+        
+        self.pills_container = tk.Frame(self.ribbon_frame, bg="#e0e0e0")
+        self.pills_container.pack(side="left", fill="x", expand=True)
+        
+        self.render_ribbon_pills()
+        
+        # Add Filter Button
+        tk.Button(self.ribbon_frame, text=" + ", font=("Arial", 9, "bold"), bg="#4CAF50", fg="white", 
+                  relief=tk.FLAT, command=self.show_add_filter_dialog).pack(side="left", padx=5)
+
+        # Quick Search
+        search_f = tk.Frame(self.ribbon_frame, bg="#e0e0e0")
+        search_f.pack(side="right", padx=10)
+        tk.Label(search_f, text="🔍", bg="#e0e0e0").pack(side="left")
+        tk.Entry(search_f, textvariable=self.search_var, width=20).pack(side="left", padx=5)
+
+        self.comms_header_lbl = tk.Label(right_frame, text="🟢 LIVE STREAM", font=("Arial", 11, "bold"), fg="#2E7D32", bg="#f0f0f0")
+        self.comms_header_lbl.pack(pady=2)
+        
+        self.comms_view = scrolledtext.ScrolledText(right_frame, bg="black", fg="#00FFFF", font=("Consolas", 10), state="disabled")
+        self.comms_view.pack(fill="both", expand=True, padx=5, pady=5)
+
+    def render_ribbon_pills(self):
+        """Dynamic rendering of toggleable pills in the ribbon."""
+        for widget in self.pills_container.winfo_children():
+            widget.destroy()
+        
+        self.pill_buttons = {}
+        
+        # 1. THE "ALL" PILL
+        all_state = self.filter_vars.get("Show All")
+        btn = tk.Button(self.pills_container, text=" ALL ", font=("Arial", 8, "bold"),
+                        relief=tk.FLAT, padx=10,
+                        command=lambda: self.toggle_filter_pill("Show All"))
+        btn.pack(side="left", padx=2)
+        self.pill_buttons["Show All"] = btn
+        
+        # 2. DYNAMIC CATEGORY PILLS
         for cat in sorted(self.filter_data.keys()):
             if cat == "Show All": continue
-            cb = tk.Checkbutton(self.filter_list_frame, text=cat, 
-                                variable=self.filter_vars[cat], 
-                                bg="#f0f0f0", font=("Arial", 8), anchor="w",
-                                command=self.refresh_comms_view)
-            cb.pack(fill="x", padx=10)
             
-        self.filter_panel_visible = True
+            p_frame = tk.Frame(self.pills_container, bg="#e0e0e0")
+            p_frame.pack(side="left", padx=2)
+            
+            btn = tk.Button(p_frame, text=f" {cat} ", font=("Arial", 8),
+                            relief=tk.FLAT, padx=8,
+                            command=lambda c=cat: self.toggle_filter_pill(c))
+            btn.pack(side="left")
+            self.pill_buttons[cat] = btn
+            
+            # Delete button for custom filters
+            del_btn = tk.Button(p_frame, text="×", font=("Arial", 8, "bold"),
+                                fg="#888", bg="#e0e0e0", relief=tk.FLAT, bd=0,
+                                command=lambda c=cat: self.delete_filter_category(c))
+            del_btn.pack(side="left")
 
-    def toggle_filter_panel(self):
-        if self.filter_panel_visible:
-            self.filter_list_frame.pack_forget()
-            self.filter_toggle_btn.config(text="[+] CHAT FILTERS")
+        self.update_pill_visuals()
+
+    def toggle_filter_pill(self, cat):
+        """Smart toggle logic for pills."""
+        if cat == "Show All":
+            # Reset everything
+            self.filter_vars["Show All"].set(True)
+            for c, var in self.filter_vars.items():
+                if c != "Show All": var.set(False)
         else:
-            self.filter_list_frame.pack(fill="x", pady=2)
-            self.filter_toggle_btn.config(text="[-] CHAT FILTERS")
-        self.filter_panel_visible = not self.filter_panel_visible
+            # Unset ALL if a specific category is picked
+            self.filter_vars["Show All"].set(False)
+            current = self.filter_vars[cat].get()
+            self.filter_vars[cat].set(not current)
+            
+            # If nothing is selected now, return to ALL
+            any_active = any(v.get() for k, v in self.filter_vars.items() if k != "Show All")
+            if not any_active:
+                self.filter_vars["Show All"].set(True)
+
+        self.update_pill_visuals()
+        self.refresh_comms_view()
+
+    def update_pill_visuals(self):
+        """Applies coloring to pills based on active state."""
+        for cat, btn in self.pill_buttons.items():
+            if self.filter_vars[cat].get():
+                btn.config(bg="#2196F3", fg="white") # Active Blue
+            else:
+                btn.config(bg="#ccc", fg="#333")    # Inactive Grey
+
+    def show_add_filter_dialog(self):
+        """Popup with multi-line rule entry."""
+        popup = tk.Toplevel(self)
+        popup.title("Add Chat Filter")
+        popup.geometry("400x450")
+        popup.attributes("-topmost", True)
+        popup.grab_set()
+
+        tk.Label(popup, text="Filter Name:", font=("Arial", 9, "bold")).pack(pady=(10, 0))
+        name_entry = tk.Entry(popup, width=30)
+        name_entry.pack(pady=5)
+        name_entry.focus_set()
+
+        tk.Label(popup, text="Keywords / Rules (One per line):", font=("Arial", 9, "bold")).pack(pady=(10, 0))
+        rules_text = tk.Text(popup, width=40, height=15)
+        rules_text.pack(padx=20, pady=5)
+        tk.Label(popup, text="Matches are case-insensitive. Use {*} for wildcards.", font=("Arial", 8, "italic"), fg="#888").pack()
+
+        def save():
+            name = name_entry.get().strip()
+            if not name:
+                messagebox.showerror("Error", "Please provide a name.", parent=popup)
+                return
+            
+            raw_rules = rules_text.get("1.0", tk.END).splitlines()
+            rules = [r.strip() for r in raw_rules if r.strip()]
+            
+            if not rules:
+                messagebox.showerror("Error", "Please provide at least one rule.", parent=popup)
+                return
+
+            self.filter_data[name] = rules
+            self.filter_vars[name] = tk.BooleanVar(value=True)
+            # Switch to the new filter immediately
+            self.toggle_filter_pill(name)
+            
+            # Persist and refresh UI
+            self.save_filters_to_disk()
+            self.render_ribbon_pills()
+            popup.destroy()
+
+        btn_f = tk.Frame(popup)
+        btn_f.pack(fill="x", pady=20)
+        tk.Button(btn_f, text=" CANCEL ", command=popup.destroy).pack(side="left", padx=40)
+        tk.Button(btn_f, text=" SAVE FILTER ", bg="#4CAF50", fg="white", font=("Arial", 9, "bold"), command=save).pack(side="right", padx=40)
+
+    def delete_filter_category(self, cat):
+        if messagebox.askyesno("Delete", f"Permanently delete filter '{cat}'?"):
+            self.filter_data.pop(cat, None)
+            self.filter_vars.pop(cat, None)
+            self.pill_buttons.pop(cat, None)
+            
+            # Default back to ALL if we deleted an active filter
+            if not any(v.get() for k, v in self.filter_vars.items()):
+                self.filter_vars["Show All"].set(True)
+
+            self.save_filters_to_disk()
+            self.render_ribbon_pills()
+            self.refresh_comms_view()
+
+    def save_filters_to_disk(self):
+        """Saves dynamic filters back to m59_filters.json."""
+        try:
+            with open("m59_filters.json", "w") as f:
+                json.dump(self.filter_data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save filters: {e}")
 
     def is_line_filtered(self, line):
-        """Returns True if the line should be shown based on inclusive OR logic."""
+        """Returns True if the line should be shown based on inclusive OR logic + Search."""
         if not self.filters_enabled.get():
             return False
 
-        # If "Show All" is checked, everything passes
+        line_lower = line.lower()
+        
+        # 1. Check Search Bar (Global constraint)
+        search_term = self.search_var.get().lower()
+        if search_term and search_term not in line_lower:
+            return False
+
+        # 2. Check "Show All" override
         if self.filter_vars.get("Show All") and self.filter_vars["Show All"].get():
             return True
         
-        line_lower = line.lower()
-        
-        # Check active categories (Inclusive OR)
+        # 3. Check active categories (Inclusive OR)
         for cat, var in self.filter_vars.items():
             if cat == "Show All": continue
             if var.get():
                 keywords = self.filter_data.get(cat, [])
-                if any(kw.lower() in line_lower for kw in keywords):
-                    return True
+                for kw in keywords:
+                    kw_lower = kw.lower()
+                    if "{*}" in kw_lower:
+                        # Convert wildcard to regex: escape specials, then replace {*} with .*?
+                        pattern = re.escape(kw_lower).replace(r"\{\*\}", ".*?")
+                        if re.search(pattern, line_lower):
+                            return True
+                    elif kw_lower in line_lower:
+                        # Fast literal match
+                        return True
         
         return False
 
@@ -364,11 +537,24 @@ class M59Dashboard(tk.Tk):
     def is_combat_line(self, line):
         """Internal helper for combat tracking; separate from UI filtering."""
         l = line.lower()
+        
+        # 1. Explicit Kill Check (Highest Priority)
+        if l.startswith("you killed "):
+            return True
+            
+        # 2. Verb-based combat detection
         for verb in self.combat_verbs:
             if f" {verb} " in l or l.endswith(f" {verb}."):
                 return True
-        if l.startswith("you ") and any(v in l for v in ["block", "dodge", "parry", "avoid"]):
+        
+        # 3. Defensive/Miss detection
+        if l.startswith("you ") and any(v in l for v in ["block", "dodge", "parry", "avoid", "resist", "evade"]):
             return True
+        
+        # 4. Incoming hit/miss pattern support
+        if " you with " in l or "'s attack" in l:
+            return True
+            
         return False
 
     def load_settings(self):
@@ -704,50 +890,6 @@ class M59Dashboard(tk.Tk):
         count = len(sorted_names)
         self.who_list_count_lbl.config(text=f"{count} Online", fg="#4CAF50" if count > 0 else "#888")
 
-    def setup_tab_communications(self):
-        paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
-        paned.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        sidebar = tk.Frame(paned, bg="#f0f0f0")
-        paned.add(sidebar, weight=1)
-        
-        # --- Sidebar Header ---
-        tk.Label(sidebar, text=" CHAT LOGS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
-        
-        # Return to Live Button
-        self.live_feed_btn = tk.Button(sidebar, text=" 🟢 LIVE STREAM ", command=self.return_to_live,
-                                       bg="#E8F5E9", font=("Arial", 8, "bold"), pady=8)
-        self.live_feed_btn.pack(fill="x", padx=5, pady=5)
-
-        # Filters Section
-        self.setup_collapsible_filters(sidebar)
-
-        # Scrollable Listbox for logs
-        list_f = tk.Frame(sidebar, bg="#f0f0f0")
-        list_f.pack(fill="both", expand=True, padx=5)
-        
-        self.log_file_list = tk.Listbox(list_f, font=("Arial", 9), height=15)
-        self.log_file_list.pack(side="left", fill="both", expand=True)
-        self.log_file_list.bind("<<ListboxSelect>>", self.load_historical_log)
-        
-        sb = ttk.Scrollbar(list_f, orient="vertical", command=self.log_file_list.yview)
-        sb.pack(side="right", fill="y")
-        self.log_file_list.config(yscrollcommand=sb.set)
-        
-        btn_row = tk.Frame(sidebar, bg="#f0f0f0")
-        btn_row.pack(fill="x", padx=5, pady=5)
-        tk.Button(btn_row, text="Refresh", command=self.refresh_log_list, font=("Arial", 8)).pack(side="left", fill="x", expand=True)
-        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("logs")),
-                  font=("Arial", 8)).pack(side="left", fill="x", expand=True, padx=2)
-        
-        right = tk.Frame(paned, bg="#f0f0f0")
-        paned.add(right, weight=4)
-        self.comms_header_lbl = tk.Label(right, text="🟢 LIVE STREAM", font=("Arial", 11, "bold"), fg="#2E7D32", bg="#f0f0f0")
-        self.comms_header_lbl.pack(pady=5)
-        
-        self.comms_view = scrolledtext.ScrolledText(right, bg="black", fg="#00FFFF", font=("Consolas", 10), state="disabled")
-        self.comms_view.pack(fill="both", expand=True, padx=5, pady=5)
-
     def return_to_live(self):
         self.comms_mode = "live"
         self.comms_header_lbl.config(text="🟢 LIVE STREAM", fg="#2E7D32")
@@ -1042,6 +1184,9 @@ class M59Dashboard(tk.Tk):
                 if p == "SystemExclamation":
                     winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
                 else:
+                    # Resolve path if relative
+                    if not os.path.isabs(p):
+                        p = resource_path(p)
                     winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
             except Exception as e:
                 self.debug_log("ALERT", f"Sound error: {e}")
@@ -1740,6 +1885,13 @@ class M59Dashboard(tk.Tk):
     def browse_sound(self):
         p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
         if p:
+            # If the path is within the current working directory, make it relative
+            try:
+                rel_p = os.path.relpath(p, os.getcwd())
+                if not rel_p.startswith(".."):
+                    p = rel_p
+            except:
+                pass
             self.pk_sound_path.set(p)
 
     def test_sound(self):
@@ -1748,6 +1900,9 @@ class M59Dashboard(tk.Tk):
             if p == "SystemExclamation":
                 winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
             else:
+                # Resolve path if relative
+                if not os.path.isabs(p):
+                    p = resource_path(p)
                 winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
         except:
             pass

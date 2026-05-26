@@ -1,1 +1,1 @@
-{"geometry": "866x405+968+107", "pk_alert_enabled": true, "pk_sound_enabled": true, "pk_frame_enabled": true, "pk_sound_path": "C:/Users/victorg/github/m59-companion-v1.0/sound/alert.wav"}
+{"geometry": "867x406+940+222", "pk_alert_enabled": true, "pk_sound_enabled": true, "pk_frame_enabled": true, "pk_sound_path": "sound/alert.wav", "debug_enabled": false, "gps_discovery_enabled": false, "who_list_enabled": true, "who_list_side": "Right", "filters_enabled": true, "filter_states": {"Show All": true, "Social": false, "Broadcasts": false, "Private": false, "Deaths": false}}
