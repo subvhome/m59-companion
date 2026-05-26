@@ -14,7 +14,48 @@ import sys
 import json
 import winsound
 import re
+import ctypes
+from ctypes import wintypes
 from datetime import datetime
+
+# --- Windows AppBar API Definitions ---
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ('left', wintypes.LONG),
+        ('top', wintypes.LONG),
+        ('right', wintypes.LONG),
+        ('bottom', wintypes.LONG)
+    ]
+
+class APPBARDATA(ctypes.Structure):
+    _fields_ = [
+        ('cbSize', wintypes.DWORD),
+        ('hWnd', wintypes.HWND),
+        ('uCallbackMessage', wintypes.UINT),
+        ('uEdge', wintypes.UINT),
+        ('rc', RECT),
+        ('lParam', wintypes.LPARAM)
+    ]
+
+ABM_NEW = 0x00000000
+ABM_REMOVE = 0x00000001
+ABM_QUERYPOS = 0x00000002
+ABM_SETPOS = 0x00000003
+ABM_GETSTATE = 0x00000004
+ABM_GETTASKBARPOS = 0x00000005
+ABM_ACTIVATE = 0x00000006
+ABM_GETAUTOHIDEBAR = 0x00000007
+ABM_SETAUTOHIDEBAR = 0x00000008
+ABM_WINDOWPOSCHANGED = 0x00000009
+ABM_SETSTATE = 0x0000000a
+
+ABE_LEFT = 0
+ABE_TOP = 1
+ABE_RIGHT = 2
+ABE_BOTTOM = 3
+
+Shell32 = ctypes.windll.shell32
+# --------------------------------------
 
 # Import centralized logging
 from m59_logging import setup_logging, get_logger
@@ -128,8 +169,10 @@ class M59Dashboard(tk.Tk):
         
         # --- Who List State ---
         self.who_list_enabled = tk.BooleanVar(value=True)
+        self.who_list_docked = tk.BooleanVar(value=False)
         self.who_list_side = tk.StringVar(value="Right")
         self.who_list_players = {} # Dict of {name: status}
+        self.who_dock_window = None
         self.frida_session = None
         self.frida_script = None
         
@@ -571,6 +614,7 @@ class M59Dashboard(tk.Tk):
                     self.debug_enabled.set(s.get("debug_enabled", False))
                     self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
                     self.who_list_enabled.set(s.get("who_list_enabled", True))
+                    self.who_list_docked.set(s.get("who_list_docked", False))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
                     
                     # Restore Filters Enabled State
@@ -599,6 +643,7 @@ class M59Dashboard(tk.Tk):
                     "debug_enabled": self.debug_enabled.get(),
                     "gps_discovery_enabled": self.gps_discovery_enabled.get(),
                     "who_list_enabled": self.who_list_enabled.get(),
+                    "who_list_docked": self.who_list_docked.get(),
                     "who_list_side": self.who_list_side.get(),
                     "filters_enabled": self.filters_enabled.get(),
                     "filter_states": fs_save
@@ -614,16 +659,39 @@ class M59Dashboard(tk.Tk):
         if self.debug_enabled.get() or self.gps_discovery_enabled.get():
             self.debug_log("GPS", message)
 
-    def setup_who_list_panel(self):
-        # Premium dark slate themed container
-        self.who_list_panel = tk.Frame(self.main_container, bg="#2b2d31", bd=1, relief=tk.SOLID)
+    def setup_who_list_panel(self, parent=None):
+        # Cleanup existing panel if it exists
+        if hasattr(self, "who_list_panel") and self.who_list_panel:
+            try: self.who_list_panel.destroy()
+            except: pass
+
+        # Use main_container if no parent is provided
+        target_parent = parent if parent else self.main_container
         
-        # Polished Title Header (not all caps)
-        self.who_list_header = tk.Label(
-            self.who_list_panel, text="Online Players", font=("Segoe UI", 10, "bold"), 
-            bg="#1e1f22", fg="#4CAF50", pady=7, bd=0
-        )
+        # Premium dark slate themed container
+        self.who_list_panel = tk.Frame(target_parent, bg="#2b2d31", bd=1, relief=tk.SOLID)
+        
+        # If we have a specific parent (like the Dock Toplevel), pack it to fill
+        if parent:
+            self.who_list_panel.pack(fill="both", expand=True)
+        
+        # Polished Title Header (with Dock Button)
+        self.who_list_header = tk.Frame(self.who_list_panel, bg="#1e1f22")
         self.who_list_header.pack(fill="x")
+        
+        tk.Label(
+            self.who_list_header, text="Online Players", font=("Segoe UI", 10, "bold"), 
+            bg="#1e1f22", fg="#4CAF50", pady=7, bd=0
+        ).pack(side="left", padx=10)
+        
+        # Dock/Toggle Button
+        dock_text = "📌" if self.who_list_docked.get() else "⧉"
+        self.who_dock_btn = tk.Button(
+            self.who_list_header, text=dock_text, font=("Segoe UI", 10),
+            bg="#1e1f22", fg="#888", activebackground="#2b2d31", activeforeground="#fff",
+            bd=0, padx=10, cursor="hand2", command=self.toggle_who_list_dock
+        )
+        self.who_dock_btn.pack(side="right")
         
         # Bottom Count Label
         self.who_list_count_lbl = tk.Label(
@@ -650,16 +718,121 @@ class M59Dashboard(tk.Tk):
         self.who_list_text.tag_config("OUTLAW", foreground="#ff9f43")    # Rich Orange
         self.who_list_text.tag_config("MURDERER", foreground="#ff6b6b")  # Soft bright Red
         self.who_list_text.tag_config("STAFF", foreground="#48dbfb")     # Sky Blue
+        
+        # If we have players, populate the UI immediately
+        if self.who_list_players:
+            self.refresh_who_list_ui()
 
     def update_who_list_visibility(self):
         self.who_list_panel.pack_forget()
         self.notebook.pack_forget()
+        
+        # If docked, it shouldn't be in the main window at all
+        if self.who_list_docked.get():
+            self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+            return
+
         if self.who_list_enabled.get():
             side = self.who_list_side.get().lower()
             self.who_list_panel.pack(side=side, fill="y", padx=2)
             if self.target_pid:
                 self.start_who_list_monitor()
         self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+
+    def toggle_who_list_dock(self):
+        """Toggles the Who List between an integrated panel and a desktop-docked AppBar."""
+        if self.who_list_docked.get():
+            # Undock
+            self.unregister_appbar()
+            self.who_list_docked.set(False)
+            self.setup_who_list_panel() # Rebuild in main container
+            self.update_who_list_visibility()
+        else:
+            # Dock
+            self.who_list_docked.set(True)
+            self.update_who_list_visibility() # Remove from main window
+            self.register_appbar()
+
+    def register_appbar(self):
+        """Creates a Toplevel window and registers it as a Windows AppBar."""
+        if self.who_dock_window:
+            return
+
+        logger.info("AppBar: Registering Who List as Desktop Dock...")
+        
+        # 1. Create the Dock Window
+        dock = tk.Toplevel(self)
+        dock.title("M59 Who List Dock")
+        dock.overrideredirect(True)
+        dock.attributes("-topmost", True)
+        dock.config(bg="#2b2d31") # Match the dark theme
+        self.who_dock_window = dock
+        
+        # 2. Add Content
+        self.setup_who_list_panel(parent=dock)
+        
+        # 3. Ensure the window is mapped and has a valid HWND
+        dock.update()
+        
+        # 4. Windows API Registration
+        hwnd = dock.winfo_id()
+        abd = APPBARDATA()
+        abd.cbSize = ctypes.sizeof(APPBARDATA)
+        abd.hWnd = hwnd
+        abd.uCallbackMessage = win32con.WM_USER + 101 # Custom callback
+        
+        # ABM_NEW: Register the AppBar
+        Shell32.SHAppBarMessage(ABM_NEW, ctypes.byref(abd))
+        
+        # ABM_QUERYPOS & ABM_SETPOS: Reserve space
+        # Use win32api to get physical screen size, adjusted for potential scaling issues
+        screen_w = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+        screen_h = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+        
+        dock_w = 250 # Fixed width for Who List
+        
+        abd.uEdge = ABE_RIGHT
+        abd.rc.left = screen_w - dock_w
+        abd.rc.right = screen_w
+        abd.rc.top = 0
+        abd.rc.bottom = screen_h
+        
+        logger.debug(f"AppBar: Requesting Right edge: L={abd.rc.left}, R={abd.rc.right}, T={abd.rc.top}, B={abd.rc.bottom} (Screen: {screen_w}x{screen_h})")
+
+        # Ask Windows for the position
+        Shell32.SHAppBarMessage(ABM_QUERYPOS, ctypes.byref(abd))
+        
+        # Actually set the position
+        Shell32.SHAppBarMessage(ABM_SETPOS, ctypes.byref(abd))
+        
+        # Apply the final geometry to the Tkinter window
+        final_w = abd.rc.right - abd.rc.left
+        final_h = abd.rc.bottom - abd.rc.top
+        
+        # Log the final values Windows gave us
+        logger.info(f"AppBar: System Reserved: L={abd.rc.left}, R={abd.rc.right}, T={abd.rc.top}, B={abd.rc.bottom} (W={final_w})")
+        
+        dock.geometry(f"{final_w}x{final_h}+{abd.rc.left}+{abd.rc.top}")
+        
+        # Force a refresh of the UI inside the dock
+        self.refresh_who_list_ui()
+
+    def unregister_appbar(self):
+        """Unregisters the AppBar and cleans up the dock window."""
+        if not self.who_dock_window:
+            return
+            
+        logger.info("AppBar: Unregistering Desktop Dock...")
+        hwnd = self.who_dock_window.winfo_id()
+        abd = APPBARDATA()
+        abd.cbSize = ctypes.sizeof(APPBARDATA)
+        abd.hWnd = hwnd
+        
+        # ABM_REMOVE: Release desktop space
+        Shell32.SHAppBarMessage(ABM_REMOVE, ctypes.byref(abd))
+        
+        self.who_dock_window.destroy()
+        self.who_dock_window = None
 
     def safe_refresh_who_list(self):
         """Sends a /who command to the game safely using Windows messages."""
@@ -1155,6 +1328,9 @@ class M59Dashboard(tk.Tk):
         tk.Checkbutton(wr_g, text="Show Who List Side Panel", variable=self.who_list_enabled, 
                        command=self.update_who_list_visibility, bg="#f0f0f0").pack(anchor="w")
         
+        tk.Checkbutton(wr_g, text="Dock to Desktop (Stand-alone)", variable=self.who_list_docked,
+                       command=self.toggle_who_list_dock, bg="#f0f0f0").pack(anchor="w", pady=(5, 0))
+        
         side_f = tk.Frame(wr_g, bg="#f0f0f0")
         side_f.pack(fill="x", pady=5)
         tk.Label(side_f, text="Panel Side:", bg="#f0f0f0").pack(side="left")
@@ -1606,6 +1782,8 @@ class M59Dashboard(tk.Tk):
     def on_closing(self):
         self.is_running = False
         self.save_settings()
+        if self.who_list_docked.get():
+            self.unregister_appbar()
         if self.target_pid:
             release_pid(self.target_pid)
         self.destroy()
@@ -1970,5 +2148,14 @@ class M59Dashboard(tk.Tk):
             self.waiting_overlay = None
 
 if __name__ == "__main__":
+    # Enable DPI awareness to fix scaling issues with AppBar and screen coordinates
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1) # PROCESS_SYSTEM_DPI_AWARE
+    except:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except:
+            pass
+            
     app = M59Dashboard()
     app.mainloop()
