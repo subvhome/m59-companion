@@ -133,18 +133,11 @@ class M59Dashboard(tk.Tk):
         self.frida_script = None
         
         # --- Chat Filtering State ---
-        self.static_filters = {
-            "Combat": tk.BooleanVar(value=True),
-            "Kills": tk.BooleanVar(value=True),
-            "Spells": tk.BooleanVar(value=True),
-            "Social": tk.BooleanVar(value=True),
-            "Private": tk.BooleanVar(value=True),
-            "Broadcasts": tk.BooleanVar(value=True),
-            "Improves": tk.BooleanVar(value=True),
-            "System": tk.BooleanVar(value=True)
-        }
-        self.custom_filters = [] # List of dicts: {"label": str, "keywords": list, "var": BooleanVar}
-        
+        self.filters_enabled = tk.BooleanVar(value=True)
+        self.filter_data = {}    # {Category: [keywords]}
+        self.filter_vars = {}    # {Category: BooleanVar}
+        self.load_filters()
+
         self.load_settings()
         
         # Initialize centralized logging with user preference
@@ -158,8 +151,6 @@ class M59Dashboard(tk.Tk):
         self.is_running = True
         self.pk_frame = None
         self.alert_active = False
-        self.all_lines = [] # Master list for live filtering
-        self.history_buffer = [] # Buffer for historical log filtering
         self.comms_mode = "live" # 'live' or 'history'
         self.gps_manager = GPSManager()
         self.waiting_overlay = None
@@ -234,11 +225,144 @@ class M59Dashboard(tk.Tk):
         # Apply initial side panel state
         self.update_who_list_visibility()
         
+        # Start Live Tail Polling
+        self.poll_chat_log()
+
         self.minsize(400, 300)
         self.after(100, self.background_update_check)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    def load_filters(self):
+        """Loads filter definitions from m59_filters.json and initializes Show All."""
+        # Ensure 'Show All' is always the primary state
+        self.filter_vars["Show All"] = tk.BooleanVar(value=True)
+        
+        p = "m59_filters.json"
+        if os.path.exists(p):
+            try:
+                with open(p, "r") as f:
+                    self.filter_data = json.load(f)
+                    for cat in self.filter_data:
+                        if cat != "Show All":
+                            # Default specific categories to False
+                            self.filter_vars[cat] = tk.BooleanVar(value=False)
+            except Exception as e:
+                logger.error(f"Failed to load filters: {e}")
+
+    def setup_collapsible_filters(self, parent):
+        """Creates the collapsible filter section in the sidebar with dynamic checkboxes."""
+        self.filter_container = tk.Frame(parent, bg="#f0f0f0")
+        self.filter_container.pack(fill="x", padx=5, pady=5)
+        
+        # Header with Toggle
+        header = tk.Frame(self.filter_container, bg="#ddd")
+        header.pack(fill="x")
+        
+        self.filter_toggle_btn = tk.Button(header, text="[-] CHAT FILTERS", font=("Arial", 8, "bold"), 
+                                           bg="#ddd", bd=0, command=self.toggle_filter_panel)
+        self.filter_toggle_btn.pack(side="left", padx=5)
+        
+        # Master Toggle (Enabled/Disabled)
+        tk.Checkbutton(header, variable=self.filters_enabled, bg="#ddd", 
+                       activebackground="#ddd", command=self.refresh_comms_view).pack(side="right")
+        
+        self.filter_list_frame = tk.Frame(self.filter_container, bg="#f0f0f0")
+        self.filter_list_frame.pack(fill="x", pady=2)
+        
+        # 1. Add "Show All" checkbox (Primary Override)
+        all_cb = tk.Checkbutton(self.filter_list_frame, text="Show All", 
+                                variable=self.filter_vars["Show All"],
+                                bg="#f0f0f0", font=("Arial", 8, "bold"), anchor="w",
+                                command=self.refresh_comms_view)
+        all_cb.pack(fill="x", padx=10)
+
+        # 2. Add dynamic checkboxes from m59_filters.json
+        for cat in sorted(self.filter_data.keys()):
+            if cat == "Show All": continue
+            cb = tk.Checkbutton(self.filter_list_frame, text=cat, 
+                                variable=self.filter_vars[cat], 
+                                bg="#f0f0f0", font=("Arial", 8), anchor="w",
+                                command=self.refresh_comms_view)
+            cb.pack(fill="x", padx=10)
+            
+        self.filter_panel_visible = True
+
+    def toggle_filter_panel(self):
+        if self.filter_panel_visible:
+            self.filter_list_frame.pack_forget()
+            self.filter_toggle_btn.config(text="[+] CHAT FILTERS")
+        else:
+            self.filter_list_frame.pack(fill="x", pady=2)
+            self.filter_toggle_btn.config(text="[-] CHAT FILTERS")
+        self.filter_panel_visible = not self.filter_panel_visible
+
+    def is_line_filtered(self, line):
+        """Returns True if the line should be shown based on inclusive OR logic."""
+        if not self.filters_enabled.get():
+            return False
+
+        # If "Show All" is checked, everything passes
+        if self.filter_vars.get("Show All") and self.filter_vars["Show All"].get():
+            return True
+        
+        line_lower = line.lower()
+        
+        # Check active categories (Inclusive OR)
+        for cat, var in self.filter_vars.items():
+            if cat == "Show All": continue
+            if var.get():
+                keywords = self.filter_data.get(cat, [])
+                if any(kw.lower() in line_lower for kw in keywords):
+                    return True
+        
+        return False
+
+    def refresh_comms_view(self):
+        """Instant UI re-render triggered by filter toggles. High-performance batch insertion."""
+        # Determine target file
+        if self.comms_mode == "live":
+            if self.char_name == "Unknown": return
+            safe_n = self.char_name.replace(" ", "_")
+            path = os.path.join("logs", f"{safe_n}_chat.log")
+        else:
+            selection = self.log_file_list.curselection()
+            if not selection: return
+            path = os.path.join("logs", self.log_file_list.get(selection[0]))
+
+        if not os.path.exists(path): return
+
+        try:
+            # Optimized read: grab last ~2000 lines for instant feedback
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                # Read large block from end for speed
+                f.seek(0, os.SEEK_END)
+                size = f.tell()
+                # Read up to 256KB or entire file
+                read_size = min(size, 256 * 1024)
+                f.seek(size - read_size)
+                lines = f.readlines()
+                # If we read a partial first line, drop it
+                if len(lines) > 1 and size > read_size:
+                    lines = lines[1:]
+
+            # Filter lines in memory
+            to_insert = [l for l in lines if self.is_line_filtered(l)]
+
+            # Batch update UI
+            self.comms_view.config(state="normal")
+            self.comms_view.delete("1.0", tk.END)
+            self.comms_view.insert(tk.END, "".join(to_insert))
+            self.comms_view.see(tk.END)
+            self.comms_view.config(state="disabled")
+            
+            # Reset the live pointer to the end of the file so tailing continues correctly
+            if self.comms_mode == "live":
+                self._log_ptr = size
+
+        except Exception as e:
+            logger.error(f"Refresh Error: {e}")
     def is_combat_line(self, line):
+        """Internal helper for combat tracking; separate from UI filtering."""
         l = line.lower()
         for verb in self.combat_verbs:
             if f" {verb} " in l or l.endswith(f" {verb}."):
@@ -263,38 +387,22 @@ class M59Dashboard(tk.Tk):
                     self.who_list_enabled.set(s.get("who_list_enabled", True))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
                     
-                    # Restore Static Filters
-                    sf = s.get("static_filters", {})
-                    for name, val in sf.items():
-                        if name in self.static_filters:
-                            self.static_filters[name].set(val)
-                            
-                    # Restore Custom Filters
-                    cf = s.get("custom_filters", [])
-                    self.custom_filters = []
-                    for f in cf:
-                        self.custom_filters.append({
-                            "label": f["label"],
-                            "keywords": f["keywords"],
-                            "var": tk.BooleanVar(value=f.get("enabled", True))
-                        })
+                    # Restore Filters Enabled State
+                    self.filters_enabled.set(s.get("filters_enabled", True))
+                    
+                    # Restore Filter Category States
+                    fs = s.get("filter_states", {})
+                    for cat, val in fs.items():
+                        if cat in self.filter_vars:
+                            self.filter_vars[cat].set(val)
             except Exception as e:
                 logger.error(f"Failed to load settings: {e}")
 
     def save_settings(self):
         try:
-            # Prepare Custom Filters for JSON
-            cf_save = []
-            for f in self.custom_filters:
-                cf_save.append({
-                    "label": f["label"],
-                    "keywords": f["keywords"],
-                    "enabled": f["var"].get()
-                })
-                
-            # Prepare Static Filters for JSON
-            sf_save = {name: var.get() for name, var in self.static_filters.items()}
-
+            # Prepare filter states for JSON
+            fs_save = {cat: var.get() for cat, var in self.filter_vars.items()}
+            
             with open(SETTINGS_FILE, "w") as f:
                 json.dump({
                     "geometry": self.geometry(),
@@ -306,8 +414,8 @@ class M59Dashboard(tk.Tk):
                     "gps_discovery_enabled": self.gps_discovery_enabled.get(),
                     "who_list_enabled": self.who_list_enabled.get(),
                     "who_list_side": self.who_list_side.get(),
-                    "static_filters": sf_save,
-                    "custom_filters": cf_save
+                    "filters_enabled": self.filters_enabled.get(),
+                    "filter_states": fs_save
                 }, f)
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
@@ -520,7 +628,7 @@ class M59Dashboard(tk.Tk):
                     if message['type'] == 'send':
                         payload = message['payload']
                         if isinstance(payload, dict) and payload.get('type') == 'log':
-                            logger.error(f"FridaLog: {payload.get('message')}")
+                            print(f"FridaLog: {payload.get('message')}")
                         else:
                             self.after(0, lambda: self.process_who_list_message(payload))
                             
@@ -564,7 +672,7 @@ class M59Dashboard(tk.Tk):
         def run():
             try:
                 logger.info("WhoList: Sending safe native trigger for population update...")
-                self.frida_script.exports.triggerupdate()
+                self.frida_script.exports_sync.triggerupdate()
             except Exception as e:
                 logger.error(f"WhoList: Failed to invoke silent update: {e}")
                 
@@ -603,49 +711,22 @@ class M59Dashboard(tk.Tk):
         sidebar = tk.Frame(paned, bg="#f0f0f0")
         paned.add(sidebar, weight=1)
         
-        # --- Static Filters Section ---
-        tk.Label(sidebar, text=" CHAT FILTERS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
-        f_scroll_f = tk.Frame(sidebar, bg="#f0f0f0")
-        f_scroll_f.pack(fill="x")
-        
-        static_f = tk.Frame(f_scroll_f, bg="#f0f0f0")
-        static_f.pack(fill="x", padx=5)
-        
-        for name, var in self.static_filters.items():
-            cb = tk.Checkbutton(static_f, text=name, variable=var, bg="#f0f0f0", anchor="w", 
-                                command=self.refresh_comms_view)
-            cb.pack(fill="x")
-            
-        # --- Custom Filters Section ---
-        tk.Label(sidebar, text=" CUSTOM KEYWORDS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
-        self.custom_filters_frame = tk.Frame(sidebar, bg="#f0f0f0")
-        self.custom_filters_frame.pack(fill="x", padx=5)
-        self.rebuild_custom_filters_ui()
-        
-        # --- Add Filter Input ---
-        add_f = tk.Frame(sidebar, bg="#f0f0f0")
-        add_f.pack(fill="x", padx=5, pady=5)
-        
-        row1 = tk.Frame(add_f, bg="#f0f0f0")
-        row1.pack(fill="x")
-        self.new_filter_entry = tk.Entry(row1, font=("Arial", 9))
-        self.new_filter_entry.pack(side="left", fill="x", expand=True)
-        tk.Button(row1, text=" + ", command=self.add_custom_filter, bg="#4CAF50", fg="white", font=("Arial", 9, "bold")).pack(side="left", padx=2)
-        tk.Button(row1, text=" ⓘ ", command=self.show_filter_info, font=("Arial", 9)).pack(side="left")
-
-        # --- Historical Logs ---
-        tk.Label(sidebar, text=" LOG BROWSER ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(15, 5))
+        # --- Sidebar Header ---
+        tk.Label(sidebar, text=" CHAT LOGS ", font=("Arial", 9, "bold"), bg="#ddd").pack(fill="x", pady=(0, 5))
         
         # Return to Live Button
-        self.live_feed_btn = tk.Button(sidebar, text=" 🟢 RETURN TO LIVE FEED ", command=self.return_to_live,
-                                       bg="#E8F5E9", font=("Arial", 8, "bold"), pady=5)
+        self.live_feed_btn = tk.Button(sidebar, text=" 🟢 LIVE STREAM ", command=self.return_to_live,
+                                       bg="#E8F5E9", font=("Arial", 8, "bold"), pady=8)
         self.live_feed_btn.pack(fill="x", padx=5, pady=5)
+
+        # Filters Section
+        self.setup_collapsible_filters(sidebar)
 
         # Scrollable Listbox for logs
         list_f = tk.Frame(sidebar, bg="#f0f0f0")
         list_f.pack(fill="both", expand=True, padx=5)
         
-        self.log_file_list = tk.Listbox(list_f, font=("Arial", 8), height=10)
+        self.log_file_list = tk.Listbox(list_f, font=("Arial", 9), height=15)
         self.log_file_list.pack(side="left", fill="both", expand=True)
         self.log_file_list.bind("<<ListboxSelect>>", self.load_historical_log)
         
@@ -655,9 +736,9 @@ class M59Dashboard(tk.Tk):
         
         btn_row = tk.Frame(sidebar, bg="#f0f0f0")
         btn_row.pack(fill="x", padx=5, pady=5)
-        tk.Button(btn_row, text="Refresh List", command=self.refresh_log_list, font=("Arial", 7)).pack(side="left", fill="x", expand=True)
-        tk.Button(btn_row, text="Open Folder", command=lambda: os.startfile(os.path.abspath("logs")),
-                  font=("Arial", 7)).pack(side="left", fill="x", expand=True, padx=2)
+        tk.Button(btn_row, text="Refresh", command=self.refresh_log_list, font=("Arial", 8)).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("logs")),
+                  font=("Arial", 8)).pack(side="left", fill="x", expand=True, padx=2)
         
         right = tk.Frame(paned, bg="#f0f0f0")
         paned.add(right, weight=4)
@@ -671,117 +752,52 @@ class M59Dashboard(tk.Tk):
         self.comms_mode = "live"
         self.comms_header_lbl.config(text="🟢 LIVE STREAM", fg="#2E7D32")
         self.live_feed_btn.config(bg="#E8F5E9") # Subtle green
-        self.refresh_comms_view()
-
-    def rebuild_custom_filters_ui(self):
-        """Redraws the custom filters list in the sidebar."""
-        for widget in self.custom_filters_frame.winfo_children():
-            widget.destroy()
-            
-        for i, f in enumerate(self.custom_filters):
-            row = tk.Frame(self.custom_filters_frame, bg="#f0f0f0")
-            row.pack(fill="x", pady=1)
-            tk.Checkbutton(row, text=f["label"], variable=f["var"], bg="#f0f0f0", anchor="w",
-                           command=self.refresh_comms_view).pack(side="left", fill="x", expand=True)
-            tk.Button(row, text="✕", command=lambda idx=i: self.remove_custom_filter(idx),
-                      fg="red", bg="#f0f0f0", bd=0, font=("Arial", 8, "bold")).pack(side="right", padx=5)
-
-    def add_custom_filter(self):
-        raw = self.new_filter_entry.get().strip()
-        if not raw: return
-        
-        label = simpledialog.askstring("Filter Label", "Enter a name for this filter:", parent=self)
-        if not label: return
-        
-        # Parse keywords: handle quotes and commas
-        import re
-        keywords = [val.lower() for val in [m[0] or m[1] for m in re.findall(r'"([^"]*)"|([^,]+)', raw)] if val.strip()]
-            
-        if not keywords: return
-        
-        self.custom_filters.append({
-            "label": label,
-            "keywords": keywords,
-            "var": tk.BooleanVar(value=True)
-        })
-        self.new_filter_entry.delete(0, tk.END)
-        self.rebuild_custom_filters_ui()
-        self.refresh_comms_view()
-        self.save_settings()
-
-    def remove_custom_filter(self, index):
-        if 0 <= index < len(self.custom_filters):
-            self.custom_filters.pop(index)
-            self.rebuild_custom_filters_ui()
-            self.refresh_comms_view()
-            self.save_settings()
-
-    def show_filter_info(self):
-        msg = ("Filter Formatting Guide:\n\n"
-               "• Single words: gold\n"
-               "• Multiple words (OR): loot, gold, gems\n"
-               "• Specific phrases: \"you find\"\n"
-               "• Combinations: loot, \"the master\", gems\n\n"
-               "Note: Filters match ANY of your terms (OR logic) and are case-insensitive.")
-        messagebox.showinfo("Filter Info", msg)
-
-    def refresh_comms_view(self):
-        """Clears and repopulates the comms view based on current mode and filters."""
         self.comms_view.config(state="normal")
         self.comms_view.delete("1.0", tk.END)
-        
-        # Determine data source based on current mode
-        source = self.all_lines if self.comms_mode == "live" else self.history_buffer
-        
-        # For performance, we limit display to last 2000 lines when filtering
-        for ts, line in source[-2000:]:
-            if self.should_show_line(line):
-                self.comms_view.insert(tk.END, f"{ts} {line}\n")
-                
-        self.comms_view.see(tk.END)
         self.comms_view.config(state="disabled")
+        # Polling loop will pick up and fill current log content
 
-    def should_show_line(self, line):
-        """Core logic to determine if a line matches ANY enabled filter."""
-        l = line.lower()
+    def poll_chat_log(self):
+        """High-performance tail of the current chat log file."""
+        if not self.is_running: return
         
-        # 1. Combat & Kills
-        if self.static_filters["Combat"].get() and self.is_combat_line(line): return True
-        if self.static_filters["Kills"].get() and "you killed" in l: return True
-        
-        # 2. Spells (Include 3rd person emotes like 'murmurs' or 'makes a mystical')
-        if self.static_filters["Spells"].get():
-            if any(x in l for x in ["you cast", "spell fails", "mana", "murmur", "mystical gesture"]):
-                return True
-        
-        # 3. Social (Broadened to catch all speech variations)
-        if self.static_filters["Social"].get():
-            # Catch "Name says," "You say," "Name yells," etc.
-            if any(x in l for x in [" say", " says", " yell", " yells", " yelling", " whisper", " shouting"]):
-                return True
-            # Catch standard emotes and 3rd person actions
-            if any(x in l for x in [" smiles ", " waves ", " bows ", " laughs ", " at you.", " to you.", " nods."]):
-                return True
+        if self.comms_mode == "live" and self.char_name != "Unknown":
+            safe_n = self.char_name.replace(" ", "_")
+            log_p = os.path.join("logs", f"{safe_n}_chat.log")
             
-        # 4. Comms
-        if self.static_filters["Private"].get() and ("tells you" in l or "you tell" in l or "sends," in l): return True
-        if self.static_filters["Broadcasts"].get() and ("broadcasts," in l or "broadcasts:" in l or "shouts," in l or "shouting," in l): return True
-        
-        # 5. Progression
-        if self.static_filters["Improves"].get() and "improved" in l: return True
-        
-        # 6. System (Catch-all for everything else)
-        if self.static_filters["System"].get():
-            # If System is on, we show everything that wasn't already caught or excluded
-            return True
+            if os.path.exists(log_p):
+                try:
+                    # Initialize pointer if not set
+                    if not hasattr(self, "_log_ptr"):
+                        self._log_ptr = 0
+                        self._last_log_p = ""
 
-        # 7. Check Custom Filters
-        for f in self.custom_filters:
-            if f["var"].get():
-                for kw in f["keywords"]:
-                    if kw in l: return True
+                    # Reset pointer if file changed or shrunk
+                    file_size = os.path.getsize(log_p)
+                    if log_p != self._last_log_p or file_size < self._log_ptr:
+                        self._log_ptr = 0
+                        self._last_log_p = log_p
+                        self.comms_view.config(state="normal")
+                        self.comms_view.delete("1.0", tk.END)
+                        self.comms_view.config(state="disabled")
+
+                    if file_size > self._log_ptr:
+                        with open(log_p, "r", encoding="utf-8", errors="replace") as f:
+                            f.seek(self._log_ptr)
+                            new_data = f.read()
+                            if new_data:
+                                self.comms_view.config(state="normal")
+                                for line in new_data.splitlines():
+                                    if self.is_line_filtered(line):
+                                        self.comms_view.insert(tk.END, line + "\n")
+                                self.comms_view.see(tk.END)
+                                self.comms_view.config(state="disabled")
+                                self._log_ptr = f.tell()
+                except Exception as e:
+                    logger.debug(f"Tail error: {e}")
         
-        return False
+        # Poll every 250ms for near-instant updates
+        self.after(250, self.poll_chat_log)
 
     def load_historical_log(self, event=None):
         selection = self.log_file_list.curselection()
@@ -794,41 +810,23 @@ class M59Dashboard(tk.Tk):
         
         path = os.path.join("logs", fn)
         try:
-            self.history_buffer = []
+            self.comms_view.config(state="normal")
+            self.comms_view.delete("1.0", tk.END)
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
-                    line = line.strip()
-                    if not line: continue
-                    # Parse timestamp if it exists [YYYY-MM-DD HH:MM:SS]
-                    if line.startswith("[") and "]" in line:
-                        parts = line.split("]", 1)
-                        ts = parts[0] + "]"
-                        msg = parts[1].strip()
-                        self.history_buffer.append((ts, msg))
-                    else:
-                        self.history_buffer.append(("", line))
-            
-            self.refresh_comms_view()
+                    if self.is_line_filtered(line):
+                        self.comms_view.insert(tk.END, line)
+            self.comms_view.see(tk.END)
+            self.comms_view.config(state="disabled")
         except Exception as e:
             logger.error(f"Failed to load historical log {fn}: {e}")
 
     def append_comms_line(self, line):
+        """Legacy helper for tracking; UI updates are now handled by poll_chat_log."""
         ts = f"[{datetime.now().strftime('%H:%M:%S')}]"
-        
         if self.debug_enabled.get():
-            logger.debug(f"Comms: Received raw line: {line[:60]}...")
-
-        # Save to master list
-        self.all_lines.append((ts, line))
-        if len(self.all_lines) > 5000:
-            self.all_lines.pop(0)
-        
-        # Only update live view auto-scrolling if we are currently IN live mode
-        if self.comms_mode == "live" and self.should_show_line(line):
-            self.comms_view.config(state="normal")
-            self.comms_view.insert(tk.END, f"{ts} {line}\n")
-            self.comms_view.see(tk.END)
-            self.comms_view.config(state="disabled")
+            logger.debug(f"Comms: {line[:60]}...")
+        # Tracker/PKAlert still use the synchronous feed provided by the chat monitor
 
     def refresh_log_list(self):
         if not os.path.exists("logs"):
