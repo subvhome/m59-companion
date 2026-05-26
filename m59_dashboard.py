@@ -1768,11 +1768,18 @@ class M59Dashboard(tk.Tk):
         rm = {"barloque": "Office of the Barloque Vaultman", "hungry": "The Hungry Vaults"}
         cur = self.get_current_room()
         logger.info(f"Vault: Validating location for {vt} scan. Current: {cur}")
+        
+        # Language-Independent relaxation:
+        # If the room name doesn't match the English default, warn but allow bypass.
         if rm.get(vt) and rm[vt].lower() not in cur.lower():
-            messagebox.showwarning("Location", f"Sync Blocked: Must be in '{rm[vt]}'.\nCurrent: '{cur}'")
+            msg = f"Your current location '{cur}' does not match the expected vault room '{rm[vt]}'.\n\n"
+            msg += "If you are on a non-English client or have already opened the vault window, you can 'Bypass' to attempt the scan anyway.\n\n"
+            msg += "Attempt scan?"
+            if not messagebox.askyesno("Vault Location Warning", msg):
+                return
+        elif not messagebox.askyesno("Scan", f"Scan {vt} vault?"):
             return
-        if not messagebox.askyesno("Scan", f"Scan {vt} vault?"):
-            return
+            
         w = self.vault_widgets[vt]
         w["sync_btn"].config(state="disabled")
         threading.Thread(target=self.perform_vault_scan_thread, args=(vt,), daemon=True).start()

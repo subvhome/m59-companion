@@ -13,9 +13,33 @@ logger = get_logger("vault")
 # Vault Specific Constants
 CHAT_CONTROL_ID = 1001
 DIALOG_CLASS = "#32770"
-DIALOG_TEXT = "Withdraw Items"
+DIALOG_TEXT = "Withdraw Items" # Legacy, now used as a fallback/log
 ID_ITEM_LIST = 1002
 ID_QTY_LIST = 1076
+
+def find_vault_window_by_components(target_pid):
+    """
+    Finds a window belonging to target_pid that contains the Vault components.
+    Language-independent as it checks for specific Control IDs.
+    """
+    vault_hwnd = [None]
+    
+    def enum_windows_cb(hwnd, param):
+        if win32gui.IsWindowVisible(hwnd):
+            _, pid = win32process.GetWindowThreadProcessId(hwnd)
+            if pid == target_pid:
+                # Check if this window has the vault listboxes
+                if find_nested_control(hwnd, ID_ITEM_LIST) and find_nested_control(hwnd, ID_QTY_LIST):
+                    vault_hwnd[0] = hwnd
+                    return False # Stop enumeration
+        return True
+
+    try:
+        win32gui.EnumWindows(enum_windows_cb, None)
+    except:
+        pass
+        
+    return vault_hwnd[0]
 
 def find_nested_control(parent_hwnd, target_id):
     """Deep search for a specific control ID within a parent window."""
@@ -71,9 +95,18 @@ def perform_vault_scan(main_hwnd, char_name, vault_type="barloque", progress_cb=
 
     # Wait for Popup
     dialog_hwnd = None
+    _, target_pid = win32process.GetWindowThreadProcessId(main_hwnd)
+    
     for _ in range(20):
-        dialog_hwnd = win32gui.FindWindow(DIALOG_CLASS, DIALOG_TEXT)
-        if dialog_hwnd and win32gui.IsWindowVisible(dialog_hwnd): break
+        # Try component-based detection first (Language Independent)
+        dialog_hwnd = find_vault_window_by_components(target_pid)
+        
+        # Fallback to legacy title-based lookup if components fail
+        if not dialog_hwnd:
+            dialog_hwnd = win32gui.FindWindow(DIALOG_CLASS, DIALOG_TEXT)
+            
+        if dialog_hwnd and win32gui.IsWindowVisible(dialog_hwnd): 
+            break
         time.sleep(0.2)
 
     if not dialog_hwnd:

@@ -50,23 +50,32 @@ def capture_identity(hwnd, target_pid):
     
     start_time = time.time()
     while time.time() - start_time < 5.0:
-        # Find all top-level dialogs
-        bio_hwnd = None
-        def find_bio(h, l):
-            nonlocal bio_hwnd
-            if win32gui.GetClassName(h) == "#32770" and win32gui.GetWindowText(h) == "Player Description":
+        # Find all top-level dialogs belonging to the process
+        bio_hwnd = [None]
+        
+        def find_bio_cb(h, param):
+            if win32gui.IsWindowVisible(h) and win32gui.GetClassName(h) == "#32770":
                 _, p = win32process.GetWindowThreadProcessId(h)
                 if p == target_pid:
-                    bio_hwnd = h
+                    # Check for Character Name control (ID 1011)
+                    # This ID is unique to the Bio/Identity dialog
+                    try:
+                        name_ctrl = win32gui.GetDlgItem(h, 1011)
+                        if name_ctrl:
+                            bio_hwnd[0] = h
+                            return False # Stop enumeration
+                    except:
+                        pass
+            return True
         
-        win32gui.EnumWindows(find_bio, None)
+        win32gui.EnumWindows(find_bio_cb, None)
         
-        if bio_hwnd:
-            name_hwnd = win32gui.GetDlgItem(bio_hwnd, 1011)
+        if bio_hwnd[0]:
+            name_hwnd = win32gui.GetDlgItem(bio_hwnd[0], 1011)
             if name_hwnd:
                 name = get_text_from_hwnd(name_hwnd)
                 if name and name != "...":
-                    win32gui.PostMessage(bio_hwnd, win32con.WM_CLOSE, 0, 0)
+                    win32gui.PostMessage(bio_hwnd[0], win32con.WM_CLOSE, 0, 0)
                     return name
         time.sleep(0.5)
     return None
