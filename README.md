@@ -49,12 +49,17 @@ A lightweight, multi-instance companion tool for Meridian 59 designed to automat
 *   **Dual Pane:** Separate lists for Monsters vs. Players & Notables.
 *   **Comprehensive Database:** Includes rare variants (Xeochicatls, Skeletons, etc.) and "dead state" detection.
 
-### 4. School Progression (Calculator)
+### 4. Live Population Tracker (Who List)
+*   **Integrated Sidebar:** A real-time list of online players visible directly in the dashboard.
+*   **Desktop Docking:** Pop the Who List out of the main window and dock it to the side of your screen for a persistent "at-a-glance" view.
+*   **Automatic Updates:** Silently monitors server population without interrupting your gameplay.
+
+### 5. School Progression (Calculator)
 *   **Target Sums:** Uses the standard server advancement formula to show exactly what % sum you need for your next rank.
 *   **Tab Dance:** One-click automation to cycle your in-game tabs and refresh all knowledge.
 *   **Intellect Scaling:** Dynamically adjusts "Points Needed" based on your character's current Intellect.
 
-### 5. Vault Management
+### 6. Vault Management
 *   **Automated Scanning:** Sends 'withdraw' commands and clicks through your vault to refresh quantities.
 *   **Dual Storage:** Dedicated support for Barloque and Hungry Vaults.
 *   **Instant Filter:** Search through large inventories instantly as you type.
@@ -70,6 +75,7 @@ A lightweight, multi-instance companion tool for Meridian 59 designed to automat
 
 ## Diagnostic & Alert Tools
 *   **PK Alert System:** Configurable alarms (Sound + Visual Red Frame) that trigger when non-mob entities attack you. Now immune to fake '/emote' pranks via color-intent filtering.
+*   **World Map & GPS Discovery:** (Experimental) A live log of your movement across the world. Discover new rooms and track transitions as you travel.
 *   **Verbose Debug Mode:** A toggleable developer console that logs raw scraper data and internal progression calculations to both the terminal and `logs/companion_debug.log`.
 
 ---
@@ -83,7 +89,7 @@ Customize how you want to be notified of threats:
 ---
 
 ## Coming Soon
-*   **GPS:** Select a destination and receive turn-by-turn directions as you move across screens.
+*   **GPS Navigation:** Select a destination and receive turn-by-turn directions as you move across screens.
 *   **Shortcut Keys:** Assign custom key combinations or mouse buttons to execute complex in-game actions.
 
 ---

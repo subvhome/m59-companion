@@ -146,6 +146,20 @@ class PKFrame(tk.Toplevel):
 class M59Dashboard(tk.Tk):
     def __init__(self):
         super().__init__()
+        
+        # --- UI Scaling & DPI Setup ---
+        # Calculate scaling factor based on system DPI
+        # Standard DPI is 96. winfo_fpixels('1i') returns the number of pixels in one inch.
+        try:
+            dpi = self.winfo_fpixels('1i')
+            self.scaling_factor = dpi / 96.0
+            # Apply Tkinter internal scaling
+            self.tk.call('tk', 'scaling', dpi / 72.0)
+        except:
+            self.scaling_factor = 1.0
+            
+        logger.info(f"UI: Initializing with scaling factor {self.scaling_factor:.2f}")
+
         self.version = "0.00"
         try:
             v_p = resource_path("VERSION")
@@ -156,8 +170,15 @@ class M59Dashboard(tk.Tk):
             pass
         
         self.title(f"M59 Companion v{self.version}")
-        self.geometry("1100x850")
         
+        # Scale initial window geometry
+        base_w, base_h = 1100, 850
+        self.geometry(f"{int(base_w * self.scaling_factor)}x{int(base_h * self.scaling_factor)}")
+        
+        # Initialize styles
+        self.style = ttk.Style()
+        self.apply_ui_scaling()
+
         # --- Settings ---
         self.pk_alert_enabled = tk.BooleanVar(value=True)
         self.pk_sound_enabled = tk.BooleanVar(value=True)
@@ -283,6 +304,26 @@ class M59Dashboard(tk.Tk):
         self.minsize(400, 300)
         self.after(100, self.background_update_check)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def scale_px(self, px):
+        """Helper to scale pixel values by the current scaling factor."""
+        return int(px * self.scaling_factor)
+
+    def apply_ui_scaling(self):
+        """Configures ttk styles for correct scaling (especially rowheight)."""
+        # Rowheight is in pixels, so it MUST be scaled manually.
+        # 25px is a good base for 10pt fonts at 96 DPI.
+        row_h = self.scale_px(25)
+        
+        # Font sizes in points (positive) are auto-scaled by Tkinter internally 
+        # when 'tk scaling' is set. Manual scaling here causes "double-scaling".
+        header_font = ("Arial", 10, "bold")
+        cell_font = ("Arial", 10)
+        
+        self.style.configure("Treeview", rowheight=row_h, font=cell_font)
+        self.style.configure("Treeview.Heading", font=header_font)
+        
+        logger.debug(f"UI: Applied Treeview scaling (rowheight={row_h}, font=10pt)")
 
     def load_filters(self):
         """Loads filter definitions from m59_filters.json and initializes Show All."""
@@ -1230,14 +1271,14 @@ class M59Dashboard(tk.Tk):
         gains_col = tk.LabelFrame(grid, text=" Session Improves ", bg="#f0f0f0", font=("Arial", 10, "bold"))
         gains_col.pack(side="left", fill="both", expand=True, padx=5)
         self.gains_tree = ttk.Treeview(gains_col, columns=("Name", "Count", "Delta"), show="headings", height=10)
-        for c, w in [("Name", 120), ("Count", 50), ("Delta", 80)]:
+        for c, w in [("Name", self.scale_px(120)), ("Count", self.scale_px(50)), ("Delta", self.scale_px(80))]:
             self.gains_tree.heading(c, text=c)
             self.gains_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
         self.gains_tree.pack(fill="both", expand=True)
         kills_col = tk.LabelFrame(grid, text=" Session Kills ", bg="#f0f0f0", font=("Arial", 10, "bold"))
         kills_col.pack(side="left", fill="both", expand=True, padx=5)
         self.kills_tree = ttk.Treeview(kills_col, columns=("Name", "Count"), show="headings", height=10)
-        for c, w in [("Name", 120), ("Count", 60)]:
+        for c, w in [("Name", self.scale_px(120)), ("Count", self.scale_px(60))]:
             self.kills_tree.heading(c, text=c)
             self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
         self.kills_tree.pack(fill="both", expand=True)
@@ -1260,8 +1301,8 @@ class M59Dashboard(tk.Tk):
         self.sync_btn.pack(side="right")
         self.prog_tree = ttk.Treeview(self.tab_prog, columns=("Level", "Sum", "Goal", "Needed"), show="tree headings")
         self.prog_tree.heading("#0", text="School / Ability")
-        self.prog_tree.column("#0", width=220)
-        for c, w in [("Level", 80), ("Sum", 100), ("Goal", 100), ("Needed", 100)]:
+        self.prog_tree.column("#0", width=self.scale_px(220))
+        for c, w in [("Level", self.scale_px(80)), ("Sum", self.scale_px(100)), ("Goal", self.scale_px(100)), ("Needed", self.scale_px(100))]:
             self.prog_tree.heading(c, text=c)
             self.prog_tree.column(c, width=w, anchor="center")
         self.prog_tree.pack(fill="both", expand=True, padx=10, pady=5)
@@ -1284,8 +1325,8 @@ class M59Dashboard(tk.Tk):
             tr = ttk.Treeview(f, columns=("Name", "Qty"), show="headings", height=15)
             tr.heading("Name", text="Item")
             tr.heading("Qty", text="Qty")
-            tr.column("Name", width=150)
-            tr.column("Qty", width=50, anchor="center")
+            tr.column("Name", width=self.scale_px(150))
+            tr.column("Qty", width=self.scale_px(50), anchor="center")
             tr.pack(fill="both", expand=True, padx=5, pady=2)
             sl = tk.Label(f, text="No scan data", font=("Arial", 7, "italic"), bg="#f0f0f0", fg="gray")
             sl.pack(side="bottom", fill="x")
@@ -1308,9 +1349,9 @@ class M59Dashboard(tk.Tk):
             tr.heading("Name", text="Victim")
             tr.heading("AllTime", text="Total")
             tr.heading("Session", text="Session")
-            tr.column("Name", width=150)
-            tr.column("AllTime", width=60, anchor="center")
-            tr.column("Session", width=60, anchor="center")
+            tr.column("Name", width=self.scale_px(150))
+            tr.column("AllTime", width=self.scale_px(60), anchor="center")
+            tr.column("Session", width=self.scale_px(60), anchor="center")
             tr.pack(fill="both", expand=True, padx=5, pady=2)
             self.book_widgets[kt] = {"tree": tr, "filter_var": fv}
 
@@ -1809,9 +1850,9 @@ class M59Dashboard(tk.Tk):
         tree.heading("PID", text="PID")
         tree.heading("Character", text="Character")
         tree.heading("Location", text="Location")
-        tree.column("PID", width=70, anchor="center")
-        tree.column("Character", width=150, anchor="w")
-        tree.column("Location", width=250, anchor="w")
+        tree.column("PID", width=self.scale_px(70), anchor="center")
+        tree.column("Character", width=self.scale_px(150), anchor="w")
+        tree.column("Location", width=self.scale_px(250), anchor="w")
         tree.pack(side="left", fill="both", expand=True)
         
         sb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
@@ -2148,14 +2189,22 @@ class M59Dashboard(tk.Tk):
             self.waiting_overlay = None
 
 if __name__ == "__main__":
-    # Enable DPI awareness to fix scaling issues with AppBar and screen coordinates
+    # Enable High DPI awareness to fix scaling issues with AppBar and screen coordinates
     try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(1) # PROCESS_SYSTEM_DPI_AWARE
+        # PROCESS_PER_MONITOR_DPI_AWARE = 2
+        # PROCESS_SYSTEM_DPI_AWARE = 1
+        # Try per-monitor awareness first
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
     except:
         try:
-            ctypes.windll.user32.SetProcessDPIAware()
+            # Fallback to system-level awareness
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except:
-            pass
+            try:
+                # Legacy fallback
+                ctypes.windll.user32.SetProcessDPIAware()
+            except:
+                pass
             
     app = M59Dashboard()
     app.mainloop()
