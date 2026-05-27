@@ -309,6 +309,30 @@ class M59Dashboard(tk.Tk):
         """Helper to scale pixel values by the current scaling factor."""
         return int(px * self.scaling_factor)
 
+    def set_tooltip(self, widget, text):
+        """Adds a simple hover tooltip to a widget."""
+        def enter(event):
+            # Create a tooltip window
+            self.tooltip = tk.Toplevel(self)
+            self.tooltip.overrideredirect(True)
+            self.tooltip.attributes("-topmost", True)
+            
+            # Position it near the mouse
+            x = event.x_root + 20
+            y = event.y_root + 10
+            self.tooltip.geometry(f"+{x}+{y}")
+            
+            label = tk.Label(self.tooltip, text=text, bg="#ffffca", fg="#333", 
+                             font=("Arial", 9), relief=tk.SOLID, borderwidth=1, padx=5, pady=2)
+            label.pack()
+            
+        def leave(event):
+            if hasattr(self, "tooltip"):
+                self.tooltip.destroy()
+                
+        widget.bind("<Enter>", enter, add="+")
+        widget.bind("<Leave>", leave, add="+")
+
     def apply_ui_scaling(self):
         """Configures ttk styles for correct scaling (especially rowheight)."""
         # Rowheight is in pixels, so it MUST be scaled manually.
@@ -726,13 +750,22 @@ class M59Dashboard(tk.Tk):
         ).pack(side="left", padx=10)
         
         # Dock/Toggle Button
-        dock_text = "📌" if self.who_list_docked.get() else "⧉"
+        # Modern Symbols: ↗ (Pop Out) and ↙ (Dock back)
+        dock_text = "↙" if self.who_list_docked.get() else "↗"
         self.who_dock_btn = tk.Button(
-            self.who_list_header, text=dock_text, font=("Segoe UI", 10),
-            bg="#1e1f22", fg="#888", activebackground="#2b2d31", activeforeground="#fff",
+            self.who_list_header, text=dock_text, font=("Segoe UI", 12, "bold"),
+            bg="#1e1f22", fg="#888", activebackground="#323338", activeforeground="#fff",
             bd=0, padx=10, cursor="hand2", command=self.toggle_who_list_dock
         )
         self.who_dock_btn.pack(side="right")
+        
+        # Add Hover Effects
+        self.who_dock_btn.bind("<Enter>", lambda e: self.who_dock_btn.config(bg="#323338", fg="#fff"), add="+")
+        self.who_dock_btn.bind("<Leave>", lambda e: self.who_dock_btn.config(bg="#1e1f22", fg="#888"), add="+")
+        
+        # Simple Tooltip Implementation
+        tip_text = "Return to Application" if self.who_list_docked.get() else "Pop out to Desktop Dock"
+        self.set_tooltip(self.who_dock_btn, tip_text)
         
         # Bottom Count Label
         self.who_list_count_lbl = tk.Label(
