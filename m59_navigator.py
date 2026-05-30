@@ -25,23 +25,77 @@ def get_compass_direction(pos):
         return "the Center"
     return f"the {direction} area"
 
-def get_friendly_action(exit_info, data):
+def get_friendly_action(from_rid, exit_info, data):
     """Creates a human-readable instruction based on exit type and location."""
-    dest_name = data.get(exit_info['to_rid'], {}).get('name', "another area")
+    from_pos = exit_info.get('from', [None, None])
+    to_rid = exit_info['to_rid']
+    dest_name = data.get(to_rid, {}).get('name', "another area")
     
+    # Custom Overrides for complex/hidden paths
+    # Key: (From_RID, To_RID, Row, Col)
+    CUSTOM_INSTRUCTIONS = {
+        ("RID_NEST1", "RID_CAVE2", 2, 19): "Walk to the Northern point, move slightly East and fall into the hole to reach A Deep, Dark, Spooky, Icky Cave.",
+        ("RID_NEST1", "RID_CAVE2", 26, 14): "Find the hole in the West area and drop down to reach A Deep, Dark, Spooky, Icky Cave.",
+        ("RID_G9", "RID_NECROAREA1", None, None): "Trigger the lever puzzle to raise the platform, allowing you to reach the ledge and enter Winding Caverns.",
+    }
+
+    # Search for a custom override
+    row, col = from_pos
+    if (from_rid, to_rid, row, col) in CUSTOM_INSTRUCTIONS:
+        return CUSTOM_INSTRUCTIONS[(from_rid, to_rid, row, col)]
+
+    direction_hint = get_compass_direction(from_pos)
+    obj_name = exit_info.get('object', 'entrance')
+    if obj_name == 'SpiderTree': obj_name = 'Web Covered Tree'
+    elif obj_name == 'Portal': obj_name = 'Portal'
+
     if exit_info['type'] == 'point':
-        direction_hint = get_compass_direction(exit_info['from'])
-        return f"Walk to the {direction_hint} and enter the door/gate to reach {dest_name}."
+        return f"Walk to the {direction_hint} and enter the {obj_name} to reach {dest_name}."
     
     if exit_info['type'] == 'edge':
         direction = exit_info['direction'].replace('LEAVE_', '').title()
         return f"Follow the path out the {direction} side of the room to {dest_name}."
     
     if exit_info['type'] == 'manual':
-        # These are the "hidden" ones like the tree hole
+        # These are the "hidden" ones like the tree hole or region triggers
+        if exit_info.get('from'):
+             # If it's a manual exit with coordinates but no object, 
+             # it's likely a region trigger (like walking off a map edge).
+             if obj_name == 'entrance':
+                 return f"Walk to the {direction_hint} to reach {dest_name}."
+             return f"Find the hidden {obj_name} in the {direction_hint} area and enter to reach {dest_name}."
         return f"Look for a special entrance (like a hole or a hidden path) to reach {dest_name}."
 
     return f"Move to {dest_name}."
+
+def get_room_selection(query, name_to_ids, data):
+    """Handles ambiguous room names by prompting the user for selection."""
+    query = query.lower().strip()
+    matches = []
+    for name in name_to_ids:
+        if query in name:
+            matches.append(name)
+            
+    if not matches:
+        return None
+        
+    options = []
+    for m in matches:
+        for rid in name_to_ids[m]:
+            options.append(rid)
+            
+    if len(options) == 1:
+        return options[0]
+        
+    print(f"\nMultiple matches for '{query}':")
+    for i, rid in enumerate(options):
+        print(f"  {i+1}. {data[rid]['name']} ({rid})")
+        
+    choice = input("Select number (or Enter to cancel): ")
+    try:
+        return options[int(choice)-1]
+    except:
+        return None
 
 def build_graph(data):
     adj = collections.defaultdict(list)
@@ -77,19 +131,19 @@ def main():
     adj, name_to_ids = build_graph(data)
     
     while True:
-        print("\n--- NEW TRIP ---")
-        start_query = input("Where are you now? ").lower().strip()
+        print("\n" + "="*40)
+        start_query = input("Where are you now? ")
         if not start_query: break
-        
-        # Simple name matcher
-        start_rid = next((ids[0] for name, ids in name_to_ids.items() if start_query in name), None)
-        
-        end_query = input("Where do you want to go? ").lower().strip()
+        start_rid = get_room_selection(start_query, name_to_ids, data)
+        if not start_rid:
+            print("Sorry, I couldn't find that room.")
+            continue
+            
+        end_query = input("Where do you want to go? ")
         if not end_query: break
-        end_rid = next((ids[0] for name, ids in name_to_ids.items() if end_query in name), None)
-        
-        if not start_rid or not end_rid:
-            print("Sorry, I couldn't find those rooms. Try names like 'Tos' or 'Castle Victoria'.")
+        end_rid = get_room_selection(end_query, name_to_ids, data)
+        if not end_rid:
+            print("Sorry, I couldn't find that room.")
             continue
             
         print(f"\nGUIDE: Getting you from {data[start_rid]['name']} to {data[end_rid]['name']}...")
@@ -98,7 +152,7 @@ def main():
         if path:
             for i, (rid, exit_info) in enumerate(path):
                 print(f"\nSTEP {i+1}: In {data[rid]['name']}...")
-                print(f"  -> {get_friendly_action(exit_info, data)}")
+                print(f"  -> {get_friendly_action(rid, exit_info, data)}")
             print(f"\nSUCCESS: You have arrived at {data[end_rid]['name']}!")
         else:
             print("\nI'm sorry, I couldn't find a walking path between those places.")

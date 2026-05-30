@@ -16,6 +16,7 @@ import winsound
 import re
 import ctypes
 from ctypes import wintypes
+import webbrowser
 from datetime import datetime
 
 # --- Windows AppBar API Definitions ---
@@ -263,6 +264,12 @@ class M59Dashboard(tk.Tk):
         self.vault_data = {"barloque": [], "hungry": []}
         self.calculator = SchoolCalculator()
         self.sync_in_progress = False
+
+        # --- Session Tracking Stats ---
+        self.total_improves = 0
+        self.bank_mainland = "---"
+        self.bank_island = "---"
+        self.who_footer_labels = {}
 
         # --- Layout ---
         self.status_var = tk.StringVar(value="Initializing...")
@@ -679,8 +686,10 @@ class M59Dashboard(tk.Tk):
                     self.debug_enabled.set(s.get("debug_enabled", False))
                     self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
                     self.who_list_enabled.set(s.get("who_list_enabled", True))
-                    self.who_list_docked.set(s.get("who_list_docked", False))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
+                    
+                    # Force Who List to be in-app on startup (don't remember desktop dock)
+                    self.who_list_docked.set(False)
                     
                     # Restore Filters Enabled State
                     self.filters_enabled.set(s.get("filters_enabled", True))
@@ -742,7 +751,7 @@ class M59Dashboard(tk.Tk):
         
         # Polished Title Header (with Dock Button)
         self.who_list_header = tk.Frame(self.who_list_panel, bg="#1e1f22")
-        self.who_list_header.pack(fill="x")
+        self.who_list_header.pack(fill="x", side="top")
         
         tk.Label(
             self.who_list_header, text="Online Players", font=("Segoe UI", 10, "bold"), 
@@ -750,7 +759,6 @@ class M59Dashboard(tk.Tk):
         ).pack(side="left", padx=10)
         
         # Dock/Toggle Button
-        # Modern Symbols: ↗ (Pop Out) and ↙ (Dock back)
         dock_text = "↙" if self.who_list_docked.get() else "↗"
         self.who_dock_btn = tk.Button(
             self.who_list_header, text=dock_text, font=("Segoe UI", 12, "bold"),
@@ -758,40 +766,63 @@ class M59Dashboard(tk.Tk):
             bd=0, padx=10, cursor="hand2", command=self.toggle_who_list_dock
         )
         self.who_dock_btn.pack(side="right")
-        
-        # Add Hover Effects
         self.who_dock_btn.bind("<Enter>", lambda e: self.who_dock_btn.config(bg="#323338", fg="#fff"), add="+")
         self.who_dock_btn.bind("<Leave>", lambda e: self.who_dock_btn.config(bg="#1e1f22", fg="#888"), add="+")
         
-        # Simple Tooltip Implementation
         tip_text = "Return to Application" if self.who_list_docked.get() else "Pop out to Desktop Dock"
         self.set_tooltip(self.who_dock_btn, tip_text)
-        
-        # Bottom Count Label
+
+        # 1. BOTTOM SECTION (Pack these first to pin to bottom)
         self.who_list_count_lbl = tk.Label(
             self.who_list_panel, text="0 Online", font=("Segoe UI", 9, "bold"), 
             bg="#1e1f22", fg="#888", pady=5, bd=0
         )
         self.who_list_count_lbl.pack(side="bottom", fill="x")
+
+        # Status Footer
+        footer_bg = "#1e1f22"
+        self.who_footer = tk.Frame(self.who_list_panel, bg=footer_bg, bd=0)
+        self.who_footer.pack(side="bottom", fill="x")
         
-        # Main text view with Discord-style dark background
+        # Helper to add a status row
+        def add_status_row(parent, label_text, key, icon=""):
+            row = tk.Frame(parent, bg=footer_bg)
+            row.pack(fill="x", padx=10, pady=2)
+            tk.Label(row, text=f"{icon} {label_text}", font=("Segoe UI", 8), bg=footer_bg, fg="#888").pack(side="left")
+            val = tk.Label(row, text="---", font=("Segoe UI", 8, "bold"), bg=footer_bg, fg="#fff", wraplength=200, justify="right")
+            val.pack(side="right")
+            self.who_footer_labels[key] = val
+
+        add_status_row(self.who_footer, "GPS:", "gps", "🧭")
+        add_status_row(self.who_footer, "IMPROVES:", "improves", "📈")
+        add_status_row(self.who_footer, "BANK (M):", "bank_m", "💰")
+        add_status_row(self.who_footer, "BANK (I):", "bank_i", "🌴")
+        
+        tk.Frame(self.who_list_panel, height=1, bg="#323338").pack(side="bottom", fill="x")
+
+        # 2. MIDDLE SECTION (Scrollable list container)
+        list_frame = tk.Frame(self.who_list_panel, bg="#2b2d31")
+        list_frame.pack(side="top", fill="both", expand=True)
+
         self.who_list_text = tk.Text(
-            self.who_list_panel, bg="#2b2d31", fg="#e0e0e0", 
+            list_frame, bg="#2b2d31", fg="#e0e0e0", 
             font=("Consolas", 10), state="disabled", 
             width=25, bd=0, padx=8, pady=5, wrap="none"
         )
         self.who_list_text.pack(side="left", fill="both", expand=True)
         
-        # Styled scrollbar
-        sb = ttk.Scrollbar(self.who_list_panel, orient="vertical", command=self.who_list_text.yview)
+        sb = ttk.Scrollbar(list_frame, orient="vertical", command=self.who_list_text.yview)
         sb.pack(side="right", fill="y")
         self.who_list_text.config(yscrollcommand=sb.set)
         
-        # High-legibility foreground tags tailored for the dark slate background
+        # High-legibility foreground tags
         self.who_list_text.tag_config("INNOCENT", foreground="#e0e0e0")
-        self.who_list_text.tag_config("OUTLAW", foreground="#ff9f43")    # Rich Orange
-        self.who_list_text.tag_config("MURDERER", foreground="#ff6b6b")  # Soft bright Red
-        self.who_list_text.tag_config("STAFF", foreground="#48dbfb")     # Sky Blue
+        self.who_list_text.tag_config("OUTLAW", foreground="#ff9f43")
+        self.who_list_text.tag_config("MURDERER", foreground="#ff6b6b")
+        self.who_list_text.tag_config("STAFF", foreground="#48dbfb")
+        
+        if self.who_list_players:
+            self.refresh_who_list_ui()
         
         # If we have players, populate the UI immediately
         if self.who_list_players:
@@ -1119,23 +1150,82 @@ class M59Dashboard(tk.Tk):
         # Sort alphabetically case-insensitively
         sorted_names = sorted(self.who_list_players.keys(), key=str.lower)
         
-        # Calculate dynamic width to prevent wrapping (min 15, max 40)
-        max_len = 15
-        for name in sorted_names:
-            max_len = max(max_len, len(name) + 3) # Name + leading space + padding
-            
-        max_len = min(40, max_len)
-        self.who_list_text.config(width=max_len)
-        
+        # 1. Text UI Update
         for name in sorted_names:
             status = self.who_list_players[name]
             self.who_list_text.insert(tk.END, f" {name}\n", status)
-            
         self.who_list_text.config(state="disabled")
         
+        # 2. Dynamic Width Calculation for Dock
+        if self.who_list_docked.get() and self.who_dock_window:
+            import tkinter.font as tkfont
+            f = tkfont.Font(font=self.who_list_text['font'])
+            
+            max_w_px = 120 # Minimum baseline
+            for name in sorted_names:
+                w = f.measure(f"  {name}  ") # Measure with padding
+                if w > max_w_px: max_w_px = w
+            
+            # Add space for scrollbar (approx 20px) + padding
+            target_w = int(max_w_px + self.scale_px(35))
+            target_w = max(180, min(350, target_w))
+            
+            # Only trigger move if change is significant (> 10px) to avoid jitter
+            current_w = self.who_dock_window.winfo_width()
+            if abs(target_w - current_w) > 10:
+                logger.info(f"AppBar: Dynamic resize triggered: {current_w}px -> {target_w}px")
+                self.update_appbar_pos(target_w)
+
         # Update dynamic player count at the bottom
         count = len(sorted_names)
         self.who_list_count_lbl.config(text=f"{count} Online", fg="#4CAF50" if count > 0 else "#888")
+        
+        # 3. Update Status Footer
+        self.refresh_who_footer()
+
+    def refresh_who_footer(self):
+        """Updates the status footer labels with the latest session data."""
+        if not self.who_footer_labels:
+            return
+
+        # GPS Status
+        gps_text = "No active route"
+        if self.gps_manager.current_path and self.gps_manager.current_destination_rid:
+            step_idx = self.gps_manager.current_step_index
+            if step_idx < len(self.gps_manager.current_path):
+                from_rid, exit_info = self.gps_manager.current_path[step_idx]
+                gps_text = self.gps_manager.get_friendly_instruction(from_rid, exit_info)
+        
+        self.who_footer_labels["gps"].config(text=gps_text)
+        self.who_footer_labels["improves"].config(text=str(self.total_improves))
+        self.who_footer_labels["bank_m"].config(text=self.bank_mainland)
+        self.who_footer_labels["bank_i"].config(text=self.bank_island)
+
+    def update_appbar_pos(self, new_width):
+        """Resizes the AppBar reservation and the dock window."""
+        if not self.who_dock_window: return
+        
+        hwnd = self.who_dock_window.winfo_id()
+        abd = APPBARDATA()
+        abd.cbSize = ctypes.sizeof(APPBARDATA)
+        abd.hWnd = hwnd
+        
+        screen_w = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+        screen_h = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+        
+        abd.uEdge = ABE_RIGHT
+        abd.rc.left = screen_w - new_width
+        abd.rc.right = screen_w
+        abd.rc.top = 0
+        abd.rc.bottom = screen_h
+        
+        # Query and Set
+        Shell32.SHAppBarMessage(ABM_QUERYPOS, ctypes.byref(abd))
+        Shell32.SHAppBarMessage(ABM_SETPOS, ctypes.byref(abd))
+        
+        final_w = abd.rc.right - abd.rc.left
+        final_h = abd.rc.bottom - abd.rc.top
+        self.who_dock_window.geometry(f"{final_w}x{final_h}+{abd.rc.left}+{abd.rc.top}")
 
     def return_to_live(self):
         self.comms_mode = "live"
@@ -1228,57 +1318,237 @@ class M59Dashboard(tk.Tk):
             self.log_file_list.insert(tk.END, f)
 
     def setup_tab_gps(self):
-        """Creates the GPS Discovery tab."""
-        header = tk.Frame(self.tab_gps, bg="#f0f0f0")
-        header.pack(fill="x", padx=10, pady=5)
-        tk.Label(header, text="World Map & GPS Discovery", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
-        
-        # --- Under Construction Banner ---
-        banner = tk.Frame(self.tab_gps, bg="#FFF9C4", bd=1, relief=tk.SOLID)
-        banner.pack(fill="x", padx=10, pady=5)
-        tk.Label(banner, text=" ⚠ FEATURE UNDER CONSTRUCTION ⚠ ", font=("Arial", 12, "bold"), bg="#FFF9C4", fg="#F57F17").pack(pady=5)
-        tk.Label(banner, text="This module is currently in development and is not yet ready for public testing.", 
-                 font=("Arial", 8, "italic"), bg="#FFF9C4", fg="#F57F17").pack(pady=(0, 5))
-        
-        cont = tk.Frame(self.tab_gps, bg="#f0f0f0")
-        cont.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        loc_f = tk.LabelFrame(cont, text=" Current Location ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        loc_f.pack(fill="x", padx=5, pady=5)
-        self.gps_loc_lbl = tk.Label(loc_f, text="Detecting...", font=("Consolas", 14, "bold"), fg="#1565C0", bg="#f0f0f0", pady=10)
-        self.gps_loc_lbl.pack(fill="x")
-        
-        stat_f = tk.Frame(cont, bg="#f0f0f0")
-        stat_f.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        left = tk.LabelFrame(stat_f, text=" Discovered Rooms ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        left.pack(side="left", fill="both", expand=True, padx=5)
-        self.gps_room_list = tk.Listbox(left, font=("Arial", 9), bg="white")
-        self.gps_room_list.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        right = tk.LabelFrame(stat_f, text=" Fast Transitions ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        right.pack(side="left", fill="both", expand=True, padx=5)
-        self.gps_trans_view = scrolledtext.ScrolledText(right, font=("Consolas", 9), bg="#1e1e1e", fg="#00FF00")
-        self.gps_trans_view.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        self.update_gps_ui()
+        """Creates the enhanced GPS Navigation & Discovery tab."""
+        # Main container with two columns
+        main_cont = tk.Frame(self.tab_gps, bg="#f0f0f0")
+        main_cont.pack(fill="both", expand=True)
 
-    def update_gps_ui(self):
-        """Refreshes the GPS tab with current map data."""
-        self.gps_room_list.delete(0, tk.END)
-        for room in sorted(self.gps_manager.m59_map.keys()):
-            self.gps_room_list.insert(tk.END, room)
+        # --- LEFT COLUMN: Destination & Search ---
+        left_col = tk.Frame(main_cont, bg="#f0f0f0", width=300)
+        left_col.pack(side="left", fill="both", padx=10, pady=10)
+        left_col.pack_propagate(False)
+
+        tk.Label(left_col, text="🔍 Destination", font=("Arial", 11, "bold"), bg="#f0f0f0").pack(anchor="w")
         
-        self.gps_trans_view.config(state="normal")
-        self.gps_trans_view.delete("1.0", tk.END)
-        for room, data in sorted(self.gps_manager.m59_map.items()):
-            for conn, dur in data.get("connections", {}).items():
-                self.gps_trans_view.insert(tk.END, f"{room} -> {conn.split(':')[1]}: {dur}s\n")
-        self.gps_trans_view.config(state="disabled")
+        self.gps_search_var = tk.StringVar()
+        self.gps_search_var.trace_add("write", lambda *a: self.filter_gps_destinations())
+        search_ent = tk.Entry(left_col, textvariable=self.gps_search_var, font=("Arial", 10))
+        search_ent.pack(fill="x", pady=5)
+        
+        # Current Location Display
+        self.gps_loc_f = tk.Frame(left_col, bg="#E3F2FD", padx=5, pady=5, bd=1, relief=tk.SOLID)
+        self.gps_loc_f.pack(fill="x", pady=(5, 10))
+        tk.Label(self.gps_loc_f, text="📍 YOU ARE HERE:", font=("Arial", 8, "bold"), bg="#E3F2FD", fg="#1976D2").pack(anchor="w")
+        self.gps_current_loc_lbl = tk.Label(self.gps_loc_f, text="Unknown", font=("Arial", 10, "bold"), bg="#E3F2FD", fg="#0D47A1", wraplength=250)
+        self.gps_current_loc_lbl.pack(anchor="w")
+        self.gps_loc_f.bind("<Configure>", self.on_gps_loc_resize)
+
+        # Results List
+        self.gps_dest_list = tk.Listbox(left_col, font=("Arial", 9), bg="white", selectmode="single")
+        self.gps_dest_list.pack(fill="both", expand=True, pady=5)
+        self.gps_dest_list.bind("<<ListboxSelect>>", self.on_gps_dest_select)
+        
+        btn_f = tk.Frame(left_col, bg="#f0f0f0")
+        btn_f.pack(fill="x")
+        
+        self.gps_start_btn = tk.Button(btn_f, text="START GPS", bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), 
+                                       command=self.start_navigation, state="disabled")
+        self.gps_start_btn.pack(side="left", fill="x", expand=True, padx=(0,2))
+        
+        self.gps_stop_btn = tk.Button(btn_f, text="STOP", bg="#f44336", fg="white", font=("Arial", 10, "bold"), 
+                                      command=self.stop_navigation, state="disabled")
+        self.gps_stop_btn.pack(side="left", fill="x", expand=True, padx=(2,0))
+
+        # --- RIGHT COLUMN: Directions & Map ---
+        right_col = tk.Frame(main_cont, bg="#f0f0f0")
+        right_col.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+        # Current Step Banner
+        step_f = tk.LabelFrame(right_col, text=" NEXT STEP ", bg="#f0f0f0", font=("Arial", 10, "bold"), fg="#1565C0")
+        step_f.pack(fill="x", pady=(0, 10))
+        
+        self.gps_instruction_lbl = tk.Label(step_f, text="Select a destination to begin...", 
+                                            font=("Arial", 14, "bold"), fg="#212121", bg="white", 
+                                            wraplength=600, justify="center", height=3)
+        self.gps_instruction_lbl.pack(fill="x", padx=10, pady=10)
+
+        # Route Preview
+        route_f = tk.LabelFrame(right_col, text=" Route Preview ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        route_f.pack(fill="both", expand=True)
+        
+        self.gps_route_view = scrolledtext.ScrolledText(route_f, font=("Consolas", 10), bg="#1e1e1e", fg="#00FF00")
+        self.gps_route_view.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # --- FOOTER: Beta Disclaimer ---
+        footer = tk.Frame(self.tab_gps, bg="#FFF9C4", bd=1, relief=tk.SOLID)
+        footer.pack(fill="x", side="bottom", padx=10, pady=5)
+        
+        tk.Label(footer, text=" ⚠ BETA: GPS Navigation is under development. Map data may be incomplete.", 
+                 font=("Arial", 9, "bold"), bg="#FFF9C4", fg="#F57F17").pack(side="left", padx=10, pady=5)
+        
+        import webbrowser
+        btn = tk.Button(footer, text="Report Issue on GitHub", font=("Arial", 8, "underline"), 
+                        fg="#1565C0", bg="#FFF9C4", bd=0, cursor="hand2",
+                        command=lambda: webbrowser.open("https://github.com/subvhome/m59-companion/issues/new"))
+        btn.pack(side="right", padx=10)
+
+        # Initial data load
+        self.gps_all_options = self.gps_manager.get_room_options()
+        self.filter_gps_destinations()
+
+    def filter_gps_destinations(self):
+        """Updates the destination listbox based on search query."""
+        query = self.gps_search_var.get().lower()
+        self.gps_dest_list.delete(0, tk.END)
+        self.gps_current_matches = []
+        
+        for opt in self.gps_all_options:
+            if query in opt['display'].lower():
+                self.gps_dest_list.insert(tk.END, opt['display'])
+                self.gps_current_matches.append(opt)
+
+    def on_gps_dest_select(self, event):
+        """Handles selection of a destination from the list."""
+        idx = self.gps_dest_list.curselection()
+        if idx:
+            self.gps_start_btn.config(state="normal")
+
+    def start_navigation(self, target_rid=None):
+        """Calculates and starts a new navigation route."""
+        if target_rid is None:
+            idx = self.gps_dest_list.curselection()
+            if not idx: return
+            target = self.gps_current_matches[idx[0]]
+            target_rid = target['rid']
+        
+        self.gps_manager.current_destination_rid = target_rid
+        
+        # Resolve current location RID
+        cur_name = self.get_current_room()
+        start_rid = self.gps_manager.resolve_name_to_rid(cur_name)
+        
+        if not start_rid:
+            self.gps_log(f"Error: Cannot resolve current location RID for '{cur_name}'")
+            return
+            
+        path = self.gps_manager.find_path(start_rid, target_rid)
+        if path is not None:
+            self.gps_manager.current_path = path
+            self.gps_manager.current_step_index = 0
+            self.gps_start_btn.config(text="RECALCULATING..." if self.gps_manager.current_path else "START GPS", state="disabled")
+            self.gps_stop_btn.config(state="normal")
+            self.update_gps_navigation_ui()
+            logger.info(f"GPS: Started navigation to RID {target_rid}")
+        else:
+            self.gps_instruction_lbl.config(text="NO PATH FOUND", fg="#f44336")
+            logger.error(f"GPS: No path found from {start_rid} to {target_rid}")
+
+    def stop_navigation(self):
+        """Clears navigation state."""
+        self.gps_manager.current_destination_rid = None
+        self.gps_manager.current_path = []
+        self.gps_instruction_lbl.config(text="Select a destination to begin...", fg="#212121")
+        self.gps_route_view.config(state="normal")
+        self.gps_route_view.delete("1.0", tk.END)
+        self.gps_route_view.config(state="disabled")
+        self.gps_stop_btn.config(state="disabled")
+        self.gps_start_btn.config(text="START GPS", state="normal")
+
+    def update_gps_navigation_ui(self):
+        """Updates the labels and path preview for active navigation."""
+        path = self.gps_manager.current_path
+        step_idx = self.gps_manager.current_step_index
+        
+        self.gps_route_view.config(state="normal")
+        self.gps_route_view.delete("1.0", tk.END)
+        
+        if not path:
+            self.gps_instruction_lbl.config(text="You have arrived at your destination!", fg="#4CAF50")
+            self.gps_route_view.insert(tk.END, "--- Destination Reached ---")
+            self.gps_route_view.config(state="disabled")
+            return
+
+        # Current instruction
+        from_rid, exit_info = path[step_idx]
+        instr = self.gps_manager.get_friendly_instruction(from_rid, exit_info)
+        self.gps_instruction_lbl.config(text=instr, fg="#1565C0")
+        
+        # Full path preview
+        for i, (rid, info) in enumerate(path):
+            prefix = " >> " if i == step_idx else "    "
+            room_name = self.gps_manager.dataset.get(rid, {}).get('name', 'Unknown')
+            dest_name = self.gps_manager.dataset.get(info['to_rid'], {}).get('name', 'Unknown')
+            self.gps_route_view.insert(tk.END, f"{prefix}{i+1}. {room_name} -> {dest_name}\n")
+            
+        self.gps_route_view.config(state="disabled")
+        self.refresh_who_footer()
+
+    def monitor_gps_navigation(self, current_room_name):
+        """Handles path advancement and automatic recalculation."""
+        # Update current location display
+        self.gps_current_loc_lbl.config(text=current_room_name)
+        
+        if not self.gps_manager.current_destination_rid:
+            return
+
+        # Always update RID tracking
+        current_rid = self.gps_manager.resolve_name_to_rid(current_room_name)
+        
+        if not self.gps_manager.current_path:
+            return
+
+        path = self.gps_manager.current_path
+        step_idx = self.gps_manager.current_step_index
+        
+        # Check if we arrived at the NEXT room in the sequence
+        next_room_rid = path[step_idx][1]['to_rid']
+        next_room_name = self.gps_manager.dataset.get(next_room_rid, {}).get('name')
+        
+        if current_room_name.lower() == next_room_name.lower():
+            # Advance step
+            self.gps_manager.current_step_index += 1
+            if self.gps_manager.current_step_index >= len(path):
+                # Arrived!
+                self.gps_manager.current_path = []
+                logger.info("GPS: Arrived at destination.")
+            else:
+                logger.info(f"GPS: Advanced to step {self.gps_manager.current_step_index + 1}")
+            self.update_gps_navigation_ui()
+            return
+
+        # Check if we moved to a room that IS in the current room list (the 'from' of this step)
+        curr_step_from_rid = path[step_idx][0]
+        curr_step_from_name = self.gps_manager.dataset.get(curr_step_from_rid, {}).get('name')
+        
+        if current_room_name.lower() == curr_step_from_name.lower():
+            # We are still in the correct starting room for this step
+            return
+
+        # If we are in a room that is neither the current step's 'from' nor 'to', we might be off-track
+        # Check if we jumped ahead in the path (shortcuts)
+        for i in range(step_idx + 1, len(path)):
+            check_rid = path[i][1]['to_rid']
+            if current_room_name.lower() == self.gps_manager.dataset.get(check_rid, {}).get('name', '').lower():
+                self.gps_manager.current_step_index = i + 1
+                if self.gps_manager.current_step_index >= len(path):
+                    self.gps_manager.current_path = []
+                self.update_gps_navigation_ui()
+                logger.info(f"GPS: Detected shortcut to step {i+1}")
+                return
+
+        # Truly off-track. Wait 2 seconds before recalculating to avoid noise
+        if not hasattr(self, 'gps_off_track_time'):
+            self.gps_off_track_time = time.time()
+            
+        if time.time() - self.gps_off_track_time > 2.0:
+            logger.info(f"GPS: Off-track detected ({current_room_name}). Recalculating...")
+            self.start_navigation(target_rid=self.gps_manager.current_destination_rid)
+            delattr(self, 'gps_off_track_time')
 
     def setup_tab_dashboard(self):
+        # --- 1. Top HUD (Vitals) ---
         top = tk.Frame(self.tab_dash, bg="#f0f0f0")
-        top.pack(fill="x", padx=10, pady=5)
+        top.pack(side="top", fill="x", padx=10, pady=5)
         self.hud_values = {}
         for s in ["HP", "MP", "VG"]:
             f = tk.Frame(top, bg="#f0f0f0")
@@ -1289,34 +1559,8 @@ class M59Dashboard(tk.Tk):
             self.hud_values[s] = val
         self.countdown_lbl = tk.Label(top, text="10s", font=("Arial", 8), bg="#f0f0f0", fg="gray")
         self.countdown_lbl.pack(side="right", padx=10)
-        grid = tk.Frame(self.tab_dash, bg="#f0f0f0")
-        grid.pack(fill="both", expand=True, padx=10, pady=5)
-        attr_col = tk.LabelFrame(grid, text=" Attributes ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        attr_col.pack(side="left", fill="both", expand=False, padx=5)
-        self.attr_labels = {}
-        for a in ["Might", "Intellect", "Stamina", "Agility", "Mysticism", "Aim", "Karma"]:
-            f = tk.Frame(attr_col, bg="#f0f0f0")
-            f.pack(fill="x", pady=4, padx=5)
-            tk.Label(f, text=f"{a}:", font=("Arial", 10), bg="#f0f0f0", width=10, anchor="w").pack(side="left")
-            v = tk.Label(f, text="--", font=("Arial", 10, "bold"), bg="#f0f0f0", width=5, anchor="e")
-            v.pack(side="right")
-            self.attr_labels[a] = v
-        gains_col = tk.LabelFrame(grid, text=" Session Improves ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        gains_col.pack(side="left", fill="both", expand=True, padx=5)
-        self.gains_tree = ttk.Treeview(gains_col, columns=("Name", "Count", "Delta"), show="headings", height=10)
-        for c, w in [("Name", self.scale_px(120)), ("Count", self.scale_px(50)), ("Delta", self.scale_px(80))]:
-            self.gains_tree.heading(c, text=c)
-            self.gains_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
-        self.gains_tree.pack(fill="both", expand=True)
-        kills_col = tk.LabelFrame(grid, text=" Session Kills ", bg="#f0f0f0", font=("Arial", 10, "bold"))
-        kills_col.pack(side="left", fill="both", expand=True, padx=5)
-        self.kills_tree = ttk.Treeview(kills_col, columns=("Name", "Count"), show="headings", height=10)
-        for c, w in [("Name", self.scale_px(120)), ("Count", self.scale_px(60))]:
-            self.kills_tree.heading(c, text=c)
-            self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
-        self.kills_tree.pack(fill="both", expand=True)
-
-        # --- Manual Sync Section ---
+        
+        # --- 2. Bottom Sync Section (Pack first to keep pinned) ---
         sync_f = tk.Frame(self.tab_dash, bg="#f0f0f0")
         sync_f.pack(side="bottom", fill="x", padx=10, pady=10)
         self.manual_sync_btn = tk.Button(
@@ -1325,6 +1569,44 @@ class M59Dashboard(tk.Tk):
             state="disabled", font=("Arial", 13, "bold"), pady=10
         )
         self.manual_sync_btn.pack(fill="x")
+
+        # --- 3. Expanding Middle Grid ---
+        grid = tk.Frame(self.tab_dash, bg="#f0f0f0")
+        grid.pack(side="top", fill="both", expand=True, padx=10, pady=5)
+        grid.columnconfigure(1, weight=1) # Gains list
+        grid.columnconfigure(2, weight=1) # Kills list
+        grid.rowconfigure(0, weight=1)    # Vertical expansion
+        
+        attr_col = tk.LabelFrame(grid, text=" Attributes ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        attr_col.grid(row=0, column=0, sticky="nsw", padx=5)
+        self.attr_labels = {}
+        for a in ["Might", "Intellect", "Stamina", "Agility", "Mysticism", "Aim", "Karma"]:
+            f = tk.Frame(attr_col, bg="#f0f0f0")
+            f.pack(fill="x", pady=4, padx=5)
+            tk.Label(f, text=f"{a}:", font=("Arial", 10), bg="#f0f0f0", width=10, anchor="w").pack(side="left")
+            v = tk.Label(f, text="--", font=("Arial", 10, "bold"), bg="#f0f0f0", width=5, anchor="e")
+            v.pack(side="right")
+            self.attr_labels[a] = v
+
+        gains_col = tk.LabelFrame(grid, text=" Session Improves ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        gains_col.grid(row=0, column=1, sticky="nsew", padx=5)
+        self.gains_tree = ttk.Treeview(gains_col, columns=("Name", "Count", "Delta"), show="headings", height=5)
+        for c, w in [("Name", self.scale_px(120)), ("Count", self.scale_px(50)), ("Delta", self.scale_px(80))]:
+            self.gains_tree.heading(c, text=c)
+            self.gains_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
+        self.gains_tree.pack(fill="both", expand=True)
+        
+        kills_col = tk.LabelFrame(grid, text=" Session Kills ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+        kills_col.grid(row=0, column=2, sticky="nsew", padx=5)
+        self.kills_tree = ttk.Treeview(kills_col, columns=("Name", "Count"), show="headings", height=5)
+        for c, w in [("Name", self.scale_px(120)), ("Count", self.scale_px(60))]:
+            self.kills_tree.heading(c, text=c)
+            self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
+        self.kills_tree.pack(fill="both", expand=True)
+
+    def on_gps_loc_resize(self, event):
+        """Dynamically adjusts text wrapping for the current location label."""
+        self.gps_current_loc_lbl.config(wraplength=event.width - 20)
 
     def setup_tab_progression(self):
         ctrl = tk.Frame(self.tab_prog, bg="#f0f0f0")
@@ -1639,7 +1921,8 @@ class M59Dashboard(tk.Tk):
                     # Enable the sync button to indicate a refresh is needed
                     self.manual_sync_btn.config(state="normal", text=" ↻ FULL SYNC REQUIRED ")
                 
-                self.gps_loc_lbl.config(text=room)
+                self.gps_current_loc_lbl.config(text=room)
+                self.monitor_gps_navigation(room)
                 if self.gps_discovery_enabled.get():
                     self.monitor_gps_discovery(room)
 
@@ -1823,10 +2106,15 @@ class M59Dashboard(tk.Tk):
         threading.Thread(target=loop, daemon=True).start()
 
     def on_gain_detected(self, g):
+        # 1. Update Dashboard List
         if self.gains_tree.exists(g['name']):
             self.gains_tree.item(g['name'], values=(g['name'], g['count'], g['delta']))
         else:
             self.gains_tree.insert("", "end", iid=g['name'], values=(g['name'], g['count'], "---"))
+            
+        # 2. Update Session-wide Stats
+        self.total_improves += 1
+        self.refresh_who_footer()
 
     def on_kill_detected(self, r):
         cat = r['category']

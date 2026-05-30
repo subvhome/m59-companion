@@ -926,6 +926,14 @@
           15,
           24
         ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_DUKE5",
+        "to_pos": [
+          null,
+          null
+        ]
       }
     ]
   },
@@ -996,6 +1004,30 @@
           5,
           32
         ]
+      }
+    ]
+  },
+  "RID_GALLERY": {
+    "name": "object gallery",
+    "rid_num": 903,
+    "file": "kod\\object\\active\\holder\\room\\gallery.kod",
+    "teleport": [
+      16,
+      8
+    ],
+    "exits": [
+      {
+        "type": "point",
+        "from": [
+          16,
+          13
+        ],
+        "to_rid": "RID_NEST1",
+        "to_pos": [
+          4,
+          17
+        ],
+        "object": "SpiderTree"
       }
     ]
   },
@@ -1081,6 +1113,18 @@
         "to_pos": [
           43,
           3
+        ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          30,
+          20
+        ],
+        "to_rid": "RID_G9",
+        "to_pos": [
+          null,
+          null
         ]
       }
     ]
@@ -1178,6 +1222,26 @@
         "to_pos": [
           1,
           37
+        ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          4,
+          13
+        ],
+        "to_rid": "RID_KOC_NORTH",
+        "to_pos": [
+          null,
+          null
+        ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_KOC_INN",
+        "to_pos": [
+          null,
+          null
         ]
       }
     ]
@@ -5899,7 +5963,11 @@
       },
       {
         "type": "manual",
-        "to_rid": "RID_C5",
+        "from": [
+          32,
+          66
+        ],
+        "to_rid": "RID_C4",
         "to_pos": [
           null,
           null
@@ -5907,7 +5975,11 @@
       },
       {
         "type": "manual",
-        "to_rid": "RID_C4",
+        "from": [
+          83,
+          48
+        ],
+        "to_rid": "RID_C5",
         "to_pos": [
           null,
           null
@@ -6157,7 +6229,11 @@
       },
       {
         "type": "manual",
-        "to_rid": "RID_TEMPLE",
+        "from": [
+          35,
+          9
+        ],
+        "to_rid": "RID_MARION",
         "to_pos": [
           null,
           null
@@ -6165,7 +6241,11 @@
       },
       {
         "type": "manual",
-        "to_rid": "RID_MARION",
+        "from": [
+          18,
+          13
+        ],
+        "to_rid": "RID_TEMPLE",
         "to_pos": [
           null,
           null
@@ -6810,14 +6890,6 @@
           7,
           59
         ]
-      },
-      {
-        "type": "manual",
-        "to_rid": "RID_E5",
-        "to_pos": [
-          null,
-          null
-        ]
       }
     ]
   },
@@ -7099,6 +7171,18 @@
           49,
           15
         ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          26,
+          50
+        ],
+        "to_rid": "RID_GUILDH3",
+        "to_pos": [
+          null,
+          null
+        ]
       }
     ]
   },
@@ -7113,6 +7197,10 @@
     "exits": [
       {
         "type": "manual",
+        "from": [
+          19,
+          7
+        ],
         "to_rid": "RID_CAVE2",
         "to_pos": [
           null,
@@ -7121,22 +7209,10 @@
       },
       {
         "type": "manual",
-        "to_rid": "RID_NEST1",
-        "to_pos": [
-          null,
-          null
-        ]
-      },
-      {
-        "type": "manual",
-        "to_rid": "RID_FOREST3",
-        "to_pos": [
-          null,
-          null
-        ]
-      },
-      {
-        "type": "manual",
+        "from": [
+          16,
+          40
+        ],
         "to_rid": "RID_FOREST1",
         "to_pos": [
           null,
@@ -7145,6 +7221,34 @@
       },
       {
         "type": "manual",
+        "from": [
+          33,
+          57
+        ],
+        "to_rid": "RID_FOREST3",
+        "to_pos": [
+          null,
+          null
+        ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          47,
+          14
+        ],
+        "to_rid": "RID_NEST1",
+        "to_pos": [
+          null,
+          null
+        ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          55,
+          46
+        ],
         "to_rid": "RID_FOREST4",
         "to_pos": [
           null,
@@ -7176,6 +7280,10 @@
       },
       {
         "type": "manual",
+        "from": [
+          39,
+          19
+        ],
         "to_rid": "RID_FOREST4",
         "to_pos": [
           null,
@@ -7211,14 +7319,10 @@
     "exits": [
       {
         "type": "manual",
-        "to_rid": "RID_FOREST3",
-        "to_pos": [
-          null,
-          null
-        ]
-      },
-      {
-        "type": "manual",
+        "from": [
+          8,
+          46
+        ],
         "to_rid": "RID_FOREST2",
         "to_pos": [
           null,
@@ -7227,6 +7331,22 @@
       },
       {
         "type": "manual",
+        "from": [
+          57,
+          49
+        ],
+        "to_rid": "RID_FOREST3",
+        "to_pos": [
+          null,
+          null
+        ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          48,
+          3
+        ],
         "to_rid": "RID_FOREST5",
         "to_pos": [
           null,
@@ -7434,18 +7554,6 @@
     ],
     "exits": [
       {
-        "type": "point",
-        "from": [
-          28,
-          30
-        ],
-        "to_rid": "RID_NECROAREA1",
-        "to_pos": [
-          6,
-          18
-        ]
-      },
-      {
         "type": "edge",
         "direction": "LEAVE_WEST",
         "to_rid": "RID_F8",
@@ -7479,15 +7587,6 @@
         "to_pos": [
           2,
           61
-        ]
-      },
-      {
-        "type": "edge",
-        "direction": "LEAVE_EAST",
-        "to_rid": "RID_NECROAREA1",
-        "to_pos": [
-          7,
-          2
         ]
       }
     ]
@@ -7536,6 +7635,15 @@
           46,
           18
         ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_NECROAREA1",
+        "to_pos": [
+          null,
+          null
+        ],
+        "object": "Lever Puzzle"
       }
     ]
   },
@@ -7721,11 +7829,28 @@
       },
       {
         "type": "manual",
+        "from": [
+          18,
+          7
+        ],
         "to_rid": "RID_CAVE2",
         "to_pos": [
           null,
           null
         ]
+      },
+      {
+        "type": "point",
+        "from": [
+          null,
+          null
+        ],
+        "to_rid": "RID_NEST1",
+        "to_pos": [
+          4,
+          17
+        ],
+        "object": "SpiderTree"
       }
     ]
   },
@@ -7949,20 +8074,19 @@
       },
       {
         "type": "edge",
-        "direction": "LEAVE_EAST",
-        "to_rid": "RID_I8",
-        "to_pos": [
-          60,
-          23
-        ]
-      },
-      {
-        "type": "edge",
         "direction": "LEAVE_SOUTH",
         "to_rid": "RID_H9",
         "to_pos": [
           21,
           43
+        ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_CANYON2",
+        "to_pos": [
+          null,
+          null
         ]
       }
     ]
@@ -8867,6 +8991,14 @@
           3,
           21
         ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_GUILDH15",
+        "to_pos": [
+          null,
+          null
+        ]
       }
     ]
   },
@@ -8881,7 +9013,61 @@
     "exits": [
       {
         "type": "manual",
+        "from": [
+          26,
+          14
+        ],
         "to_rid": "RID_CAVE2",
+        "to_pos": [
+          null,
+          null
+        ]
+      },
+      {
+        "type": "manual",
+        "from": [
+          2,
+          19
+        ],
+        "to_rid": "RID_CAVE2",
+        "to_pos": [
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  "RID_OLD_BAR_NORTH": {
+    "name": "Historic North Barloque",
+    "rid_num": 9002,
+    "file": "kod\\object\\active\\holder\\room\\monsroom\\oldbarln.kod",
+    "teleport": [
+      25,
+      42
+    ],
+    "exits": [
+      {
+        "type": "manual",
+        "to_rid": "RID_OLD_BAR_SOUTH",
+        "to_pos": [
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  "RID_OLD_BAR_SOUTH": {
+    "name": "Historic South Barloque",
+    "rid_num": 9003,
+    "file": "kod\\object\\active\\holder\\room\\monsroom\\oldbarls.kod",
+    "teleport": [
+      34,
+      43
+    ],
+    "exits": [
+      {
+        "type": "manual",
+        "to_rid": "RID_OLD_BAR_NORTH",
         "to_pos": [
           null,
           null
@@ -9238,6 +9424,14 @@
         "to_pos": [
           35,
           67
+        ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_ORC_PIT_A",
+        "to_pos": [
+          null,
+          null
         ]
       }
     ]
@@ -9730,6 +9924,14 @@
         "to_pos": [
           16,
           2
+        ]
+      },
+      {
+        "type": "manual",
+        "to_rid": "RID_KA0",
+        "to_pos": [
+          null,
+          null
         ]
       }
     ]
@@ -11577,7 +11779,11 @@
     "exits": [
       {
         "type": "manual",
-        "to_rid": "RID_TEMPLE",
+        "from": [
+          7,
+          58
+        ],
+        "to_rid": "RID_FOREST4",
         "to_pos": [
           null,
           null
@@ -11585,6 +11791,10 @@
       },
       {
         "type": "manual",
+        "from": [
+          36,
+          5
+        ],
         "to_rid": "RID_MARION",
         "to_pos": [
           null,
@@ -11593,7 +11803,11 @@
       },
       {
         "type": "manual",
-        "to_rid": "RID_FOREST4",
+        "from": [
+          17,
+          12
+        ],
+        "to_rid": "RID_TEMPLE",
         "to_pos": [
           null,
           null
@@ -11657,15 +11871,6 @@
       26
     ],
     "exits": [
-      {
-        "type": "edge",
-        "direction": "LEAVE_EAST",
-        "to_rid": "RID_I9",
-        "to_pos": [
-          67,
-          3
-        ]
-      },
       {
         "type": "edge",
         "direction": "LEAVE_WEST",
