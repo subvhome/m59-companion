@@ -71,6 +71,7 @@ from m59_calculator import SchoolCalculator
 from m59_vault import perform_vault_scan, find_nested_control
 from m59_updater import check_for_updates
 from m59_gps import GPSManager
+from m59_bank import BankManager
 from m59_lifecycle import InstanceManager
 
 SETTINGS_FILE = "gui_settings.json"
@@ -241,6 +242,8 @@ class M59Dashboard(tk.Tk):
         # Patterns & Subtraction List
         import re
         self.re_speech = re.compile(r'^(.*?) (?:broadcasts?|tells?|says?|yells?|sends?), "(.*)"$', re.I)
+        self.re_bank_total = re.compile(r'^(.*?) tells you, ".*?(?:You have|You now have) (\d+) shillings in your account\."', re.I)
+        self.re_bank_withdraw = re.compile(r'^(.*?) tells you, "Here are your (\d+) shillings\. Thank you for your business\."', re.I)
         self.combat_verbs = {
             "wounds", "damages", "slays", "burns", "sears", "disfigures", "dissolves",
             "incinerates", "scorches", "chars", "singes", "electrocutes", "fries",
@@ -263,12 +266,11 @@ class M59Dashboard(tk.Tk):
         self.current_attributes = {}
         self.vault_data = {"barloque": [], "hungry": []}
         self.calculator = SchoolCalculator()
+        self.bank_manager = BankManager()
         self.sync_in_progress = False
 
         # --- Session Tracking Stats ---
         self.total_improves = 0
-        self.bank_mainland = "---"
-        self.bank_island = "---"
         self.who_footer_labels = {}
 
         # --- Layout ---
@@ -754,7 +756,7 @@ class M59Dashboard(tk.Tk):
         self.who_list_header.pack(fill="x", side="top")
         
         tk.Label(
-            self.who_list_header, text="Online Players", font=("Segoe UI", 10, "bold"), 
+            self.who_list_header, text="Status Dock", font=("Segoe UI", 10, "bold"), 
             bg="#1e1f22", fg="#4CAF50", pady=7, bd=0
         ).pack(side="left", padx=10)
         
@@ -1198,8 +1200,12 @@ class M59Dashboard(tk.Tk):
         
         self.who_footer_labels["gps"].config(text=gps_text)
         self.who_footer_labels["improves"].config(text=str(self.total_improves))
-        self.who_footer_labels["bank_m"].config(text=self.bank_mainland)
-        self.who_footer_labels["bank_i"].config(text=self.bank_island)
+        
+        # Bank Balances (Direct from BankManager)
+        m = self.bank_manager.balances['mainland']
+        i = self.bank_manager.balances['island']
+        self.who_footer_labels["bank_m"].config(text=f"{m:,}s")
+        self.who_footer_labels["bank_i"].config(text=f"{i:,}s")
 
     def update_appbar_pos(self, new_width):
         """Resizes the AppBar reservation and the dock window."""
@@ -1622,12 +1628,30 @@ class M59Dashboard(tk.Tk):
             self.prog_tree.column(c, width=w, anchor="center")
         self.prog_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
+    def update_vault_ui(self):
+        """Updates the bank balance displays in the Vault tab."""
+        if hasattr(self, 'bank_currency_lbl'):
+            m = self.bank_manager.balances['mainland']
+            i = self.bank_manager.balances['island']
+            self.bank_currency_lbl.config(text=f" Mainland: {m:,}s   |   Island: {i:,}s ")
+
     def setup_tab_vault(self):
         cont = tk.Frame(self.tab_vault, bg="#f0f0f0")
         cont.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # --- Bank Accounts Header ---
+        bank_f = tk.Frame(cont, bg="#E8F5E9", bd=1, relief=tk.SOLID)
+        bank_f.pack(fill="x", padx=5, pady=(0, 10))
+        tk.Label(bank_f, text="💰 BANK ACCOUNTS:", font=("Arial", 9, "bold"), bg="#E8F5E9", fg="#2E7D32").pack(side="left", padx=10, pady=10)
+        self.bank_currency_lbl = tk.Label(bank_f, text=" Mainland: 0s   |   Island: 0s ", font=("Consolas", 11, "bold"), bg="#E8F5E9", fg="#1B5E20")
+        self.bank_currency_lbl.pack(side="left", padx=10)
+        
+        vaults_cont = tk.Frame(cont, bg="#f0f0f0")
+        vaults_cont.pack(fill="both", expand=True)
+
         self.vault_widgets = {}
         for vt in ["barloque", "hungry"]:
-            f = tk.LabelFrame(cont, text=f" {vt.title()} Vault ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+            f = tk.LabelFrame(vaults_cont, text=f" {vt.title()} Vault ", bg="#f0f0f0", font=("Arial", 10, "bold"))
             f.pack(side="left", fill="both", expand=True, padx=5)
             row = tk.Frame(f, bg="#f0f0f0")
             row.pack(fill="x", padx=5, pady=5)
@@ -1646,6 +1670,8 @@ class M59Dashboard(tk.Tk):
             sl = tk.Label(f, text="No scan data", font=("Arial", 7, "italic"), bg="#f0f0f0", fg="gray")
             sl.pack(side="bottom", fill="x")
             self.vault_widgets[vt] = {"tree": tr, "filter_var": fv, "status_lbl": sl, "sync_btn": btn}
+        
+        self.update_vault_ui()
 
     def setup_tab_book(self):
         cont = tk.Frame(self.tab_book, bg="#f0f0f0")
@@ -1679,9 +1705,9 @@ class M59Dashboard(tk.Tk):
         pg.pack(fill="x")
         tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
         
-        wr_g = tk.LabelFrame(c, text=" Who List Panel ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        wr_g = tk.LabelFrame(c, text=" Status Dock Side Panel ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         wr_g.pack(fill="x", pady=10)
-        tk.Checkbutton(wr_g, text="Show Who List Side Panel", variable=self.who_list_enabled, 
+        tk.Checkbutton(wr_g, text="Show Status Dock Panel", variable=self.who_list_enabled, 
                        command=self.update_who_list_visibility, bg="#f0f0f0").pack(anchor="w")
         
         tk.Checkbutton(wr_g, text="Dock to Desktop (Stand-alone)", variable=self.who_list_docked,
@@ -1816,7 +1842,12 @@ class M59Dashboard(tk.Tk):
                     self.char_name = new_name
                     self.after(0, lambda: self.title(f"M59 Companion v{self.version} - {self.char_name}"))
                 
-                # 2. Tab Dance & Scrape
+                # 2. Bank Balances
+                self.bank_manager.load_balances(self.char_name)
+                self.after(0, self.refresh_who_footer)
+                self.after(0, self.update_vault_ui)
+
+                # 3. Tab Dance & Scrape
                 logger.info("Sync: Starting Tab Dance & Scrape...")
                 mr = MemoryReader(self.pm_obj)
                 kn, st = cycle_tabs_and_scrape(self.main_hwnd, mr)
@@ -1878,6 +1909,11 @@ class M59Dashboard(tk.Tk):
             self.load_vault_cache()
             self.load_kill_book()
             self.refresh_log_list()
+            
+            # Initialize Bank Manager for this character
+            self.bank_manager.load_balances(self.char_name)
+            self.refresh_who_footer()
+            self.update_vault_ui()
             
             if not self.pk_frame:
                 self.pk_frame = PKFrame(self, self.main_hwnd)
@@ -2066,6 +2102,12 @@ class M59Dashboard(tk.Tk):
                                     f.write(f"{ts} {l}\n")
                                     self.after(0, lambda ln=l: self.append_comms_line(ln))
                                     try:
+                                        # 1. Bank Balance Tracking
+                                        if self.bank_manager.process_line(l):
+                                            self.after(0, self.refresh_who_footer)
+                                            self.after(0, self.update_vault_ui)
+
+                                        # 2. Skill Improvement Tracking
                                         g = tr.process_line(l)
                                         if g:
                                             logger.info(f"ChatMonitor: Skill improvement: {g['name']}")
