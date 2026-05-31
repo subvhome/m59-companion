@@ -1,6 +1,6 @@
 # M59 Companion
 
-A lightweight, multi-instance companion tool for Meridian 59 designed to automate character tracking, progression math, and tactical awareness.
+The **M59 Companion** is an intelligent assistant and digital "heads-up display" (HUD) designed specifically for Meridian 59. It acts as a modern layer for the game, automating tedious tasks—like calculating progression goals or navigating the Meridian 59 realm—so you can focus on playing.
 
 [**Download Latest Release (EXE)**](https://github.com/subvhome/m59-companion/raw/main/dist/M59Companion.exe)
 
@@ -10,91 +10,80 @@ A lightweight, multi-instance companion tool for Meridian 59 designed to automat
 
 ### Main Dashboard
 ![Main Dashboard Interface](demo/main.gif)
-*Overview of the primary tactical HUD, including HP/MP/VG monitoring and session statistics.*
+*Overview of the primary tactical HUD, including vital monitoring and session statistics.*
 
 ### Live Tracker
 ![Live Tracker](demo/tracker.gif)
-*Real-time tracking of skill gains, hit point improvements, and session kill counts.*
+*Real-time tracking of skill improvements and session progress.*
 
 ### PK Alert System
 ![PK Alert](demo/PVP%20alert.gif)
-*I USED THE RAT IN THIS DEMO -- Configurable alerts that trigger when non-mob entities attack you. Works even when the app is in the background.*
+*Visual and audio alerts that trigger when you are attacked by other players.*
 
 ### Vault Manager
 ![Vault Manager](demo/Vault%20Management.gif)
-*Automated inventory scanning for the Barloque Vault. High-density dual-pane view for remote storage tracking.*
+*High-density searchable view for tracking your remote storage.*
 
 ---
 
-## Core Features
+## Key Features
 
-### 1. Tactical HUD (Dashboard)
-*   **Live Vitals:** Raw values for HP, MP, and VG refreshed every 10 seconds.
-*   **Static Attributes:** Instant view of Might, Intellect, Stamina, Agility, Mysticism, Aim, and Karma.
-*   **Session Gains:** Real-time list of every skill improved during your current session.
-*   **Quick Kills:** Dedicated column for monster and player kills in the current run.
-*   **Stable Layout:** A persistent footer status bar and reinforced UI that maintains visibility even when shrinking the window.
+### 1. School Progression & Skill Goals
+Plan your character's growth with precision.
+*   **Goal Tracking:** Automatically calculates the exact skill percentages you need to reach the next level in your fighter or magic school.
+*   **Real-Time Growth:** Tracks every "You have improved" message, giving you an instant session-wide total of your progress.
+*   **Knowledge Sync:** A "one-click" sync cycles your in-game tabs to refresh your entire skill list in seconds.
 
-### 2. Unified Communications Center
-*   **Combat Subtraction Filter:** Uses high-efficiency logic (derived from the official Blakod source) to strip battle spam from your social feed.
-*   **Real-time Channels:** Automatic sorting of incoming text into dedicated channels:
-    *   **Clean Feed:** Social and System messages only.
-    *   **Tells:** Dedicated Private Message tracker.
-    *   **Broadcasts:** Global chat and Yells.
-    *   **Social:** Local 'Says' and Emotes.
-*   **Historical Log Browser:** Integrated directly into the comms center; switch between live feeds and your entire log library without leaving the tab.
+### 2. Status Dock (Players Online)
+A high-visibility sidebar that keeps you connected to the world and your session stats.
+*   **Live Player List:** Shows everyone currently online, color-coded by their status (Innocent, Outlaw, Murderer, or Staff).
+*   **Desktop Docking:** "Pop" the dock out of the app to have it physically stick to the side of your monitor, keeping your stats in view even when the main app is hidden.
+*   **Session Summary:** A dedicated footer showing your next GPS turn, your total skill improves today, and your current wealth at a glance.
 
-### 3. The Kill Book (Eternal Trophies)
-*   **Historical Tally:** Persistent tracking of every creature and player you've ever slain.
-*   **Dual Pane:** Separate lists for Monsters vs. Players & Notables.
-*   **Comprehensive Database:** Includes rare variants (Xeochicatls, Skeletons, etc.) and "dead state" detection.
+### 3. Smart GPS & World Navigation
+The "Google Maps" of Meridian 59.
+*   **Automatic Tracking:** The app watches your game and always knows exactly where you are.
+*   **Turn-by-Turn Directions:** Search for any destination and receive specific instructions like *"Follow the path out the North side"* or *"Enter the portal to reach Tos."*
+*   **Intelligent Recalculation:** If you take a wrong turn or enter a tavern, the GPS automatically finds a new path from your new location.
+*   **Ambiguity Handling:** Helps you distinguish between identical room names by showing what they are near (e.g., *"The Sewers near Barloque"*).
 
-### 4. Live Population Tracker (Who List)
-*   **Integrated Sidebar:** A real-time list of online players visible directly in the dashboard.
-*   **Desktop Docking:** Pop the Who List out of the main window and dock it to the side of your screen for a persistent "at-a-glance" view.
-*   **Automatic Updates:** Silently monitors server population without interrupting your gameplay.
+### 4. Wealth & Bank Tracking
+A digital ledger for your hard-earned shillings.
+*   **Account Memory:** Automatically listens to your conversations with bankers and remembers your Mainland and Island totals.
+*   **Persistent Totals:** Your bank balances are saved locally per character, so they are waiting for you the next time you log in.
+*   **Live Updates:** Instantly updates your totals the moment you deposit or withdraw a single shilling.
 
-### 5. School Progression (Calculator)
-*   **Target Sums:** Uses the standard server advancement formula to show exactly what % sum you need for your next rank.
-*   **Tab Dance:** One-click automation to cycle your in-game tabs and refresh all knowledge.
-*   **Intellect Scaling:** Dynamically adjusts "Points Needed" based on your character's current Intellect.
+### 5. Automatic Vault Management
+Take the paperwork out of storage tracking.
+*   **Vault Scanning:** Visit a vault NPC and let the app scan your storage to record every item and quantity.
+*   **Searchable Inventory:** Filter through hundreds of items instantly from anywhere in the world to see what you have in remote storage.
+*   **Dual Support:** Full tracking for both the Barloque and Hungry Vaults.
 
-### 6. Vault Management
-*   **Automated Scanning:** Sends 'withdraw' commands and clicks through your vault to refresh quantities.
-*   **Dual Storage:** Dedicated support for Barloque and Hungry Vaults.
-*   **Instant Filter:** Search through large inventories instantly as you type.
+### 6. Safety & PVP Alerts
+A "safety siren" to protect you in dangerous areas.
+*   **PK Detection:** Monitors the environment for aggressive players targeting you.
+*   **Visual & Audio Alarms:** If a dangerous player attacks, the app flashes the edges of your screen bright red and plays a warning sound.
+
+### 7. Smart Communication & Logs
+A massive upgrade to the standard game chat.
+*   **Organized Feed:** Use the "Ribbon" to filter chat into categories like "Tells," "Shouts," or "System Messages" with one click.
+*   **Historical Archive:** Every word spoken is saved to a searchable local log, allowing you to read conversations from days or weeks ago.
+
+### 8. The Kill Book
+Your personal database and trophy room.
+*   **Career Tracking:** Keeps a permanent record of every creature or player you have ever defeated.
+*   **Session vs. All-Time:** See your kill count for the current session compared to your character's entire career.
 
 ---
 
 ## UI & Customization
-*   **Draggable Tabs:** A fully modular interface—click and drag any tab header to rearrange the dashboard layout to fit your workflow.
-*   **Orderly Startup:** A prioritized initialization sequence that handles updates and identity verification before loading heavy profile data, ensuring a lag-free experience.
-*   **Persistent Monitoring:** The chat and stat monitors automatically re-bind to the game client even after character logouts or reloads.
-
----
-
-## Diagnostic & Alert Tools
-*   **PK Alert System:** Configurable alarms (Sound + Visual Red Frame) that trigger when non-mob entities attack you. Now immune to fake '/emote' pranks via color-intent filtering.
-*   **World Map & GPS Discovery:** (Experimental) A live log of your movement across the world. Discover new rooms and track transitions as you travel.
-*   **Verbose Debug Mode:** A toggleable developer console that logs raw scraper data and internal progression calculations to both the terminal and `logs/companion_debug.log`.
-
----
-
-## Alert Settings
-Customize how you want to be notified of threats:
-*   **Global Toggle:** Enable or disable all PK alerts.
-*   **Custom Alarm:** Select any `.wav` file as your alarm sound.
-*   **Red Frame:** A thick visual bracket appears around your game window when attacked.
-
----
-
-## Coming Soon
-*   **GPS Navigation:** Select a destination and receive turn-by-turn directions as you move across screens.
-*   **Shortcut Keys:** Assign custom key combinations or mouse buttons to execute complex in-game actions.
+*   **Draggable Tabs:** Rearrange the dashboard layout by dragging tab headers to fit your workflow.
+*   **Dynamic Resizing:** The UI intelligently scales and wraps text to ensure information remains readable on any screen size.
+*   **Automatic Re-binding:** The companion automatically reconnects to your game even after logouts or crashes.
 
 ---
 
 ## Feedback & Suggestions
-We are always looking for ways to improve the Companion. If you have ideas or bug reports, please mail **MF DOOM** in-game with your suggestions.
+We are always looking for ways to improve the Companion. If you have ideas or bug reports, please [Report an Issue on GitHub](https://github.com/subvhome/m59-companion/issues) or mail **MF DOOM** in-game.
 
 *Created for the Meridian 59 community.*
