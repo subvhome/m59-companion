@@ -29,5 +29,33 @@
         "connections": {
             "Unknown:The Streets of Tos": 10.09
         }
+    },
+    "RID_TOS_INN": {
+        "connections": {
+            "Unknown:RID_TOS": 60.78
+        }
+    },
+    "RID_TOS": {
+        "connections": {
+            "Unknown:RID_DUKE1": 44.46,
+            "Unknown:RID_TOS_INN": 7.08
+        }
+    },
+    "RID_DUKE1": {
+        "connections": {
+            "Unknown:RID_DUKE2": 8.07,
+            "Unknown:RID_TOS": 10.09
+        }
+    },
+    "RID_DUKE2": {
+        "connections": {
+            "Unknown:RID_DUKE3": 16.18,
+            "Unknown:RID_DUKE1": 10.07
+        }
+    },
+    "RID_DUKE3": {
+        "connections": {
+            "Unknown:RID_DUKE2": 6.08
+        }
     }
 }

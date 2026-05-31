@@ -224,9 +224,8 @@ class M59Dashboard(tk.Tk):
         self.comms_mode = "live" # 'live' or 'history'
         # Initialize GPS with fallback logic
         map_p = "m59_map.json"
-        if not os.path.exists(map_p):
-            map_p = resource_path("m59_map.json")
-        self.gps_manager = GPSManager(map_path=map_p)
+        dataset_p = resource_path("meridian_rooms_dataset.json")
+        self.gps_manager = GPSManager(map_path=map_p, dataset_path=dataset_p)
         self.waiting_overlay = None
         
         # --- Lifecycle State ---
@@ -1340,6 +1339,7 @@ class M59Dashboard(tk.Tk):
         self.gps_search_var.trace_add("write", lambda *a: self.filter_gps_destinations())
         search_ent = tk.Entry(left_col, textvariable=self.gps_search_var, font=("Arial", 10))
         search_ent.pack(fill="x", pady=5)
+        search_ent.bind("<Return>", lambda e: self.start_navigation())
         
         # Current Location Display
         self.gps_loc_f = tk.Frame(left_col, bg="#E3F2FD", padx=5, pady=5, bd=1, relief=tk.SOLID)
@@ -1959,8 +1959,13 @@ class M59Dashboard(tk.Tk):
                 
                 self.gps_current_loc_lbl.config(text=room)
                 self.monitor_gps_navigation(room)
-                if self.gps_discovery_enabled.get():
-                    self.monitor_gps_discovery(room)
+                
+                # Always track travel times in background (Weighted Pathfinding)
+                was_t, msg = self.gps_manager.process_room_update(room)
+                if msg:
+                    # Log to console/debug only if debug is on or discovery is on
+                    if self.debug_enabled.get() or self.gps_discovery_enabled.get():
+                        self.gps_log(msg)
 
         except Exception as e:
             logger.debug(f"Title tracking error: {e}")
