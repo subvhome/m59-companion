@@ -95,21 +95,28 @@ def claim_pid(pid):
 def get_unclaimed_instances(target_name="Meridian.exe"):
     """
     Returns a list of dictionaries containing {pid, title, hwnd, char_name} 
-    for all game instances that are not currently locked by another companion.
+    for all unique game processes that are not currently locked.
+    Consolidates multiple windows per PID and prioritizes logged-in windows.
     """
     cleanup_stale_locks()
-    all_instances = []
+    
+    # Dictionary to collect the "best" window handle for each unique PID
+    instances_by_pid = {}
     
     def callback(hwnd, extra):
         if win32gui.IsWindowVisible(hwnd):
             text = win32gui.GetWindowText(hwnd)
             if "Meridian 59" in text:
-                _, pid = win32process.GetWindowThreadProcessId(hwnd)
-                # Check if it's actually the right process name
                 try:
+                    _, pid = win32process.GetWindowThreadProcessId(hwnd)
                     import psutil
                     if psutil.Process(pid).name().lower() == target_name.lower():
-                        all_instances.append({"pid": pid, "title": text, "hwnd": hwnd})
+                        # PRIORITY LOGIC:
+                        # 1. If we haven't seen this PID, add it.
+                        # 2. If we HAVE seen it, prefer a window that has " --- " (active character).
+                        is_logged_in = " --- " in text
+                        if pid not in instances_by_pid or (is_logged_in and " --- " not in instances_by_pid[pid]["title"]):
+                            instances_by_pid[pid] = {"pid": pid, "title": text, "hwnd": hwnd}
                 except:
                     pass
     
@@ -118,16 +125,16 @@ def get_unclaimed_instances(target_name="Meridian.exe"):
     # Filter only unclaimed ones and try to peek at character names
     from m59_scraper import capture_identity
     unclaimed = []
-    for i in all_instances:
-        if not is_pid_locked(i["pid"]):
+    
+    for pid, info in instances_by_pid.items():
+        if not is_pid_locked(pid):
             # Try to peek at character name without claiming
             try:
-                # We use capture_identity but note that this requires the window to be accessible
-                cname = capture_identity(i["hwnd"], i["pid"]) or "Unknown"
-                i["char_name"] = cname
+                cname = capture_identity(info["hwnd"], pid) or "Unknown"
+                info["char_name"] = cname
             except:
-                i["char_name"] = "Unknown"
-            unclaimed.append(i)
+                info["char_name"] = "Unknown"
+            unclaimed.append(info)
             
     return unclaimed
 

@@ -41,29 +41,32 @@ def get_text_from_hwnd(hwnd):
     return ""
 
 def capture_identity(hwnd, target_pid):
-    print("Searching for Character Identity (Bio window)...")
+    """
+    Triggers the in-game Bio window and extracts the character name.
+    """
+    # 1. Verify we are looking at the main game window
     face_btn = win32gui.GetDlgItem(hwnd, 5001)
-    if not face_btn: return None
+    if not face_btn or not win32gui.IsWindowVisible(face_btn):
+        logger.debug("Identity: Face button not visible. UI not ready.")
+        return None
 
+    # 2. Trigger the Bio Window
     win32gui.SendMessage(face_btn, win32con.WM_RBUTTONDOWN, win32con.MK_RBUTTON, 0)
     win32gui.SendMessage(face_btn, win32con.WM_RBUTTONUP, 0, 0)
     
     start_time = time.time()
     while time.time() - start_time < 5.0:
-        # Find all top-level dialogs belonging to the process
         bio_hwnd = [None]
         
         def find_bio_cb(h, param):
             if win32gui.IsWindowVisible(h) and win32gui.GetClassName(h) == "#32770":
                 _, p = win32process.GetWindowThreadProcessId(h)
                 if p == target_pid:
-                    # Check for Character Name control (ID 1011)
-                    # This ID is unique to the Bio/Identity dialog
                     try:
-                        name_ctrl = win32gui.GetDlgItem(h, 1011)
-                        if name_ctrl:
+                        # ID 1011 is the character name field in the Bio dialog
+                        if win32gui.GetDlgItem(h, 1011):
                             bio_hwnd[0] = h
-                            return False # Stop enumeration
+                            return False
                     except:
                         pass
             return True
@@ -74,10 +77,19 @@ def capture_identity(hwnd, target_pid):
             name_hwnd = win32gui.GetDlgItem(bio_hwnd[0], 1011)
             if name_hwnd:
                 name = get_text_from_hwnd(name_hwnd)
-                if name and name != "...":
+                logger.debug(f"Identity: Found window {bio_hwnd[0]}, text read: '{name}'")
+                
+                if name and name not in ["...", "Unknown", ""]:
+                    # SUCCESS: Clean up and return
                     win32gui.PostMessage(bio_hwnd[0], win32con.WM_CLOSE, 0, 0)
                     return name
+        
         time.sleep(0.5)
+        
+    # If we found a window but never got a valid name, close it anyway to clean up
+    if bio_hwnd[0]:
+        win32gui.PostMessage(bio_hwnd[0], win32con.WM_CLOSE, 0, 0)
+        
     return None
 
 # BlakGraph Constants

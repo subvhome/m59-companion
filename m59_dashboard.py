@@ -1799,18 +1799,9 @@ class M59Dashboard(tk.Tk):
                 logger.info(f"LifeCycle: Login detected via title: {title}")
                 self.hide_waiting_overlay()
                 
-                # Check if this is the first initialization of the session
-                is_first_init = (self.char_name == "Unknown")
-                
-                if is_first_init:
-                    logger.info("LifeCycle: Initializing first-run handshake.")
-                    self.char_name = capture_identity(self.main_hwnd, self.target_pid) or "Unknown"
-                    self._finalize_connection()
-                else:
-                    logger.info(f"LifeCycle: Character {self.char_name} logged back in.")
-                    self.status_var.set(f"Re-connected: {self.char_name} (Ready for Manual Sync)")
-                    self.manual_sync_btn.config(state="normal", text=" ↻ FULL SYNC REQUIRED ")
-                    self._post_connection_init(passive=True)
+                # Start the intelligent identity capture loop
+                logger.info("LifeCycle: Starting character identification handshake...")
+                self.attempt_identity_capture(0)
                 
                 # Trigger silent who update 1.5s after character is fully active in-game
                 self.after(1500, self.trigger_silent_who_update)
@@ -1820,6 +1811,29 @@ class M59Dashboard(tk.Tk):
         except Exception as e:
             logger.debug(f"LifeCycle: Error checking for login: {e}")
             self.after(2000, self.check_for_login)
+
+    def attempt_identity_capture(self, count):
+        """Intelligently retries character identification with adaptive delays and UI feedback."""
+        # Update status bar with progress
+        self.status_var.set(f"Finalizing Identity... (Attempt {count + 1}/10)")
+        
+        name = capture_identity(self.main_hwnd, self.target_pid)
+        
+        if name:
+            logger.info(f"LifeCycle: Identity verified as '{name}' on attempt {count + 1}.")
+            self.char_name = name
+            self._finalize_connection()
+            return
+
+        if count < 9: # Total 10 attempts
+            # Adaptive delay: Start fast, slow down to allow for server lag
+            delay = 1000 if count < 3 else 2000
+            logger.info(f"LifeCycle: Identity not ready (Attempt {count + 1}/10). Retrying in {delay/1000}s...")
+            self.after(delay, lambda: self.attempt_identity_capture(count + 1))
+        else:
+            logger.warn("LifeCycle: Identity capture failed after 10 attempts. Falling back to Unknown.")
+            self.char_name = "Unknown"
+            self._finalize_connection()
 
     def trigger_manual_sync(self):
         """Action for the manual sync button on the Dashboard."""
