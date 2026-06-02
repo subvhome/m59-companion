@@ -6,7 +6,9 @@ import win32con
 import win32gui
 import win32process
 import array
+import logging
 from m59_logging import get_logger
+from m59_utils import get_safe_name, find_game_hwnd
 
 logger = get_logger("vault")
 
@@ -64,6 +66,7 @@ def send_chat_command(main_hwnd, text):
     for char in text:
         win32gui.SendMessage(edit_hwnd, win32con.WM_CHAR, ord(char), 0)
     
+    win32gui.SendMessage(edit_hwnd, win32con.VK_RETURN, 0, 0) # Use simpler enter trigger if needed
     win32gui.SendMessage(edit_hwnd, win32con.WM_KEYDOWN, win32con.VK_RETURN, 0)
     win32gui.SendMessage(edit_hwnd, win32con.WM_KEYUP, win32con.VK_RETURN, 0)
     return True
@@ -145,7 +148,7 @@ def perform_vault_scan(main_hwnd, char_name, vault_type="barloque", progress_cb=
             progress_cb(i + 1, total_rows, item_name, qty)
 
     # Save Persistence
-    safe_name = char_name.replace(" ", "_")
+    safe_name = get_safe_name(char_name)
     save_path = f"logs/{safe_name}_vault_{vault_type}.json"
     if not os.path.exists("logs"): os.makedirs("logs")
     with open(save_path, "w") as f:
@@ -160,17 +163,11 @@ def run_standalone():
     pid = None
     try:
         pm, pid = establish_bridge()
-        def get_hwnd_cb(h, l):
-            _, p = win32process.GetWindowThreadProcessId(h)
-            if p == pid and win32gui.IsWindowVisible(h) and win32gui.GetWindowText(h).startswith("Meridian 59"):
-                l.append(h)
-        hwnds = []
-        win32gui.EnumWindows(get_hwnd_cb, hwnds)
-        if not hwnds: return
-        main_hwnd = hwnds[0]
+        main_hwnd = find_game_hwnd(pid)
+        if not main_hwnd: return
         char_name = capture_identity(main_hwnd, pid) or "Unknown"
         
-        inventory = perform_vault_scan(main_hwnd, char_name, lambda c, t, i, q: print(f"[{c}/{t}] {i} | {q}"))
+        inventory = perform_vault_scan(main_hwnd, char_name, "barloque", lambda c, t, i, q: print(f"[{c}/{t}] {i} | {q}"))
         if inventory:
             print(f"Success: Scanned {len(inventory)} items.")
     finally:

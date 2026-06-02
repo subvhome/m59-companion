@@ -1,33 +1,15 @@
 import os
 import json
 import re
-import sys
 from datetime import datetime
-
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+from m59_utils import resource_path, get_safe_name, RE_KILL, RE_HIT, RE_MISS
 
 class CombatMonitor:
     def __init__(self, char_name="Unknown"):
         self.char_name = char_name
-        self.safe_name = char_name.replace(" ", "_")
+        self.safe_name = get_safe_name(char_name)
         self.mob_set = self._load_moblist()
         self.kill_book = self._load_kill_book()
-        
-        # Patterns
-        # Matches: 'You killed the victim.'
-        self.kill_pattern = re.compile(r"^You killed (?:the )?(.*)\.$")
-        
-        # Defender Patterns (When someone hits you)
-        # Matches: Attacker [Verb] you with [his/her/its/their] [Weapon].
-        self.hit_pattern = re.compile(r"^(.*?) \w+ you with (?:his|her|its|their) .*\.$")
-        # Matches: You [Verb] Attacker's attack.
-        self.miss_pattern = re.compile(r"^You \w+ (.*?)'s attack\.$")
         
         # Entities that are NOT monsters but NOT players
         self.whitelist = {"town guard", "corpse", "reflection", "the town guard"}
@@ -83,7 +65,7 @@ class CombatMonitor:
         clean_line = line.strip()
 
         # 1. Check for Kills
-        kill_match = self.kill_pattern.match(clean_line)
+        kill_match = RE_KILL.match(clean_line)
         if kill_match:
             victim = kill_match.group(1).strip()
             if victim.endswith('.'): victim = victim[:-1]
@@ -109,11 +91,11 @@ class CombatMonitor:
 
         # 2. Check for Incoming Attacks (PK Detection)
         attacker = None
-        hit_match = self.hit_pattern.match(clean_line)
+        hit_match = RE_HIT.match(clean_line)
         if hit_match and " you with " in clean_line:
             attacker = hit_match.group(1).strip()
         else:
-            miss_match = self.miss_pattern.match(clean_line)
+            miss_match = RE_MISS.match(clean_line)
             if miss_match:
                 attacker = miss_match.group(1).strip()
 

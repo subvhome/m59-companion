@@ -38,7 +38,8 @@
     "RID_TOS": {
         "connections": {
             "Unknown:RID_DUKE1": 44.46,
-            "Unknown:RID_TOS_INN": 7.08
+            "Unknown:RID_TOS_INN": 3.06,
+            "Unknown:RID_EAST_TOS": 8.06
         }
     },
     "RID_DUKE1": {
@@ -56,6 +57,47 @@
     "RID_DUKE3": {
         "connections": {
             "Unknown:RID_DUKE2": 6.08
+        }
+    },
+    "RID_BAR_NORTH": {
+        "connections": {
+            "Unknown:RID_BAR_SOUTH": 12.11
+        }
+    },
+    "RID_BAR_SOUTH": {
+        "connections": {
+            "Unknown:RID_I3": 12.12
+        }
+    },
+    "RID_I3": {
+        "connections": {
+            "Unknown:RID_H3": 6.07
+        }
+    },
+    "RID_H3": {
+        "connections": {
+            "Unknown:RID_H4": 5.03
+        }
+    },
+    "RID_H4": {
+        "connections": {
+            "Unknown:RID_H5": 15.15
+        }
+    },
+    "RID_H5": {
+        "connections": {
+            "Unknown:RID_H6": 12.15
+        }
+    },
+    "RID_H6": {
+        "connections": {
+            "Unknown:RID_TOS": 9.07
+        }
+    },
+    "RID_EAST_TOS": {
+        "connections": {
+            "Unknown:RID_TOS_ARENA2": 5.06,
+            "Unknown:RID_TOS": 6.06
         }
     }
 }

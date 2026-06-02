@@ -1,17 +1,14 @@
 import os
 import json
-import re
 import logging
+from m59_utils import get_safe_name, RE_BANK_TOTAL, RE_BANK_WITHDRAW
 
-logger = logging.getLogger("dashboard")
+logger = logging.getLogger("m59.bank")
 
 class BankManager:
     def __init__(self):
         self.balances = {"mainland": 0, "island": 0}
         self.current_char = None
-        
-        self.re_total = re.compile(r'(.*?) tells you, "(?:Thank you for your deposit\.\s+)?You (?:now )?have (\d+) shillings in your account\."', re.I)
-        self.re_withdraw = re.compile(r'(.*?) tells you, "Here are your (\d+) shillings\. Thank you for your business\."', re.I)
 
     def load_balances(self, char_name):
         """Loads persistent balances for a specific character."""
@@ -19,8 +16,8 @@ class BankManager:
             return
             
         self.current_char = char_name
-        sn = char_name.replace(" ", "_")
-        p = f"logs/{sn}_bank.json"
+        safe_n = get_safe_name(char_name)
+        p = f"logs/{safe_n}_bank.json"
         
         if os.path.exists(p):
             try:
@@ -37,8 +34,8 @@ class BankManager:
         if not self.current_char or self.current_char == "Unknown":
             return
             
-        sn = self.current_char.replace(" ", "_")
-        p = f"logs/{sn}_bank.json"
+        safe_n = get_safe_name(self.current_char)
+        p = f"logs/{safe_n}_bank.json"
         
         try:
             os.makedirs("logs", exist_ok=True)
@@ -52,7 +49,7 @@ class BankManager:
         changed = False
         
         # 1. Check for Total Balance / Deposit Result
-        m = self.re_total.search(line)
+        m = RE_BANK_TOTAL.search(line)
         if m:
             npc, amount = m.groups()
             bank_type = self._get_bank_type(npc)
@@ -65,7 +62,7 @@ class BankManager:
         
         # 2. Check for Withdrawal
         else:
-            m = self.re_withdraw.search(line)
+            m = RE_BANK_WITHDRAW.search(line)
             if m:
                 npc, amount = m.groups()
                 bank_type = self._get_bank_type(npc)

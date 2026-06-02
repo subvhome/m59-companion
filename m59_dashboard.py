@@ -63,6 +63,11 @@ from m59_logging import setup_logging, get_logger
 logger = get_logger("dashboard")
 
 # Import modules
+from m59_utils import (
+    resource_path, get_safe_name, find_game_hwnd, 
+    GAME_EXE, GAME_TITLE_BASE, LOGIN_MARKER,
+    RE_SPEECH, RE_BANK_TOTAL, RE_BANK_WITHDRAW
+)
 from m59_bridge import establish_bridge, release_pid, find_available_instance, claim_pid, get_unclaimed_instances
 from m59_scraper import capture_identity, get_blakgraph_stats, cycle_tabs_and_scrape, get_text_from_hwnd, MemoryReader
 from m59_tracker import SessionTracker
@@ -75,15 +80,6 @@ from m59_bank import BankManager
 from m59_lifecycle import InstanceManager
 
 SETTINGS_FILE = "gui_settings.json"
-
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
 
 class DraggableNotebook(ttk.Notebook):
     """A ttk.Notebook with drag-and-drop tab reordering."""
@@ -239,10 +235,9 @@ class M59Dashboard(tk.Tk):
         )
         
         # Patterns & Subtraction List
-        import re
-        self.re_speech = re.compile(r'^(.*?) (?:broadcasts?|tells?|says?|yells?|sends?), "(.*)"$', re.I)
-        self.re_bank_total = re.compile(r'^(.*?) tells you, ".*?(?:You have|You now have) (\d+) shillings in your account\."', re.I)
-        self.re_bank_withdraw = re.compile(r'^(.*?) tells you, "Here are your (\d+) shillings\. Thank you for your business\."', re.I)
+        self.re_speech = RE_SPEECH
+        self.re_bank_total = RE_BANK_TOTAL
+        self.re_bank_withdraw = RE_BANK_WITHDRAW
         self.combat_verbs = {
             "wounds", "damages", "slays", "burns", "sears", "disfigures", "dissolves",
             "incinerates", "scorches", "chars", "singes", "electrocutes", "fries",
@@ -611,7 +606,7 @@ class M59Dashboard(tk.Tk):
         # Determine target file
         if self.comms_mode == "live":
             if self.char_name == "Unknown": return
-            safe_n = self.char_name.replace(" ", "_")
+            safe_n = get_safe_name(self.char_name)
             path = os.path.join("logs", f"{safe_n}_chat.log")
         else:
             selection = self.log_file_list.curselection()
@@ -1246,7 +1241,7 @@ class M59Dashboard(tk.Tk):
         if not self.is_running: return
         
         if self.comms_mode == "live" and self.char_name != "Unknown":
-            safe_n = self.char_name.replace(" ", "_")
+            safe_n = get_safe_name(self.char_name)
             log_p = os.path.join("logs", f"{safe_n}_chat.log")
             
             if os.path.exists(log_p):
@@ -1768,12 +1763,7 @@ class M59Dashboard(tk.Tk):
         self.target_pid = pid
         
         # Find the HWND for this PID
-        self.main_hwnd = None
-        def find_hwnd(h, l):
-            _, p = win32process.GetWindowThreadProcessId(h)
-            if p == pid and win32gui.IsWindowVisible(h) and "Meridian 59" in win32gui.GetWindowText(h):
-                self.main_hwnd = h
-        win32gui.EnumWindows(find_hwnd, None)
+        self.main_hwnd = find_game_hwnd(pid)
         
         if not self.main_hwnd:
             logger.error(f"LifeCycle: Found PID {pid} but could not locate its window.")
@@ -2030,7 +2020,7 @@ class M59Dashboard(tk.Tk):
                 else:
                     raise
 
-            safe_n = self.char_name.replace(" ", "_")
+            safe_n = get_safe_name(self.char_name)
             log_p = os.path.join("logs", f"{safe_n}_chat.log")
             
             # Initial baseline
@@ -2217,15 +2207,24 @@ class M59Dashboard(tk.Tk):
         
         popup = tk.Toplevel(self)
         popup.title("Select Game Instance")
-        popup.geometry("500x350")
+        
+        # Scale window geometry for DPI
+        w, h = self.scale_px(550), self.scale_px(450)
+        popup.geometry(f"{w}x{h}")
+        popup.minsize(w, h)
         popup.attributes("-topmost", True)
         popup.grab_set() # Modal
         
-        tk.Label(popup, text="Multiple unclaimed games detected.", font=("Arial", 11, "bold"), pady=10).pack()
-        tk.Label(popup, text="Please select the instance you want this Companion to control:", font=("Arial", 9)).pack(pady=(0, 10))
+        tk.Label(popup, text="Multiple unclaimed games detected.", font=("Arial", 11, "bold"), pady=10).pack(side="top")
+        tk.Label(popup, text="Please select the instance you want this Companion to control:", font=("Arial", 9)).pack(side="top", pady=(0, 10))
         
+        # Bottom Button Frame (Pack this first to pin to bottom)
+        btn_f = tk.Frame(popup)
+        btn_f.pack(side="bottom", fill="x", pady=20)
+        
+        # Center Treeview Frame (Pack last with expand=True to fill middle)
         frame = tk.Frame(popup)
-        frame.pack(fill="both", expand=True, padx=20, pady=5)
+        frame.pack(side="top", fill="both", expand=True, padx=20, pady=5)
         
         # Treeview for selection
         tree = ttk.Treeview(frame, columns=("PID", "Character", "Location"), show="headings", height=8)
@@ -2286,9 +2285,6 @@ class M59Dashboard(tk.Tk):
                 else:
                     for i in tree.get_children(): tree.delete(i)
                     for i in unclaimed: tree.insert("", "end", iid=str(i["pid"]), values=(i["pid"], i.get("char_name", "Unknown"), i["title"]))
-        
-        btn_f = tk.Frame(popup)
-        btn_f.pack(fill="x", pady=20)
         
         tk.Button(btn_f, text=" CONNECT TO SELECTED ", command=on_select, 
                   bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), padx=20, pady=5).pack()
@@ -2433,9 +2429,9 @@ class M59Dashboard(tk.Tk):
     def load_vault_cache(self):
         if self.char_name == "Unknown":
             return
-        sn = self.char_name.replace(" ", "_")
+        sn = get_safe_name(self.char_name)
         for vt in ["barloque", "hungry"]:
-            p = next((x for x in [f"logs/{sn}_vault_{vt}.json", f"logs/{self.char_name}_vault_{vt}.json"] if os.path.exists(x)), None)
+            p = next((x for x in [f"logs/{sn}_vault_{vt}.json"] if os.path.exists(x)), None)
             if p:
                 try:
                     with open(p, "r") as f:
@@ -2448,7 +2444,8 @@ class M59Dashboard(tk.Tk):
     def load_kill_book(self):
         if self.char_name == "Unknown":
             return
-        p = f"logs/{self.char_name.replace(' ', '_')}_kills.json"
+        sn = get_safe_name(self.char_name)
+        p = f"logs/{sn}_kills.json"
         if os.path.exists(p):
             try:
                 with open(p, "r") as f:

@@ -8,6 +8,7 @@ from m59_bridge import establish_bridge, release_pid
 from m59_scraper import get_text_from_hwnd, capture_identity
 from m59_tracker import SessionTracker
 from m59_combat import CombatMonitor
+from m59_utils import get_safe_name, find_game_hwnd
 
 def manage_rotation(char_name, log_path):
     """Handles 24-hour rotation with unique timestamps."""
@@ -17,7 +18,7 @@ def manage_rotation(char_name, log_path):
     creation_time = os.path.getctime(log_path)
     if time.time() - creation_time > 86400: # 24 hours
         log_dir = os.path.dirname(log_path)
-        safe_name = char_name.replace(" ", "_")
+        safe_name = get_safe_name(char_name)
         now_ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         rotated_path = os.path.join(log_dir, f"{safe_name}_chat_{now_ts}.log")
         
@@ -41,14 +42,8 @@ def run_logger():
         pm_obj, pid = establish_bridge()
         
         # 2. Find Window
-        def get_hwnd_cb(h, l):
-            _, p = win32process.GetWindowThreadProcessId(h)
-            if p == pid and win32gui.IsWindowVisible(h) and win32gui.GetWindowText(h).startswith("Meridian 59"):
-                l.append(h)
-        hwnds = []
-        win32gui.EnumWindows(get_hwnd_cb, hwnds)
-        if not hwnds: return
-        hwnd = hwnds[0]
+        hwnd = find_game_hwnd(pid)
+        if not hwnd: return
 
         # 3. Identity
         char_name = capture_identity(hwnd, pid)
@@ -63,7 +58,7 @@ def run_logger():
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         
-        safe_name = char_name.replace(" ", "_")
+        safe_name = get_safe_name(char_name)
         log_path = os.path.join(log_dir, f"{safe_name}_chat.log")
         
         # 5. Initialization (Take snapshot of current buffer)
