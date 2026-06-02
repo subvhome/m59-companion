@@ -133,6 +133,30 @@ class GPSManager:
                     
         return None
 
+    def get_8point_direction(self, pos, grid_dims):
+        """Translates [Row, Col] into a player-friendly 8-point compass direction."""
+        row, col = pos
+        if row is None or col is None:
+            return "the Center"
+            
+        max_col, max_row = grid_dims
+        
+        # Vertical (North/South)
+        v = ""
+        if row < (max_row / 3): v = "North"
+        elif row > (max_row * 2 / 3): v = "South"
+        
+        # Horizontal (East/West)
+        h = ""
+        if col < (max_col / 3): h = "West"
+        elif col > (max_col * 2 / 3): h = "East"
+        
+        # Combine
+        if not v and not h: return "the Center"
+        if not v: return f"the {h} area"
+        if not h: return f"the {v} area"
+        return f"the {v}-{h} area"
+
     def get_friendly_instruction(self, from_rid, exit_info):
         """Creates a human-readable instruction based on exit type and location."""
         if not self.dataset: return "Move to destination."
@@ -141,17 +165,20 @@ class GPSManager:
         to_rid = exit_info['to_rid']
         dest_name = self.dataset.get(to_rid, {}).get('name', "another area")
         
-        # Compass logic
+        # Custom Overrides for complex/hidden paths
+        CUSTOM_INSTRUCTIONS = {
+            ("RID_NEST1", "RID_CAVE2", 2, 19): "Walk to the Northern point, move slightly East and fall into the hole to reach A Deep, Dark, Spooky, Icky Cave.",
+            ("RID_NEST1", "RID_CAVE2", 26, 14): "Find the hole in the West area and drop down to reach A Deep, Dark, Spooky, Icky Cave.",
+            ("RID_G9", "RID_NECROAREA1", None, None): "Trigger the lever puzzle to raise the platform, allowing you to reach the ledge and enter Winding Caverns.",
+        }
+
         row, col = from_pos
-        direction_hint = "the Center"
-        if row is not None and col is not None:
-            v, h = "", ""
-            if row < 22: v = "North"
-            elif row > 42: v = "South"
-            if col < 22: h = "West"
-            elif col > 42: h = "East"
-            direction_hint = f"the {v}-{h}".replace("--", "-").strip("-") + " area"
-            if direction_hint == "the  area": direction_hint = "the Center"
+        if (from_rid, to_rid, row, col) in CUSTOM_INSTRUCTIONS:
+            return CUSTOM_INSTRUCTIONS[(from_rid, to_rid, row, col)]
+
+        # Dynamic 8-point compass logic
+        grid_dims = self.dataset.get(from_rid, {}).get('grid', [64, 64])
+        direction_hint = self.get_8point_direction(from_pos, grid_dims)
 
         obj_name = exit_info.get('object', 'entrance')
         if obj_name == 'SpiderTree': obj_name = 'Web Covered Tree'
@@ -161,6 +188,8 @@ class GPSManager:
         
         if exit_info['type'] == 'edge':
             direction = exit_info['direction'].replace('LEAVE_', '').title()
+            # For edge exits, the instruction "Follow the path out the [Side]" is already 
+            # specific to the wall. We can add the corner hint if it's near one.
             return f"Follow the path out the {direction} side of the room to reach {dest_name}."
         
         if exit_info['type'] == 'manual':

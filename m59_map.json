@@ -1,103 +1,82 @@
 {
-    "Cor Noth": {
+    "RID_HERMITHUT": {
         "connections": {
-            "Unknown:The Weapon Master's Abode": 10.08,
-            "Unknown:Main gate to Cor Noth": 10.08
+            "Unknown:RID_I7": 18.16
         }
     },
-    "The Adventurer's Hall of Cor Noth": {
+    "RID_I7": {
         "connections": {
-            "Unknown:Cor Noth": 30.19
+            "Unknown:RID_I6": 17.12
         }
     },
-    "Main gate to Cor Noth": {
+    "RID_I6": {
         "connections": {
-            "Unknown:The Flatlands": 10.08
-        }
-    },
-    "The Flatlands": {
-        "connections": {
-            "Unknown:The border of the Badlands": 20.14
-        }
-    },
-    "The border of the Badlands": {
-        "connections": {
-            "Unknown:Main gate to the city of Tos": 10.05
-        }
-    },
-    "Main gate to the city of Tos": {
-        "connections": {
-            "Unknown:The Streets of Tos": 10.09
-        }
-    },
-    "RID_TOS_INN": {
-        "connections": {
-            "Unknown:RID_TOS": 60.78
-        }
-    },
-    "RID_TOS": {
-        "connections": {
-            "Unknown:RID_DUKE1": 44.46,
-            "Unknown:RID_TOS_INN": 3.06,
-            "Unknown:RID_EAST_TOS": 8.06
-        }
-    },
-    "RID_DUKE1": {
-        "connections": {
-            "Unknown:RID_DUKE2": 8.07,
-            "Unknown:RID_TOS": 10.09
-        }
-    },
-    "RID_DUKE2": {
-        "connections": {
-            "Unknown:RID_DUKE3": 16.18,
-            "Unknown:RID_DUKE1": 10.07
-        }
-    },
-    "RID_DUKE3": {
-        "connections": {
-            "Unknown:RID_DUKE2": 6.08
-        }
-    },
-    "RID_BAR_NORTH": {
-        "connections": {
-            "Unknown:RID_BAR_SOUTH": 12.11
-        }
-    },
-    "RID_BAR_SOUTH": {
-        "connections": {
-            "Unknown:RID_I3": 12.12
-        }
-    },
-    "RID_I3": {
-        "connections": {
-            "Unknown:RID_H3": 6.07
-        }
-    },
-    "RID_H3": {
-        "connections": {
-            "Unknown:RID_H4": 5.03
-        }
-    },
-    "RID_H4": {
-        "connections": {
-            "Unknown:RID_H5": 15.15
-        }
-    },
-    "RID_H5": {
-        "connections": {
-            "Unknown:RID_H6": 12.15
-        }
-    },
-    "RID_H6": {
-        "connections": {
-            "Unknown:RID_TOS": 9.07
+            "Unknown:RID_EAST_TOS": 13.12
         }
     },
     "RID_EAST_TOS": {
         "connections": {
-            "Unknown:RID_TOS_ARENA2": 5.06,
-            "Unknown:RID_TOS": 6.06
+            "Unknown:RID_TOS": 11.1
+        }
+    },
+    "RID_TOS": {
+        "connections": {
+            "Unknown:RID_H6": 6.05,
+            "Unknown:RID_TOS_INN": 6.07
+        }
+    },
+    "RID_H6": {
+        "connections": {
+            "Unknown:RID_TOS": 9.1,
+            "Unknown:RID_H5": 9.06
+        }
+    },
+    "RID_TOS_INN": {
+        "connections": {
+            "Unknown:RID_TOS": 43.46
+        }
+    },
+    "RID_H5": {
+        "connections": {
+            "Unknown:RID_H4": 9.09
+        }
+    },
+    "RID_H4": {
+        "connections": {
+            "Unknown:RID_H3": 11.14
+        }
+    },
+    "RID_H3": {
+        "connections": {
+            "Unknown:RID_I3": 5.03
+        }
+    },
+    "RID_I3": {
+        "connections": {
+            "Unknown:RID_BADLAND2": 7.08,
+            "Unknown:RID_BAR_SOUTH": 10.05
+        }
+    },
+    "RID_BADLAND2": {
+        "connections": {
+            "Unknown:RID_K5": 3.01,
+            "Unknown:RID_I3": 15.13
+        }
+    },
+    "RID_K5": {
+        "connections": {
+            "Unknown:RID_BADLAND2": 10.1
+        }
+    },
+    "RID_BAR_SOUTH": {
+        "connections": {
+            "Unknown:RID_I3": 5.06,
+            "Unknown:RID_BAR_NORTH": 8.05
+        }
+    },
+    "RID_BAR_NORTH": {
+        "connections": {
+            "Unknown:RID_BAR_BAR": 21.22
         }
     }
 }
