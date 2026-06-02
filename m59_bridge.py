@@ -123,17 +123,12 @@ def get_unclaimed_instances(target_name="Meridian.exe"):
     win32gui.EnumWindows(callback, None)
     
     # Filter only unclaimed ones and try to peek at character names
-    from m59_scraper import capture_identity
     unclaimed = []
     
     for pid, info in instances_by_pid.items():
         if not is_pid_locked(pid):
-            # Try to peek at character name without claiming
-            try:
-                cname = capture_identity(info["hwnd"], pid) or "Unknown"
-                info["char_name"] = cname
-            except:
-                info["char_name"] = "Unknown"
+            # We no longer peek at character names here to avoid blocking the loop
+            info["char_name"] = "Unscanned"
             unclaimed.append(info)
             
     return unclaimed

@@ -2247,7 +2247,25 @@ class M59Dashboard(tk.Tk):
             location = title.split(" --- ", 1)[1] if " --- " in title else "Select Screen"
             char_name = inst.get("char_name", "Unknown")
             tree.insert("", "end", iid=str(inst["pid"]), values=(inst["pid"], char_name, location))
-            
+
+        # NEW: Background scanner for identity
+        def background_identity_scan():
+            try:
+                from m59_scraper import capture_identity
+                for inst in instances:
+                    if not popup.winfo_exists(): return
+
+                    # Only scan if we don't already have a valid name
+                    if inst.get("char_name") in ["Unscanned", "Unknown", "..."]:
+                        name = capture_identity(inst["hwnd"], inst["pid"])
+                        if name and popup.winfo_exists():
+                            # Update the specific row in the Treeview via the main thread
+                            self.after(0, lambda p=inst["pid"], n=name: tree.set(str(p), "Character", n))
+            except Exception as e:
+                logger.error(f"UI: Background identity scan failed: {e}")
+
+        threading.Thread(target=background_identity_scan, daemon=True).start()
+
         def on_select():
             selected = tree.selection()
             if not selected:
