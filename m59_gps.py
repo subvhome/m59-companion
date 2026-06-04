@@ -4,6 +4,7 @@ import time
 import collections
 import logging
 import heapq
+import math
 from datetime import datetime
 
 logger = logging.getLogger("dashboard")
@@ -26,10 +27,8 @@ class GPSManager:
 
     def load_map_data(self):
         """Loads the discovered travel time data from JSON."""
-        # Ensure logs directory exists
         os.makedirs("logs", exist_ok=True)
-        
-        # Handle migration from old m59_map.json if it exists
+        # Migration from old m59_map.json if it exists
         old_path = "m59_map.json"
         if os.path.exists(old_path) and not os.path.exists(self.map_path):
             try:
@@ -72,11 +71,11 @@ class GPSManager:
         """Returns a list of all unique room names with 'Nearby' hints for duplicates."""
         if not self.dataset:
             return []
-            
+
         name_map = collections.defaultdict(list)
         for rid, info in self.dataset.items():
             name_map[info['name']].append(rid)
-            
+
         options = []
         for name, rids in name_map.items():
             if len(rids) == 1:
@@ -94,122 +93,177 @@ class GPSManager:
                     options.append({"name": name, "rid": rid, "display": f"{name} (Near: {neighbor})"})
         return sorted(options, key=lambda x: x['display'])
 
+    def get_8point_direction(self, start_pos, end_pos, grid_dims):
+        """Calculates high-precision direction with Cardinal Dominance logic."""
+        if not start_pos or not end_pos or None in start_pos or None in end_pos:
+            return "CENTER •"
+            
+        r1, c1 = start_pos
+        r2, c2 = end_pos
+        
+        dr = r2 - r1
+        dc = c2 - c1
+        
+        # Base thresholds (to avoid "Center" loops)
+        row_threshold = max(1, grid_dims[1] * 0.03)
+        col_threshold = max(1, grid_dims[0] * 0.03)
+
+        v, h = "", ""
+        if abs(dr) > row_threshold:
+            v = "NORTH" if dr < 0 else "SOUTH"
+        if abs(dc) > col_threshold:
+            h = "WEST" if dc < 0 else "EAST"
+
+        # CARDINAL DOMINANCE Logic
+        # If one axis is much stronger than the other, lock to it (ignore minor diagonal drift)
+        if v and h:
+            ratio = abs(dc) / abs(dr)
+            if ratio < 0.45: # Primarily vertical
+                h = ""
+            elif ratio > 2.2: # Primarily horizontal
+                v = ""
+
+        mapping = {
+            "NORTH": "↑", "SOUTH": "↓", "EAST": "→", "WEST": "←",
+            "NORTH-EAST": "↗", "SOUTH-EAST": "↘", "SOUTH-WEST": "↙", "NORTH-WEST": "↖",
+            "CENTER": "•"
+        }
+        
+        dir_name = f"{v}-{h}".strip("-") if v or h else "CENTER"
+        arrow = mapping.get(dir_name, "•")
+        
+        return f"{dir_name} {arrow}"
+
+    def get_friendly_instruction(self, from_rid, exit_info, step=None, total=None, arrival_pos=None):
+        """Creates a high-signal 3-liner HUD instruction with Relative Perspective."""
+        if not self.dataset: return "No Data\nMove to destination"
+        
+        exit_from = exit_info.get('from', [None, None])
+        to_rid = exit_info['to_rid']
+        dest_name = self.dataset.get(to_rid, {}).get('name', "another area")
+        
+        # Progress Tracker Prefix
+        prefix = f"[{step}/{total}]" if step is not None and total is not None else ""
+
+        # Default arrival_pos to room's teleport point if not provided
+        if arrival_pos is None:
+            arrival_pos = self.dataset.get(from_rid, {}).get('teleport', [32, 32])
+
+        # Direction calculation
+        grid_dims = self.dataset.get(from_rid, {}).get('grid', [64, 64])
+        dir_hud = self.get_8point_direction(arrival_pos, exit_from, grid_dims)
+
+        # EDGE TRANSITION Logic: Always trust the code's intended wall
+        if exit_info['type'] == 'edge' and 'direction' in exit_info:
+            code_dir = exit_info['direction'].replace('LEAVE_', '')
+            mapping = {"NORTH": "↑", "SOUTH": "↓", "EAST": "→", "WEST": "←"}
+            dir_hud = f"{code_dir} {mapping.get(code_dir, '•')}"
+
+        # Action detection
+        action = "Path"
+        obj_name = exit_info.get('object', '').lower()
+        if exit_info['type'] == 'point':
+            action = "Door"
+            if "hole" in obj_name or "pit" in obj_name or "nest" in from_rid.lower() or "cave" in from_rid.lower():
+                action = "Hole"
+            elif "tree" in obj_name:
+                action = "Tree"
+            elif obj_name:
+                action = obj_name.title()
+        
+        if exit_info['type'] == 'manual' and not exit_from[0]:
+            return f"{prefix}\nGO FIND\n➔ {dest_name}"
+
+        line1 = f"{prefix}"
+        line2 = f"GO {dir_hud}"
+        line3 = f"{action} to {dest_name}"
+        
+        return f"{line1}\n{line2}\n{line3}"
+
     def find_path(self, start_rid, end_rid):
-        """Finds the shortest path based on travel time using Dijkstra's algorithm."""
+        """Finds the shortest path based on learned travel times (Dijkstra) with Proximity Logic."""
         if not self.dataset or start_rid not in self.dataset or end_rid not in self.dataset:
             return None
             
-        # priority queue stores (total_time, tie_breaker, current_rid, current_path)
-        # default weight for unknown edges is 10 seconds
-        DEFAULT_WEIGHT = 10.0
+        # Default weight for untimed transitions
+        DEFAULT_TRANSITION_TIME = 10.0 
         
-        count = 0 # Tie-breaker counter
-        pq = [(0, count, start_rid, [])]
-        visited = {} # rid: total_time
+        # Start at the room's teleport point
+        start_tele = self.dataset[start_rid].get('teleport', [32, 32])
+        
+        count = 0
+        pq = [(0, count, start_rid, [], start_tele)] # (total_time, tie_breaker, current_rid, path, arrival_pos)
+        visited = {} # (rid, tuple(arrival_pos)): total_time
         
         while pq:
-            curr_time, _, curr_rid, path = heapq.heappop(pq)
+            curr_time, _, curr_rid, path, arrival_pos = heapq.heappop(pq)
             
             if curr_rid == end_rid:
                 return path
                 
-            if curr_rid in visited and visited[curr_rid] <= curr_time:
+            state = (curr_rid, tuple(arrival_pos))
+            if state in visited and visited[state] <= curr_time:
                 continue
-            visited[curr_rid] = curr_time
+            visited[state] = curr_time
             
+            # Group exits by to_rid to pick the physically closest option if destinations are identical
+            destination_map = {}
             for exit_info in self.dataset[curr_rid].get('exits', []):
                 to_rid = exit_info['to_rid']
+                if to_rid not in self.dataset: continue
                 
-                # Get weight from measured data
-                weight = DEFAULT_WEIGHT
+                # Calculate distance for THIS specific exit option from current arrival_pos
+                exit_from = exit_info.get('from')
+                if not exit_from or exit_from[0] is None:
+                    grid = self.dataset[curr_rid].get('grid', [64, 64])
+                    exit_from = [grid[1]//2, grid[0]//2]
+                
+                this_dist = math.sqrt((exit_from[0] - arrival_pos[0])**2 + (exit_from[1] - arrival_pos[1])**2)
+                
+                if to_rid not in destination_map:
+                    destination_map[to_rid] = (exit_info, this_dist)
+                else:
+                    existing_info, existing_dist = destination_map[to_rid]
+                    # Priority: 1. Type (Point > Edge > Manual), 2. Proximity (Dist)
+                    better = False
+                    if exit_info['type'] == 'point' and existing_info['type'] != 'point':
+                        better = True
+                    elif exit_info['type'] == existing_info['type'] and this_dist < existing_dist:
+                        better = True
+                    elif exit_info['type'] == 'edge' and existing_info['type'] == 'manual':
+                        better = True
+                    if better:
+                        destination_map[to_rid] = (exit_info, this_dist)
+
+            for to_rid, (exit_info, dist) in destination_map.items():
+                # Get weight from learned travel times
+                weight = DEFAULT_TRANSITION_TIME
                 if curr_rid in self.m59_map:
                     conn_key = f"Unknown:{to_rid}"
-                    weight = self.m59_map[curr_rid].get("connections", {}).get(conn_key, DEFAULT_WEIGHT)
+                    weight = self.m59_map[curr_rid].get("connections", {}).get(conn_key, DEFAULT_TRANSITION_TIME)
                 
+                # Destination Arrival Point
+                to_pos = exit_info.get('to_pos')
+                if not to_pos or to_pos[0] is None:
+                    to_pos = self.dataset[to_rid].get('teleport', [32, 32])
+
                 new_time = curr_time + weight
-                if to_rid not in visited or new_time < visited[to_rid]:
+                new_state = (to_rid, tuple(to_pos))
+                if new_state not in visited or new_time < visited[new_state]:
                     count += 1
-                    heapq.heappush(pq, (new_time, count, to_rid, path + [(curr_rid, exit_info)]))
+                    heapq.heappush(pq, (new_time, count, to_rid, path + [(curr_rid, exit_info)], to_pos))
                     
         return None
 
-    def get_8point_direction(self, pos, grid_dims):
-        """Translates [Row, Col] into a player-friendly 8-point compass direction."""
-        row, col = pos
-        if row is None or col is None:
-            return "the Center"
-            
-        max_col, max_row = grid_dims
-        
-        # Vertical (North/South)
-        v = ""
-        if row < (max_row / 3): v = "North"
-        elif row > (max_row * 2 / 3): v = "South"
-        
-        # Horizontal (East/West)
-        h = ""
-        if col < (max_col / 3): h = "West"
-        elif col > (max_col * 2 / 3): h = "East"
-        
-        # Combine
-        if not v and not h: return "the Center"
-        if not v: return f"the {h} area"
-        if not h: return f"the {v} area"
-        return f"the {v}-{h} area"
-
-    def get_friendly_instruction(self, from_rid, exit_info):
-        """Creates a human-readable instruction based on exit type and location."""
-        if not self.dataset: return "Move to destination."
-        
-        from_pos = exit_info.get('from', [None, None])
-        to_rid = exit_info['to_rid']
-        dest_name = self.dataset.get(to_rid, {}).get('name', "another area")
-        
-        # Custom Overrides for complex/hidden paths
-        CUSTOM_INSTRUCTIONS = {
-            ("RID_NEST1", "RID_CAVE2", 2, 19): "Walk to the Northern point, move slightly East and fall into the hole to reach A Deep, Dark, Spooky, Icky Cave.",
-            ("RID_NEST1", "RID_CAVE2", 26, 14): "Find the hole in the West area and drop down to reach A Deep, Dark, Spooky, Icky Cave.",
-            ("RID_G9", "RID_NECROAREA1", None, None): "Trigger the lever puzzle to raise the platform, allowing you to reach the ledge and enter Winding Caverns.",
-        }
-
-        row, col = from_pos
-        if (from_rid, to_rid, row, col) in CUSTOM_INSTRUCTIONS:
-            return CUSTOM_INSTRUCTIONS[(from_rid, to_rid, row, col)]
-
-        # Dynamic 8-point compass logic
-        grid_dims = self.dataset.get(from_rid, {}).get('grid', [64, 64])
-        direction_hint = self.get_8point_direction(from_pos, grid_dims)
-
-        obj_name = exit_info.get('object', 'entrance')
-        if obj_name == 'SpiderTree': obj_name = 'Web Covered Tree'
-
-        if exit_info['type'] == 'point':
-            return f"Walk to {direction_hint} and enter the {obj_name} to reach {dest_name}."
-        
-        if exit_info['type'] == 'edge':
-            direction = exit_info['direction'].replace('LEAVE_', '').title()
-            # For edge exits, the instruction "Follow the path out the [Side]" is already 
-            # specific to the wall. We can add the corner hint if it's near one.
-            return f"Follow the path out the {direction} side of the room to reach {dest_name}."
-        
-        if exit_info['type'] == 'manual':
-            if from_pos[0] is not None:
-                return f"Walk to {direction_hint} to reach {dest_name}."
-            return f"Look for a special entrance (hole or hidden path) to reach {dest_name}."
-
-        return f"Move to {dest_name}."
-
     def resolve_name_to_rid(self, name):
-        """Attempts to find the most likely RID for a given room name and updates last_known_rid."""
+        """Attempts to find the most likely RID for a given room name."""
         if not self.dataset: return None
         matches = [rid for rid, info in self.dataset.items() if info['name'].lower() == name.lower()]
         if not matches: return None
         
         resolved_rid = matches[0]
-        
-        # If we have multiple matches, prioritize one connected to our last_known_rid
-        if len(matches) > 1 and self.last_known_rid and self.last_known_rid in self.dataset:
-            for exit_info in self.dataset[self.last_known_rid].get('exits', []):
+        if len(matches) > 1 and self.last_known_rid:
+            for exit_info in self.dataset.get(self.last_known_rid, {}).get('exits', []):
                 if exit_info['to_rid'] in matches:
                     resolved_rid = exit_info['to_rid']
                     break
@@ -218,7 +272,7 @@ class GPSManager:
         return resolved_rid
 
     def record_transition(self, from_rid, to_rid, duration):
-        """Updates the map data with a new RID-to-RID connection and time."""
+        """Updates travel history. Always saves first time, then only if faster."""
         if from_rid not in self.m59_map:
             self.m59_map[from_rid] = {"connections": {}}
         
@@ -226,41 +280,37 @@ class GPSManager:
         existing_time = self.m59_map[from_rid]["connections"].get(conn_key)
         
         updated = False
+        # Always save if first time, otherwise only if shorter
         if existing_time is None or duration < existing_time:
             self.m59_map[from_rid]["connections"][conn_key] = duration
             updated = True
             self.save_map_data()
+            logger.info(f"GPS: Learned faster path {from_rid}->{to_rid}: {duration}s")
             
         return updated, duration, existing_time
 
     def process_room_update(self, current_room):
-        """Detects changes and records data based on RIDs. Returns (was_transition, log_msg)"""
-        if current_room == "Unknown Location":
-            return False, None
-
+        """Updates navigation status based on current room string."""
+        if current_room == "Unknown Location": return False, None
         now = time.time()
         was_transition = False
         log_msg = None
         
-        # Resolve current RID
         current_rid = self.resolve_name_to_rid(current_room)
-
+        
         if current_room != self.last_room:
-            if self.last_room is not None and hasattr(self, 'last_known_from_rid') and self.last_known_from_rid:
+            if self.last_room is not None and self.last_known_from_rid and current_rid:
                 duration = round(now - self.transition_start_time, 2)
-                # Only record if it's a plausible transition (under 2 minutes)
-                if duration < 120:
+                # Cap extremely long durations to 1 hour just for sanity, 
+                # but basically follow the "always save delta" rule
+                if duration < 3600:
                     improved, dur, old = self.record_transition(self.last_known_from_rid, current_rid, duration)
-                    if improved:
-                        log_msg = f"New Record! {self.last_room} -> {current_room} in {dur}s"
-                    else:
-                        log_msg = f"Transition: {self.last_room} -> {current_room} in {dur}s (Best: {old}s)"
+                    log_msg = f"Transition: {self.last_room} -> {current_room} in {dur}s"
+                    if improved: log_msg += " (New Personal Best!)"
                     was_transition = True
-            else:
-                log_msg = f"GPS Tracking active at: {current_room}"
             
             self.last_room = current_room
-            self.last_known_from_rid = current_rid # Store for next update
+            self.last_known_from_rid = current_rid
             self.transition_start_time = now
             
         return was_transition, log_msg

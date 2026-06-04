@@ -190,6 +190,7 @@ class M59Dashboard(tk.Tk):
         self.who_list_enabled = tk.BooleanVar(value=True)
         self.who_list_docked = tk.BooleanVar(value=False)
         self.who_list_side = tk.StringVar(value="Right")
+        self.who_list_width = tk.IntVar(value=250)
         self.who_list_players = {} # Dict of {name: status}
         self.who_dock_window = None
         self.frida_session = None
@@ -219,7 +220,7 @@ class M59Dashboard(tk.Tk):
         self.alert_active = False
         self.comms_mode = "live" # 'live' or 'history'
         # Initialize GPS with fallback logic
-        map_p = "m59_map.json"
+        map_p = "logs/travel_times.json"
         dataset_p = resource_path("meridian_rooms_dataset.json")
         self.gps_manager = GPSManager(map_path=map_p, dataset_path=dataset_p)
         self.waiting_overlay = None
@@ -683,6 +684,7 @@ class M59Dashboard(tk.Tk):
                     self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
                     self.who_list_enabled.set(s.get("who_list_enabled", True))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
+                    self.who_list_width.set(s.get("who_list_width", 250))
                     
                     # Force Who List to be in-app on startup (don't remember desktop dock)
                     self.who_list_docked.set(False)
@@ -738,14 +740,36 @@ class M59Dashboard(tk.Tk):
         # Use main_container if no parent is provided
         target_parent = parent if parent else self.main_container
         
-        # Premium dark slate themed container
-        self.who_list_panel = tk.Frame(target_parent, bg="#2b2d31", bd=1, relief=tk.SOLID)
-        
-        # If we have a specific parent (like the Dock Toplevel), pack it to fill
+        # Outer container to hold the resize handle and the content
+        self.who_list_outer = tk.Frame(target_parent, bg="#1e1f22", bd=0)
         if parent:
-            self.who_list_panel.pack(fill="both", expand=True)
+            self.who_list_outer.pack(fill="both", expand=True)
+
+        # RESIZE HANDLE (Draggable line)
+        if self.who_list_docked.get():
+            self.resize_handle = tk.Frame(self.who_list_outer, bg="#323338", width=4, cursor="sb_h_double_arrow")
+            self.resize_handle.pack(side="left", fill="y")
+            
+            def start_resize(event):
+                self._drag_start_x = event.x_root
+                self._start_width = self.who_list_width.get()
+
+            def perform_resize(event):
+                dx = self._drag_start_x - event.x_root
+                new_w = self._start_width + dx
+                new_w = max(180, min(600, new_w)) # Hard limits
+                self.who_list_width.set(new_w)
+                self.update_appbar_pos(new_w)
+                
+            self.resize_handle.bind("<Button-1>", start_resize)
+            self.resize_handle.bind("<B1-Motion>", perform_resize)
+            self.resize_handle.bind("<ButtonRelease-1>", lambda e: self.save_settings())
+
+        # Premium dark slate themed container
+        self.who_list_panel = tk.Frame(self.who_list_outer, bg="#2b2d31", bd=1, relief=tk.SOLID)
+        self.who_list_panel.pack(side="left", fill="both", expand=True)
         
-        # Polished Title Header (with Dock Button)
+        # Polished Title Header
         self.who_list_header = tk.Frame(self.who_list_panel, bg="#1e1f22")
         self.who_list_header.pack(fill="x", side="top")
         
@@ -780,16 +804,38 @@ class M59Dashboard(tk.Tk):
         self.who_footer = tk.Frame(self.who_list_panel, bg=footer_bg, bd=0)
         self.who_footer.pack(side="bottom", fill="x")
         
-        # Helper to add a status row
-        def add_status_row(parent, label_text, key, icon=""):
+        # 1. GPS Header Row (Centered)
+        gps_header = tk.Label(
+            self.who_footer, text="🧭 GPS NAVIGATION", font=("Segoe UI", 8, "bold"), 
+            bg=footer_bg, fg="#888", pady=5
+        )
+        gps_header.pack(fill="x")
+        
+        # 2. GPS Data Row (Full width, centered)
+        # Using a higher wraplength and centering for the new 2-liner format
+        wrap = self.who_list_width.get() - self.scale_px(40)
+        self.gps_dock_lbl = tk.Label(
+            self.who_footer, text="No active route", font=("Segoe UI", 8, "bold"), 
+            bg=footer_bg, fg="#fff", wraplength=wrap, justify="center"
+        )
+        self.gps_dock_lbl.pack(fill="x", padx=10, pady=(0, 5))
+        self.who_footer_labels["gps"] = self.gps_dock_lbl
+        
+        # Subtle Divider
+        tk.Frame(self.who_footer, height=1, bg="#323338").pack(fill="x", pady=5)
+
+        # Helper to add remaining status rows
+        def add_status_row(parent, label_text, key, icon="", justify="right"):
             row = tk.Frame(parent, bg=footer_bg)
             row.pack(fill="x", padx=10, pady=2)
             tk.Label(row, text=f"{icon} {label_text}", font=("Segoe UI", 8), bg=footer_bg, fg="#888").pack(side="left")
-            val = tk.Label(row, text="---", font=("Segoe UI", 8, "bold"), bg=footer_bg, fg="#fff", wraplength=200, justify="right")
-            val.pack(side="right")
+            
+            # Use current width for initial wrap
+            wrap = self.who_list_width.get() - self.scale_px(80)
+            val = tk.Label(row, text="---", font=("Segoe UI", 8, "bold"), bg=footer_bg, fg="#fff", wraplength=wrap, justify=justify)
+            val.pack(side="right" if justify == "right" else "left", padx=(10 if justify == "left" else 0))
             self.who_footer_labels[key] = val
 
-        add_status_row(self.who_footer, "GPS:", "gps", "🧭")
         add_status_row(self.who_footer, "IMPROVES:", "improves", "📈")
         add_status_row(self.who_footer, "BANK (M):", "bank_m", "💰")
         add_status_row(self.who_footer, "BANK (I):", "bank_i", "🌴")
@@ -825,7 +871,8 @@ class M59Dashboard(tk.Tk):
             self.refresh_who_list_ui()
 
     def update_who_list_visibility(self):
-        self.who_list_panel.pack_forget()
+        if hasattr(self, "who_list_outer"):
+            self.who_list_outer.pack_forget()
         self.notebook.pack_forget()
         
         # If docked, it shouldn't be in the main window at all
@@ -833,9 +880,9 @@ class M59Dashboard(tk.Tk):
             self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
             return
 
-        if self.who_list_enabled.get():
+        if self.who_list_enabled.get() and hasattr(self, "who_list_outer"):
             side = self.who_list_side.get().lower()
-            self.who_list_panel.pack(side=side, fill="y", padx=2)
+            self.who_list_outer.pack(side=side, fill="y", padx=2)
             if self.target_pid:
                 self.start_who_list_monitor()
         self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
@@ -890,7 +937,7 @@ class M59Dashboard(tk.Tk):
         screen_w = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
         screen_h = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
         
-        dock_w = 250 # Fixed width for Who List
+        dock_w = self.who_list_width.get()
         
         abd.uEdge = ABE_RIGHT
         abd.rc.left = screen_w - dock_w
@@ -1152,32 +1199,17 @@ class M59Dashboard(tk.Tk):
             self.who_list_text.insert(tk.END, f" {name}\n", status)
         self.who_list_text.config(state="disabled")
         
-        # 2. Dynamic Width Calculation for Dock
-        if self.who_list_docked.get() and self.who_dock_window:
-            import tkinter.font as tkfont
-            f = tkfont.Font(font=self.who_list_text['font'])
+        # 2. Update Footer & Wraplength
+        # Use current static width for wraplength
+        current_w = self.who_list_width.get()
+        for lbl in self.who_footer_labels.values():
+            lbl.config(wraplength=current_w - self.scale_px(40))
             
-            max_w_px = 120 # Minimum baseline
-            for name in sorted_names:
-                w = f.measure(f"  {name}  ") # Measure with padding
-                if w > max_w_px: max_w_px = w
-            
-            # Add space for scrollbar (approx 20px) + padding
-            target_w = int(max_w_px + self.scale_px(35))
-            target_w = max(180, min(350, target_w))
-            
-            # Only trigger move if change is significant (> 10px) to avoid jitter
-            current_w = self.who_dock_window.winfo_width()
-            if abs(target_w - current_w) > 10:
-                logger.info(f"AppBar: Dynamic resize triggered: {current_w}px -> {target_w}px")
-                self.update_appbar_pos(target_w)
+        self.refresh_who_footer()
 
         # Update dynamic player count at the bottom
         count = len(sorted_names)
         self.who_list_count_lbl.config(text=f"{count} Online", fg="#4CAF50" if count > 0 else "#888")
-        
-        # 3. Update Status Footer
-        self.refresh_who_footer()
 
     def refresh_who_footer(self):
         """Updates the status footer labels with the latest session data."""
@@ -1188,9 +1220,23 @@ class M59Dashboard(tk.Tk):
         gps_text = "No active route"
         if self.gps_manager.current_path and self.gps_manager.current_destination_rid:
             step_idx = self.gps_manager.current_step_index
-            if step_idx < len(self.gps_manager.current_path):
+            total_steps = len(self.gps_manager.current_path)
+            if step_idx < total_steps:
                 from_rid, exit_info = self.gps_manager.current_path[step_idx]
-                gps_text = self.gps_manager.get_friendly_instruction(from_rid, exit_info)
+                
+                # Get the arrival point for THIS room to calculate relative direction
+                arrival_pos = None
+                if step_idx == 0:
+                    # First room, use its teleport point as baseline
+                    arrival_pos = self.gps_manager.dataset.get(from_rid, {}).get('teleport')
+                else:
+                    # Previous step's destination is our current entry point
+                    prev_rid, prev_exit = self.gps_manager.current_path[step_idx-1]
+                    arrival_pos = prev_exit.get('to_pos')
+
+                gps_text = self.gps_manager.get_friendly_instruction(
+                    from_rid, exit_info, step=step_idx+1, total=total_steps, arrival_pos=arrival_pos
+                )
         
         self.who_footer_labels["gps"].config(text=gps_text)
         self.who_footer_labels["improves"].config(text=str(self.total_improves))
@@ -1436,7 +1482,7 @@ class M59Dashboard(tk.Tk):
         if path is not None:
             self.gps_manager.current_path = path
             self.gps_manager.current_step_index = 0
-            self.gps_start_btn.config(text="RECALCULATING..." if self.gps_manager.current_path else "START GPS", state="disabled")
+            self.gps_start_btn.config(text="START GPS", state="disabled")
             self.gps_stop_btn.config(state="normal")
             self.update_gps_navigation_ui()
             logger.info(f"GPS: Started navigation to RID {target_rid}")
@@ -1464,14 +1510,41 @@ class M59Dashboard(tk.Tk):
         self.gps_route_view.delete("1.0", tk.END)
         
         if not path:
-            self.gps_instruction_lbl.config(text="You have arrived at your destination!", fg="#4CAF50")
+            msg = "ARRIVED!\nYou have reached your destination."
+            self.gps_instruction_lbl.config(text=msg, fg="#4CAF50")
             self.gps_route_view.insert(tk.END, "--- Destination Reached ---")
             self.gps_route_view.config(state="disabled")
+            
+            # Reset button state
+            self.gps_start_btn.config(text="START GPS", state="normal")
+            self.gps_stop_btn.config(state="disabled")
+            
+            # Update Dock with success message
+            if "gps" in self.who_footer_labels:
+                self.who_footer_labels["gps"].config(text="🏁 ARRIVED!", fg="#4CAF50")
             return
+
+        # Reset button if it was in 'Recalculating' mode
+        self.gps_start_btn.config(text="START GPS", state="disabled")
+        self.gps_stop_btn.config(state="normal")
+        if "gps" in self.who_footer_labels:
+            self.who_footer_labels["gps"].config(fg="#fff") # Restore normal color
 
         # Current instruction
         from_rid, exit_info = path[step_idx]
-        instr = self.gps_manager.get_friendly_instruction(from_rid, exit_info)
+        total_steps = len(path)
+        
+        # Calculate relative arrival_pos for the instruction label
+        arrival_pos = None
+        if step_idx == 0:
+            arrival_pos = self.gps_manager.dataset.get(from_rid, {}).get('teleport')
+        else:
+            _, prev_exit = path[step_idx-1]
+            arrival_pos = prev_exit.get('to_pos')
+
+        instr = self.gps_manager.get_friendly_instruction(
+            from_rid, exit_info, step=step_idx+1, total=total_steps, arrival_pos=arrival_pos
+        )
         self.gps_instruction_lbl.config(text=instr, fg="#1565C0")
         
         # Full path preview
@@ -1492,11 +1565,16 @@ class M59Dashboard(tk.Tk):
         if not self.gps_manager.current_destination_rid:
             return
 
-        # Always update RID tracking
-        current_rid = self.gps_manager.resolve_name_to_rid(current_room_name)
-        
+        # If we reached the destination (path is empty) and move to a DIFFERENT room, clear the state
         if not self.gps_manager.current_path:
+            dest_rid = self.gps_manager.current_destination_rid
+            dest_name = self.gps_manager.dataset.get(dest_rid, {}).get('name', '')
+            if current_room_name.lower() != dest_name.lower():
+                logger.info("GPS: Moved away from destination, clearing state.")
+                self.stop_navigation()
             return
+
+        # Always update RID tracking
 
         path = self.gps_manager.current_path
         step_idx = self.gps_manager.current_step_index

@@ -56,9 +56,14 @@ def main():
         path = gps.find_path(start_rid, end_rid)
         
         if path:
+            total_steps = len(path)
+            arrival_pos = gps.dataset.get(start_rid, {}).get('teleport')
+            
             for i, (rid, exit_info) in enumerate(path):
                 print(f"\nSTEP {i+1}: In {gps.dataset[rid]['name']}...")
-                print(f"  -> {gps.get_friendly_instruction(rid, exit_info)}")
+                print(f"  -> {gps.get_friendly_instruction(rid, exit_info, step=i+1, total=total_steps, arrival_pos=arrival_pos)}")
+                # Next room's arrival point
+                arrival_pos = exit_info.get('to_pos')
             print(f"\nSUCCESS: You have arrived at {gps.dataset[end_rid]['name']}!")
         else:
             print("\nI'm sorry, I couldn't find a walking path between those places.")

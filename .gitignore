@@ -1,6 +1,6 @@
 logs/
-prev-code/
 __pycache__/
+prev-code/
 *.spec
 build/
 m59_companion_locks/

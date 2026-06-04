@@ -6,61 +6,75 @@
     },
     "RID_I7": {
         "connections": {
-            "Unknown:RID_I6": 17.12
+            "Unknown:RID_I6": 16.16,
+            "Unknown:RID_G8": 27.21,
+            "Unknown:RID_I8": 17.15
         }
     },
     "RID_I6": {
         "connections": {
-            "Unknown:RID_EAST_TOS": 13.12
+            "Unknown:RID_EAST_TOS": 13.12,
+            "Unknown:RID_I7": 13.15
         }
     },
     "RID_EAST_TOS": {
         "connections": {
-            "Unknown:RID_TOS": 11.1
+            "Unknown:RID_TOS": 11.1,
+            "Unknown:RID_I6": 12.1
         }
     },
     "RID_TOS": {
         "connections": {
-            "Unknown:RID_H6": 6.05,
-            "Unknown:RID_TOS_INN": 6.07
+            "Unknown:RID_H6": 6.03,
+            "Unknown:RID_TOS_INN": 2.02,
+            "Unknown:RID_TOS_APOTH": 6.06,
+            "Unknown:RID_EAST_TOS": 3.03
         }
     },
     "RID_H6": {
         "connections": {
-            "Unknown:RID_TOS": 9.1,
-            "Unknown:RID_H5": 9.06
+            "Unknown:RID_TOS": 3.03,
+            "Unknown:RID_H5": 9.06,
+            "Unknown:RID_H7": 9.09,
+            "Unknown:RID_I6": 9.06
         }
     },
     "RID_TOS_INN": {
         "connections": {
-            "Unknown:RID_TOS": 43.46
+            "Unknown:RID_TOS": 5.07
         }
     },
     "RID_H5": {
         "connections": {
-            "Unknown:RID_H4": 9.09
+            "Unknown:RID_H4": 9.05,
+            "Unknown:RID_H6": 11.08
         }
     },
     "RID_H4": {
         "connections": {
-            "Unknown:RID_H3": 11.14
+            "Unknown:RID_H3": 10.14,
+            "Unknown:RID_G4": 11.14,
+            "Unknown:RID_H5": 11.12
         }
     },
     "RID_H3": {
         "connections": {
-            "Unknown:RID_I3": 5.03
+            "Unknown:RID_I3": 5.03,
+            "Unknown:RID_H4": 5.04
         }
     },
     "RID_I3": {
         "connections": {
             "Unknown:RID_BADLAND2": 7.08,
-            "Unknown:RID_BAR_SOUTH": 10.05
+            "Unknown:RID_BAR_SOUTH": 7.08,
+            "Unknown:RID_H3": 5.04,
+            "Unknown:RID_J3": 19.23
         }
     },
     "RID_BADLAND2": {
         "connections": {
             "Unknown:RID_K5": 3.01,
-            "Unknown:RID_I3": 15.13
+            "Unknown:RID_I3": 11.14
         }
     },
     "RID_K5": {
@@ -71,12 +85,154 @@
     "RID_BAR_SOUTH": {
         "connections": {
             "Unknown:RID_I3": 5.06,
-            "Unknown:RID_BAR_NORTH": 8.05
+            "Unknown:RID_BAR_NORTH": 6.03
         }
     },
     "RID_BAR_NORTH": {
         "connections": {
-            "Unknown:RID_BAR_BAR": 21.22
+            "Unknown:RID_BAR_BAR": 5.05,
+            "Unknown:RID_BAR_SOUTH": 13.13,
+            "Unknown:RID_BAR_PORT": 19.14
+        }
+    },
+    "RID_F4": {
+        "connections": {
+            "Unknown:RID_E4": 33.33,
+            "Unknown:RID_G4": 25.23
+        }
+    },
+    "RID_E4": {
+        "connections": {
+            "Unknown:RID_D5": 10.11,
+            "Unknown:RID_D4": 13.12,
+            "Unknown:RID_F4": 106.14
+        }
+    },
+    "RID_D5": {
+        "connections": {
+            "Unknown:RID_E4": 4.04,
+            "Unknown:RID_C5": 2.03,
+            "Unknown:RID_D4": 6.06
+        }
+    },
+    "RID_D4": {
+        "connections": {
+            "Unknown:RID_D5": 9.12,
+            "Unknown:RID_E4": 8.07
+        }
+    },
+    "RID_C5": {
+        "connections": {
+            "Unknown:RID_D5": 12.14,
+            "Unknown:RID_MARION": 1.01
+        }
+    },
+    "RID_MARION": {
+        "connections": {
+            "Unknown:RID_C5": 2.03
+        }
+    },
+    "RID_G4": {
+        "connections": {
+            "Unknown:RID_CORNOTH": 7.06
+        }
+    },
+    "RID_CORNOTH": {
+        "connections": {
+            "Unknown:RID_COR_HALL": 8.06,
+            "Unknown:RID_G4": 79.72
+        }
+    },
+    "RID_COR_HALL": {
+        "connections": {
+            "Unknown:RID_CORNOTH": 29.31
+        }
+    },
+    "RID_H7": {
+        "connections": {
+            "Unknown:RID_H6": 4.02,
+            "Unknown:RID_NEST1": 19.18,
+            "Unknown:RID_CAVE2": 44.46
+        }
+    },
+    "RID_TOS_APOTH": {
+        "connections": {
+            "Unknown:RID_TOS": 17.24
+        }
+    },
+    "RID_NEST1": {
+        "connections": {
+            "Unknown:RID_CAVE2": 12.12
+        }
+    },
+    "RID_CAVE2": {
+        "connections": {
+            "Unknown:RID_H7": 6.05
+        }
+    },
+    "RID_G8": {
+        "connections": {
+            "Unknown:RID_I9": 15.15,
+            "Unknown:RID_G5": 34.25
+        }
+    },
+    "RID_I9": {
+        "connections": {
+            "Unknown:RID_CASTLE1C": 37.26,
+            "Unknown:RID_H9": 25.22
+        }
+    },
+    "RID_CASTLE1C": {
+        "connections": {
+            "Unknown:RID_CASTLE1": 5.07,
+            "Unknown:RID_I9": 32.25
+        }
+    },
+    "RID_CASTLE1": {
+        "connections": {
+            "Unknown:RID_CASTLE1C": 7.04,
+            "Unknown:RID_DUNGEON": 4.02
+        }
+    },
+    "RID_DUNGEON": {
+        "connections": {
+            "Unknown:RID_CASTLE1": 22.22
+        }
+    },
+    "RID_H9": {
+        "connections": {
+            "Unknown:RID_G9": 12.08
+        }
+    },
+    "RID_G9": {
+        "connections": {
+            "Unknown:RID_G8": 21.17
+        }
+    },
+    "RID_G5": {
+        "connections": {
+            "Unknown:RID_H7": 14.08
+        }
+    },
+    "RID_BAR_PORT": {
+        "connections": {
+            "Unknown:RID_BAR_VAULT": 9.07,
+            "Unknown:RID_BAR_NORTH": 9.07
+        }
+    },
+    "RID_BAR_VAULT": {
+        "connections": {
+            "Unknown:RID_BAR_PORT": 96.87
+        }
+    },
+    "RID_BAR_BAR": {
+        "connections": {
+            "Unknown:RID_BAR_NORTH": 16.22
+        }
+    },
+    "RID_I8": {
+        "connections": {
+            "Unknown:RID_I7": 4.05
         }
     }
 }
