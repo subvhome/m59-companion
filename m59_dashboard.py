@@ -78,6 +78,8 @@ from m59_updater import check_for_updates
 from m59_gps import GPSManager
 from m59_bank import BankManager
 from m59_lifecycle import InstanceManager
+from m59_inventory import InventoryScraper
+from m59_wholist import WhoListMonitor
 
 SETTINGS_FILE = "gui_settings.json"
 
@@ -193,8 +195,7 @@ class M59Dashboard(tk.Tk):
         self.who_list_width = tk.IntVar(value=250)
         self.who_list_players = {} # Dict of {name: status}
         self.who_dock_window = None
-        self.frida_session = None
-        self.frida_script = None
+        self.who_list_monitor = None
         
         # --- Chat Filtering State ---
         self.filters_enabled = tk.BooleanVar(value=True)
@@ -262,6 +263,8 @@ class M59Dashboard(tk.Tk):
         self.vault_data = {"barloque": [], "hungry": []}
         self.calculator = SchoolCalculator()
         self.bank_manager = BankManager()
+        self.inventory_scraper = None
+        self.inventory_items = []
         self.sync_in_progress = False
 
         # --- Session Tracking Stats ---
@@ -285,13 +288,14 @@ class M59Dashboard(tk.Tk):
         self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
         # Tab Creation
-        tabs = [("Dashboard", "dash"), ("Communications", "comms"), ("GPS", "gps"), ("Progression", "prog"), ("Vault", "vault"), ("Kill Book", "book"), ("Settings", "settings")]
+        tabs = [("Dashboard", "dash"), ("Inventory", "inv"), ("Communications", "comms"), ("GPS", "gps"), ("Progression", "prog"), ("Vault", "vault"), ("Kill Book", "book"), ("Settings", "settings")]
         for name, key in tabs:
             f = tk.Frame(self.notebook, bg="#f0f0f0")
             setattr(self, f"tab_{key}", f)
             self.notebook.add(f, text=f" {name} ")
         
         self.setup_tab_dashboard()
+        self.setup_tab_inventory()
         self.setup_tab_communications()
         self.setup_tab_gps()
         self.setup_tab_progression()
@@ -373,6 +377,73 @@ class M59Dashboard(tk.Tk):
                             self.filter_vars[cat] = tk.BooleanVar(value=False)
             except Exception as e:
                 logger.error(f"Failed to load filters: {e}")
+
+    def setup_tab_inventory(self):
+        """Creates the real-time Inventory list tab."""
+        cont = tk.Frame(self.tab_inv, bg="#f0f0f0")
+        cont.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        header_f = tk.Frame(cont, bg="#f0f0f0")
+        header_f.pack(fill="x", pady=(0, 10))
+        
+        tk.Label(header_f, text="Real-time Inventory", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
+        
+        # Max Capacity Display
+        self.inv_capacity_var = tk.StringVar(value="Capacity: --- units")
+        tk.Label(header_f, textvariable=self.inv_capacity_var, font=("Arial", 10, "italic"), bg="#f0f0f0", fg="#555").pack(side="right")
+        
+        # Treeview for Inventory
+        self.inv_tree = ttk.Treeview(cont, columns=("Name", "Qty"), show="headings", height=20)
+        self.inv_tree.heading("Name", text="Item Name")
+        self.inv_tree.heading("Qty", text="Quantity")
+        
+        self.inv_tree.column("Name", width=self.scale_px(300), anchor="w")
+        self.inv_tree.column("Qty", width=self.scale_px(100), anchor="center")
+        
+        self.inv_tree.pack(fill="both", expand=True)
+        
+        # Scrollbar
+        sb = ttk.Scrollbar(cont, orient="vertical", command=self.inv_tree.yview)
+        sb.pack(side="right", fill="y")
+        self.inv_tree.configure(yscrollcommand=sb.set)
+
+    def update_inventory_tree(self):
+        """Refreshes the inventory tree with the latest items."""
+        if not hasattr(self, "inv_tree"): return
+        
+        # Clear existing
+        for i in self.inv_tree.get_children():
+            self.inv_tree.delete(i)
+            
+        # Insert new items
+        # Sorting: alphabetically
+        sorted_items = sorted(self.inventory_items, key=lambda x: x['name'].lower())
+        
+        for item in sorted_items:
+            # requirement: if quantity is zero then its shouldn't display anything as a quantity
+            qty_display = item['display_qty']
+            self.inv_tree.insert("", "end", values=(item['name'], qty_display))
+
+    def poll_inventory(self):
+        """Background thread to poll inventory every 3 seconds."""
+        if not self.is_running: return
+        
+        if self.inventory_scraper and self.target_pid:
+            try:
+                # Update Max Capacity Display based on Might
+                might = self.current_attributes.get("Might", 25)
+                max_w = self.inventory_scraper.get_max_weight(might)
+                self.inv_capacity_var.set(f"Total Capacity: {max_w:,} units")
+
+                items = self.inventory_scraper.scan_inventory()
+                if items is not None:
+                    self.inventory_items = items
+                    self.after(0, self.update_inventory_tree)
+            except Exception as e:
+                logger.debug(f"Inventory poll error: {e}")
+        
+        # Poll every 3 seconds
+        self.after(3000, self.poll_inventory)
 
     def setup_tab_communications(self):
         paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
@@ -998,177 +1069,31 @@ class M59Dashboard(tk.Tk):
             win32gui.SendMessage(edit_hwnd, win32con.WM_CHAR, ord(char), 0)
 
     def start_who_list_monitor(self):
-        """Initializes Frida hook for real-time population tracking using safe, passive interception."""
+        """Initializes WhoList monitor using the modular WhoListMonitor class."""
         if not self.target_pid or not self.who_list_enabled.get():
             return
             
-        if self.frida_session:
+        if self.who_list_monitor:
             return 
             
-        def run_frida():
-            try:
-                import frida
-                logger.info(f"WhoList: Attaching Passive Listener to PID {self.target_pid}...")
-                session = frida.attach(self.target_pid)
-                self.frida_session = session
-                
-                # Dynamic ASLR-resilient interception + Safe RPC trigger (Robust Engine v1.6).
-                js_code = """
-                let baseAddress = null;
-                let moduleNameActual = "";
-
-                // Dynamically find the primary game module regardless of string casing
-                const modules = Process.enumerateModules();
-                for (let i = 0; i < modules.length; i++) {
-                    const nameLower = modules[i].name.toLowerCase();
-                    if (nameLower === "meridian.exe") {
-                        baseAddress = modules[i].base;
-                        moduleNameActual = modules[i].name;
-                        break;
-                    }
-                }
-
-                // Ultimate Fallback: if enumeration fails to filter, pick the first loaded module
-                if (!baseAddress && modules.length > 0) {
-                    baseAddress = modules[0].base;
-                    moduleNameActual = modules[0].name;
-                }
-
-                if (!baseAddress) {
-                    send({type: 'log', message: 'ERROR: Unable to determine target module base address.'});
-                } else {
-                    send({type: 'log', message: 'Target Module Found: ' + moduleNameActual + ' @ ' + baseAddress});
-                    
-                    // Offsets: LookupMessage = 0x277d0, ToServer = 0x74e0
-                    const addrLookup = baseAddress.add(0x277d0);
-                    const addrToServer = baseAddress.add(0x74e0);
-                    
-                    const PF_MASK = 0x0000C000;
-                    let playerCache = {}; 
-
-                    function getStatus(flags) {
-                        const playerFlags = flags & PF_MASK;
-                        if (playerFlags === 0xC000) return "STAFF";
-                        if (playerFlags === 0x8000) return "OUTLAW";
-                        if (playerFlags === 0x4000) return "MURDERER";
-                        return "INNOCENT";
-                    }
-
-                    try {
-                        Interceptor.attach(addrLookup, {
-                            onEnter: function (args) {
-                                try {
-                                    const buffer = args[0];
-                                    if (buffer.isNull()) return;
-                                    const packetType = buffer.readU8();
-
-                                    if (packetType === 136) { // Population List
-                                        const count = buffer.add(1).readU16();
-                                        let pos = buffer.add(3);
-                                        let players = [];
-                                        for (let i = 0; i < count; i++) {
-                                            try {
-                                                const objId = pos.readU32();
-                                                const nameLen = pos.add(8).readU16();
-                                                const name = pos.add(10).readUtf8String(nameLen);
-                                                const flags = pos.add(10 + nameLen).readU32();
-                                                const status = getStatus(flags);
-                                                if (name) {
-                                                    playerCache[objId] = { name: name, status: status };
-                                                    players.push({ name: name, status: status });
-                                                }
-                                                pos = pos.add(14 + nameLen);
-                                            } catch (e) { break; }
-                                        }
-                                        send({type: 'list', data: players});
-                                    } 
-                                    else if (packetType === 137) { // Logon
-                                        try {
-                                            const objId = buffer.add(1).readU32();
-                                            const nameLen = buffer.add(9).readU16();
-                                            const name = buffer.add(11).readUtf8String(nameLen);
-                                            const flags = buffer.add(11 + nameLen).readU32();
-                                            const status = getStatus(flags);
-                                            if (name) {
-                                                playerCache[objId] = { name: name, status: status };
-                                                send({type: 'logon', name: name, status: status});
-                                            }
-                                        } catch (e) {}
-                                    }
-                                    else if (packetType === 138) { // Logoff
-                                        try {
-                                            const objId = buffer.add(1).readU32();
-                                            if (playerCache[objId]) {
-                                                const p = playerCache[objId];
-                                                send({type: 'logoff', name: p.name});
-                                                delete playerCache[objId];
-                                            }
-                                        } catch (e) {}
-                                    }
-                                } catch (e) {}
-                            }
-                        });
-                        send({type: 'log', message: 'LookupMessage Interceptor hook active.'});
-                    } catch (err) {
-                        send({type: 'log', message: 'ERROR: Hooking LookupMessage failed: ' + err.message});
-                    }
-                    
-                    // Expose safe trigger via RPC (defined on the global scope)
-                    rpc.exports = {
-                        triggerupdate: function() {
-                            try {
-                                const fnToServer = new NativeFunction(addrToServer, 'void', ['uint8', 'pointer'], 'default');
-                                fnToServer(44, ptr(0));
-                                return true;
-                            } catch (e) {
-                                return false;
-                            }
-                        }
-                    };
-                }
-                """
-                
-                script = session.create_script(js_code)
-                self.frida_script = script
-                
-                def on_message(message, data):
-                    if message['type'] == 'send':
-                        payload = message['payload']
-                        if isinstance(payload, dict) and payload.get('type') == 'log':
-                            print(f"FridaLog: {payload.get('message')}")
-                        else:
-                            self.after(0, lambda: self.process_who_list_message(payload))
-                            
-                script.on('message', on_message)
-                script.load()
-                logger.info("WhoList: Passive Listener active and RPC exported.")
-                
-                # Check if we are already logged in when the script finishes loading
-                if self.char_name != "Unknown":
-                    self.after(1500, self.trigger_silent_who_update)
-                
-            except Exception as e:
-                logger.error(f"WhoList: Frida Error: {e}")
-                self.frida_session = None
-
-        threading.Thread(target=run_frida, daemon=True).start()
-
-    def process_who_list_message(self, payload):
-        if not isinstance(payload, dict): return
+        self.who_list_monitor = WhoListMonitor(
+            target_pid=self.target_pid,
+            on_update_callback=self.on_who_list_update
+        )
+        self.who_list_monitor.start()
         
-        ptype = payload.get('type')
-        if ptype == 'list':
-            self.who_list_players = {p['name']: p['status'] for p in payload['data']}
-        elif ptype == 'logon':
-            self.who_list_players[payload['name']] = payload['status']
-        elif ptype == 'logoff':
-            self.who_list_players.pop(payload['name'], None)
-            
-        self.refresh_who_list_ui()
+        # Trigger an update after a short delay to populate initial list
+        if self.char_name != "Unknown":
+            self.after(1500, self.trigger_silent_who_update)
+
+    def on_who_list_update(self, players):
+        """Callback from WhoListMonitor when player list changes."""
+        self.who_list_players = players
+        self.after(0, self.refresh_who_list_ui)
 
     def trigger_silent_who_update(self):
-        """Triggers the silent population update via Frida RPC."""
-        if not self.who_list_enabled.get() or not self.frida_script:
+        """Triggers the silent population update via the monitor's RPC wrapper."""
+        if not self.who_list_enabled.get() or not self.who_list_monitor:
             return
             
         if getattr(self, "sync_in_progress", False):
@@ -1176,14 +1101,7 @@ class M59Dashboard(tk.Tk):
             self.after(1500, self.trigger_silent_who_update)
             return
             
-        def run():
-            try:
-                logger.info("WhoList: Sending safe native trigger for population update...")
-                self.frida_script.exports_sync.triggerupdate()
-            except Exception as e:
-                logger.error(f"WhoList: Failed to invoke silent update: {e}")
-                
-        threading.Thread(target=run, daemon=True).start()
+        self.who_list_monitor.trigger_silent_update()
 
     def refresh_who_list_ui(self):
         if not self.who_list_enabled.get(): return
@@ -1625,6 +1543,7 @@ class M59Dashboard(tk.Tk):
             delattr(self, 'gps_off_track_time')
 
     def setup_tab_dashboard(self):
+        # ... (rest of dashboard setup)
         # --- 1. Top HUD (Vitals) ---
         top = tk.Frame(self.tab_dash, bg="#f0f0f0")
         top.pack(side="top", fill="x", padx=10, pady=5)
@@ -1839,8 +1758,12 @@ class M59Dashboard(tk.Tk):
         logger.info(f"LifeCycle: New Game Instance Detected (PID {pid})")
         self.pm_obj = pm
         self.target_pid = pid
-        
+
+        # Initialize Scraper
+        self.inventory_scraper = InventoryScraper(pm)
+
         # Find the HWND for this PID
+
         self.main_hwnd = find_game_hwnd(pid)
         
         if not self.main_hwnd:
@@ -1853,9 +1776,11 @@ class M59Dashboard(tk.Tk):
         # Start Who List if enabled
         if self.who_list_enabled.get():
             self.start_who_list_monitor()
-            
-        self.after(500, self.check_for_login)
 
+        # Start Inventory Polling
+        self.after(2000, self.poll_inventory)
+
+        self.after(500, self.check_for_login)
     def check_for_login(self):
         """Polls the window title to detect when a character has entered the world."""
         if not self.main_hwnd or not self.is_running:
@@ -1956,15 +1881,16 @@ class M59Dashboard(tk.Tk):
         """Callback when InstanceManager loses connection to a game process."""
         logger.info(f"LifeCycle: Game Instance Lost (PID {pid}). Entering search mode...")
         
-        # Stop Frida
-        if self.frida_session:
-            try: self.frida_session.detach()
-            except: pass
-            self.frida_session = None
-            self.frida_script = None
+        # Stop WhoList Monitor
+        if self.who_list_monitor:
+            self.who_list_monitor.stop()
+            self.who_list_monitor = None
             
         self.who_list_players = {}
+        self.inventory_items = []
+        self.inventory_scraper = None
         self.refresh_who_list_ui()
+        self.update_inventory_tree()
         
         self.show_waiting_overlay()
         self.status_var.set(f"Game Lost ({self.char_name}) - Searching...")
@@ -2275,6 +2201,8 @@ class M59Dashboard(tk.Tk):
         self.save_settings()
         if self.who_list_docked.get():
             self.unregister_appbar()
+        if self.who_list_monitor:
+            self.who_list_monitor.stop()
         if self.target_pid:
             release_pid(self.target_pid)
         self.destroy()

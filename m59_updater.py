@@ -15,7 +15,14 @@ def check_for_updates(current_version):
         url = f"{VERSION_URL}?t={int(time.time())}"
         with urllib.request.urlopen(url, timeout=5) as response:
             remote_v = response.read().decode('utf-8').strip()
-            return (float(remote_v) > float(current_version)), remote_v
+            
+            def parse(v):
+                # Robustly parse version strings like "1.8.0" or "v1.8" into integer lists
+                import re
+                nums = re.findall(r'\d+', v)
+                return [int(n) for n in nums] if nums else [0]
+                
+            return (parse(remote_v) > parse(current_version)), remote_v
     except:
         return False, None
 

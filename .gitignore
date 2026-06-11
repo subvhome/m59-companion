@@ -1,6 +1,6 @@
 logs/
-__pycache__/
 prev-code/
+__pycache__/
 *.spec
 build/
 m59_companion_locks/
@@ -17,6 +17,12 @@ test_version_trigger.py
 wholist-discover.py
 wholist-final.py
 wholist-smart.py
+debugscripts/
+*.pcapng
+*.txt
+*.log
+*.tmp
 navrecap.md
 SESSION_RESUME.md
 complex_room_files.txt
+inv_hunt.txt
