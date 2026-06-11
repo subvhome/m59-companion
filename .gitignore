@@ -1,6 +1,7 @@
 logs/
 prev-code/
 __pycache__/
+.gemini/
 *.spec
 build/
 m59_companion_locks/
