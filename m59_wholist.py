@@ -2,15 +2,11 @@ import threading
 import logging
 import time
 
-# --- Meridian 59 Improved Wholist Engine ---
-# Based on wholist.py v10.0 (Direct Memory Polling)
+# --- Meridian 59 Improved Wholist Engine (ASLR-Safe) ---
+# Based on wholist-perfect.py (Direct Memory Polling with Relative Offsets)
 
 FRIDA_JS_CODE = """
 const log = (msg) => send({type: 'log', data: msg});
-
-// Base address and pointer to the linked list of online players
-var currentUsersPtrAddr = ptr("0x8089a0");
-var LookupRscAddr = null;
 
 function start() {
     var meridian = Process.findModuleByName("meridian.exe") || Process.findModuleByName("Meridian.exe");
@@ -19,7 +15,11 @@ function start() {
         return;
     }
 
-    // Locate the LookupRsc export to resolve resource IDs to strings
+    // ASLR-Safe Offset: current_users pointer is at this distance from module base
+    var offset = 0x2A89A0; 
+    var currentUsersPtrAddr = meridian.base.add(offset);
+    
+    var LookupRscAddr = null;
     var exps = meridian.enumerateExports();
     for (var i = 0; i < exps.length; i++) {
         if (exps[i].name === "LookupRsc") LookupRscAddr = exps[i].address;
@@ -31,7 +31,7 @@ function start() {
 
     rpc.exports = {
         getlist: function() {
-            if (!currentUsersPtrAddr || !LookupRscAddr) return [];
+            if (!LookupRscAddr) return [];
             try {
                 var lookupRsc = new NativeFunction(LookupRscAddr, 'pointer', ['uint32']);
                 var head = currentUsersPtrAddr.readPointer();
@@ -50,15 +50,16 @@ function start() {
                             var name = nameStrPtr.readCString();
                             
                             // Protocol Flags (Fixed Bits)
-                            // PF_KILLER  = 0x00004000 (RED)
-                            // PF_OUTLAW  = 0x00008000 (ORANGE)
-                            // PF_CREATOR = 0x00010000 (YELLOW)
+                            // PF_KILLER  = 0x4000
+                            // PF_OUTLAW  = 0x8000
+                            // PF_CREATOR = 0x10000
                             var flags = objPtr.add(20).readU32();
                             var status = "WHITE";
                             
-                            if (flags & 0x00004000) status = "RED";
-                            else if (flags & 0x00008000) status = "ORANGE";
-                            else if (flags & 0x00010000 || name === "Zaphod") status = "YELLOW"; 
+                            if (flags & 0x4000) status = "RED";
+                            else if (flags & 0x8000) status = "ORANGE";
+                            else if (flags & 0xC000) status = "BLUE";
+                            else if (flags & 0x10000 || name === "Zaphod") status = "YELLOW"; 
 
                             if (name && name.length > 1) {
                                 players.push({name: name, status: status});
@@ -72,7 +73,7 @@ function start() {
             } catch (e) { return []; }
         }
     };
-    log("Discovery Complete. Memory monitoring active.");
+    log("Discovery Complete. ASLR-safe monitoring active.");
 }
 
 start();
@@ -126,20 +127,19 @@ class WhoListMonitor:
             
             script.on('message', on_message)
             script.load()
-            logger.info("WhoList: Memory Polling Engine active.")
+            logger.info("WhoList: ASLR-safe Memory Polling active.")
 
-            # Polling Loop (Direct replacement for passive interception)
+            # Polling Loop
             while self.running and self.frida_script:
                 try:
-                    # Retrieve latest list from memory
                     current_data = script.exports_sync.getlist()
                     
-                    # Map colors to Dashboard status strings
-                    # WHITE -> INNOCENT, ORANGE -> OUTLAW, RED -> MURDERER, YELLOW -> STAFF
+                    # Map colors to Dashboard status tags
                     status_map = {
                         "WHITE": "INNOCENT",
                         "ORANGE": "OUTLAW",
                         "RED": "MURDERER",
+                        "BLUE": "STAFF",
                         "YELLOW": "STAFF"
                     }
                     
@@ -148,7 +148,6 @@ class WhoListMonitor:
                         raw_status = p['status']
                         new_players[p['name']] = status_map.get(raw_status, "INNOCENT")
 
-                    # If the list has changed, update the UI
                     if new_players != self.players:
                         self.players = new_players
                         if self.on_update_callback:
@@ -164,10 +163,5 @@ class WhoListMonitor:
             self.running = False
 
     def trigger_silent_update(self):
-        """
-        Compatibility method for the dashboard.
-        Since we are polling memory directly, a manual trigger is no longer strictly required,
-        but we maintain the method to avoid breaking dashboard logic.
-        """
+        """Manual update requested - polling is already active."""
         logger.debug("WhoList: Manual update requested (Polling is already active).")
-        # Optional: We could force an immediate iteration here if needed.

@@ -1,6 +1,7 @@
 logs/
 prev-code/
 __pycache__/
+debugscripts/
 *.spec
 build/
 m59_companion_locks/
@@ -26,3 +27,4 @@ navrecap.md
 SESSION_RESUME.md
 complex_room_files.txt
 inv_hunt.txt
+wholist-perfect.py
