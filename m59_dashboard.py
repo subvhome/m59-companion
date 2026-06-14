@@ -459,6 +459,12 @@ class M59Dashboard(tk.Tk):
         draw_bar(self.sat_bar_canvas, sat_perc)
         self.sat_lbl.config(text=f"Current Load: {sat_perc:.1f}%")
         
+        # Update Dock Footer Saturation
+        if hasattr(self, 'dock_inv_lbl'):
+            self.dock_inv_lbl.config(text=f"{sat_perc:.1f}%")
+        if hasattr(self, 'dock_inv_canvas'):
+            draw_bar(self.dock_inv_canvas, sat_perc, h_override=self.scale_px(4))
+
         # 2. Detailed Bars
         draw_bar(self.weight_bar_canvas, w_perc)
         draw_bar(self.bulk_bar_canvas, b_perc)
@@ -486,15 +492,19 @@ class M59Dashboard(tk.Tk):
                 if raw_items is not None:
                     # 2. Map for inventory.process_inventory
                     # Needs 'id', 'name', 'amount'
-                    calc_items = [{'id': '0', 'name': i['name'], 'amount': i['qty']} for i in raw_items]
+                    # Fix: If qty is 0, it means it's a single item (non-stackable). Treat as 1.
+                    calc_items = []
+                    for i in raw_items:
+                        qty = i['qty'] if i['qty'] > 0 else 1
+                        calc_items.append({'id': '0', 'name': i['name'], 'amount': qty})
                     
                     # 3. Process using logic from inventory.py
                     weight, bulk, detailed, unknowns = inventory.process_inventory(calc_items)
                     
-                    # 4. Calculate Max Capacity based on Might and inventory.CONFIG
-                    char_cfg = inventory.CONFIG.get("character", {"base_capacity": 1700, "might_factor": 20})
-                    might = self.current_attributes.get("Might", char_cfg.get("might", 25))
-                    max_cap = char_cfg["base_capacity"] + (int(might) * char_cfg["might_factor"])
+                    # 4. Calculate Max Capacity based on Live Might stat
+                    # Formula: 1700 (Base) + (Might * 20)
+                    might = self.current_attributes.get("Might", 25)
+                    max_cap = 1700 + (int(might) * 20)
                     
                     # 5. Percentages
                     w_perc = (weight / max_cap) * 100 if max_cap > 0 else 0
@@ -975,6 +985,21 @@ class M59Dashboard(tk.Tk):
         add_status_row(self.who_footer, "IMPROVES:", "improves", "📈")
         add_status_row(self.who_footer, "BANK (M):", "bank_m", "💰")
         add_status_row(self.who_footer, "BANK (I):", "bank_i", "🌴")
+        
+        # Subtle Divider
+        tk.Frame(self.who_footer, height=1, bg="#323338").pack(fill="x", pady=5)
+
+        # 4. Inventory Saturation Row (Most Bottom)
+        inv_row = tk.Frame(self.who_footer, bg=footer_bg)
+        inv_row.pack(fill="x", padx=10, pady=(2, 10))
+        tk.Label(inv_row, text="🎒 BAG SPACE:", font=("Segoe UI", 8), bg=footer_bg, fg="#888").pack(side="left")
+        
+        self.dock_inv_lbl = tk.Label(inv_row, text="0%", font=("Segoe UI", 8, "bold"), bg=footer_bg, fg="#fff")
+        self.dock_inv_lbl.pack(side="right")
+        self.who_footer_labels["bag"] = self.dock_inv_lbl
+
+        self.dock_inv_canvas = tk.Canvas(self.who_footer, height=self.scale_px(4), bg="#323338", highlightthickness=0)
+        self.dock_inv_canvas.pack(fill="x", padx=10, pady=(0, 10))
         
         tk.Frame(self.who_list_panel, height=1, bg="#323338").pack(side="bottom", fill="x")
 
