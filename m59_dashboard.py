@@ -80,6 +80,7 @@ from m59_bank import BankManager
 from m59_lifecycle import InstanceManager
 from m59_inventory import InventoryScraper
 from m59_wholist import WhoListMonitor
+import inventory
 
 SETTINGS_FILE = "gui_settings.json"
 
@@ -379,71 +380,135 @@ class M59Dashboard(tk.Tk):
                 logger.error(f"Failed to load filters: {e}")
 
     def setup_tab_inventory(self):
-        """Creates the real-time Inventory list tab."""
+        """Creates the real-time Inventory list tab with Weight and Bulk metrics."""
         cont = tk.Frame(self.tab_inv, bg="#f0f0f0")
         cont.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # --- TOP SECTION: Primary Saturation Meter ---
+        sat_frame = tk.Frame(cont, bg="#f0f0f0")
+        sat_frame.pack(fill="x", pady=(0, 5))
+        tk.Label(sat_frame, text="TOTAL INVENTORY SATURATION", font=("Arial", 10, "bold"), bg="#f0f0f0", fg="#333").pack(anchor="w")
+        self.sat_bar_canvas = tk.Canvas(sat_frame, height=self.scale_px(18), bg="#ddd", highlightthickness=0)
+        self.sat_bar_canvas.pack(fill="x", pady=2)
+        self.sat_lbl = tk.Label(sat_frame, text="Current Load: 0%", font=("Arial", 9, "bold"), bg="#f0f0f0", fg="#555")
+        self.sat_lbl.pack(anchor="w")
+
+        # --- MIDDLE SECTION: Detailed Metrics ---
+        metrics_frame = tk.Frame(cont, bg="#f0f0f0")
+        metrics_frame.pack(fill="x", pady=(10, 10))
         
-        header_f = tk.Frame(cont, bg="#f0f0f0")
-        header_f.pack(fill="x", pady=(0, 10))
-        
-        tk.Label(header_f, text="Real-time Inventory", font=("Arial", 12, "bold"), bg="#f0f0f0").pack(side="left")
-        
-        # Max Capacity Display
-        self.inv_capacity_var = tk.StringVar(value="Capacity: --- units")
-        tk.Label(header_f, textvariable=self.inv_capacity_var, font=("Arial", 10, "italic"), bg="#f0f0f0", fg="#555").pack(side="right")
-        
-        # Treeview for Inventory
-        self.inv_tree = ttk.Treeview(cont, columns=("Name", "Qty"), show="headings", height=20)
+        # Weight Metric (Left)
+        w_frame = tk.Frame(metrics_frame, bg="#f0f0f0")
+        w_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        tk.Label(w_frame, text="Weight Load", font=("Arial", 8, "bold"), bg="#f0f0f0", fg="#666").pack(anchor="w")
+        self.weight_bar_canvas = tk.Canvas(w_frame, height=self.scale_px(8), bg="#eee", highlightthickness=0)
+        self.weight_bar_canvas.pack(fill="x", pady=1)
+        self.weight_lbl = tk.Label(w_frame, text="0 / 0", font=("Arial", 8), bg="#f0f0f0", fg="#777")
+        self.weight_lbl.pack(anchor="w")
+
+        # Bulk Metric (Right)
+        b_frame = tk.Frame(metrics_frame, bg="#f0f0f0")
+        b_frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
+        tk.Label(b_frame, text="Bulk Volume", font=("Arial", 8, "bold"), bg="#f0f0f0", fg="#666").pack(anchor="w")
+        self.bulk_bar_canvas = tk.Canvas(b_frame, height=self.scale_px(8), bg="#eee", highlightthickness=0)
+        self.bulk_bar_canvas.pack(fill="x", pady=1)
+        self.bulk_lbl = tk.Label(b_frame, text="0 / 0", font=("Arial", 8), bg="#f0f0f0", fg="#777")
+        self.bulk_lbl.pack(anchor="w")
+
+        # --- BOTTOM SECTION: Item List ---
+        list_label = tk.Label(cont, text="CARRIED ITEMS", font=("Arial", 9, "bold"), bg="#f0f0f0", fg="#333")
+        list_label.pack(anchor="w", pady=(10, 5))
+
+        # Treeview for Inventory with W/B columns
+        self.inv_tree = ttk.Treeview(cont, columns=("Name", "Qty", "W", "B"), show="headings", height=15)
         self.inv_tree.heading("Name", text="Item Name")
-        self.inv_tree.heading("Qty", text="Quantity")
-        
-        self.inv_tree.column("Name", width=self.scale_px(300), anchor="w")
-        self.inv_tree.column("Qty", width=self.scale_px(100), anchor="center")
-        
+        self.inv_tree.heading("Qty", text="Qty")
+        self.inv_tree.heading("W", text="W")
+        self.inv_tree.heading("B", text="B")
+
+        self.inv_tree.column("Name", width=self.scale_px(250), anchor="w")
+        self.inv_tree.column("Qty", width=self.scale_px(60), anchor="center")
+        self.inv_tree.column("W", width=self.scale_px(40), anchor="center")
+        self.inv_tree.column("B", width=self.scale_px(40), anchor="center")
+
         self.inv_tree.pack(fill="both", expand=True)
-        
+
         # Scrollbar
         sb = ttk.Scrollbar(cont, orient="vertical", command=self.inv_tree.yview)
         sb.pack(side="right", fill="y")
         self.inv_tree.configure(yscrollcommand=sb.set)
 
-    def update_inventory_tree(self):
-        """Refreshes the inventory tree with the latest items."""
-        if not hasattr(self, "inv_tree"): return
+    def update_inventory_ui(self, weight, bulk, w_perc, b_perc, max_cap, detailed_items):
+        """Updates the metrics bars and the item list."""
+        def draw_bar(canvas, perc, h_override=None):
+            canvas.update_idletasks()
+            w = canvas.winfo_width()
+            h = h_override if h_override else canvas.winfo_height()
+            canvas.delete("all")
+
+            # Colors: Green -> Yellow (80%) -> Red (95%)
+            color = "#4CAF50"
+            if perc > 95: color = "#F44336"
+            elif perc > 80: color = "#FFC107"
+
+            fill_w = (min(100, perc) / 100.0) * w
+            canvas.create_rectangle(0, 0, fill_w, h, fill=color, outline="")
+
+        # 1. Primary Saturation (the dominant limit)
+        sat_perc = max(w_perc, b_perc)
+        draw_bar(self.sat_bar_canvas, sat_perc)
+        self.sat_lbl.config(text=f"Current Load: {sat_perc:.1f}%")
         
-        # Clear existing
+        # 2. Detailed Bars
+        draw_bar(self.weight_bar_canvas, w_perc)
+        draw_bar(self.bulk_bar_canvas, b_perc)
+        self.weight_lbl.config(text=f"{int(weight):,} / {max_cap:,} ({w_perc:.1f}%)")
+        self.bulk_lbl.config(text=f"{int(bulk):,} / {max_cap:,} ({b_perc:.1f}%)")
+
+        # 3. Update Tree
         for i in self.inv_tree.get_children():
             self.inv_tree.delete(i)
-            
-        # Insert new items
-        # Sorting: alphabetically
-        sorted_items = sorted(self.inventory_items, key=lambda x: x['name'].lower())
-        
-        for item in sorted_items:
-            # requirement: if quantity is zero then its shouldn't display anything as a quantity
-            qty_display = item['display_qty']
-            self.inv_tree.insert("", "end", values=(item['name'], qty_display))
+
+        for item in detailed_items:
+            # handle 'qty' key from inventory.process_inventory
+            q = item.get('qty', 1)
+            qty_disp = f"x{q}" if q > 1 or q == 0 else ""
+            self.inv_tree.insert("", "end", values=(item['name'], qty_disp, item['weight'], item['bulk']))
 
     def poll_inventory(self):
-        """Background thread to poll inventory every 3 seconds."""
+        """Background thread to poll inventory every 3 seconds using inventory.py logic."""
         if not self.is_running: return
-        
+
         if self.inventory_scraper and self.target_pid:
             try:
-                # Update Max Capacity Display based on Might
-                might = self.current_attributes.get("Might", 25)
-                max_w = self.inventory_scraper.get_max_weight(might)
-                self.inv_capacity_var.set(f"Total Capacity: {max_w:,} units")
-
-                items = self.inventory_scraper.scan_inventory()
-                if items is not None:
-                    self.inventory_items = items
-                    self.after(0, self.update_inventory_tree)
+                # 1. Get raw items using the robust pymem scraper
+                raw_items = self.inventory_scraper.scan_inventory()
+                if raw_items is not None:
+                    # 2. Map for inventory.process_inventory
+                    # Needs 'id', 'name', 'amount'
+                    calc_items = [{'id': '0', 'name': i['name'], 'amount': i['qty']} for i in raw_items]
+                    
+                    # 3. Process using logic from inventory.py
+                    weight, bulk, detailed, unknowns = inventory.process_inventory(calc_items)
+                    
+                    # 4. Calculate Max Capacity based on Might and inventory.CONFIG
+                    char_cfg = inventory.CONFIG.get("character", {"base_capacity": 1700, "might_factor": 20})
+                    might = self.current_attributes.get("Might", char_cfg.get("might", 25))
+                    max_cap = char_cfg["base_capacity"] + (int(might) * char_cfg["might_factor"])
+                    
+                    # 5. Percentages
+                    w_perc = (weight / max_cap) * 100 if max_cap > 0 else 0
+                    b_perc = (bulk / max_cap) * 100 if max_cap > 0 else 0
+                    
+                    # Update UI
+                    self.after(0, lambda: self.update_inventory_ui(weight, bulk, w_perc, b_perc, max_cap, detailed))
             except Exception as e:
-                logger.debug(f"Inventory poll error: {e}")
-        
+                logger.error(f"Inventory poll error: {e}")
+
+
         # Poll every 3 seconds
         self.after(3000, self.poll_inventory)
+
 
     def setup_tab_communications(self):
         paned = ttk.PanedWindow(self.tab_comms, orient=tk.HORIZONTAL)
