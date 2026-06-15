@@ -18,7 +18,7 @@ The **M59 Companion** is a modern assistant and digital "heads-up display" (HUD)
 
 ### PK Alert System
 ![PK Alert](demo/PVP%20alert.gif)
-*Visual and audio alerts that trigger when you are attacked by other players.*
+*Visual and audio alerts that trigger when you are attacked by other players. Can be useful if you play without sound. (This test was done on a rat)*
 
 ### Vault Manager
 ![Vault Manager](demo/Vault%20Management.gif)
