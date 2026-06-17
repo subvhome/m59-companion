@@ -21,8 +21,8 @@ CONFIG = load_config()
 JS_CODE = """
 const log = (msg) => send({type: 'log', data: msg});
 
-const GET_PLAYER_INFO_ADDR = ptr("0x643a10");
-const LOOKUP_RSC_ADDR = ptr("0x617cd0");
+const GET_PLAYER_INFO_ADDR = Module.findExportByName(null, "GetPlayerInfo");
+const LOOKUP_RSC_ADDR = Module.findExportByName(null, "LookupNameRsc");
 
 var getPlayerInfo = new NativeFunction(GET_PLAYER_INFO_ADDR, 'pointer', []);
 var lookupRsc = new NativeFunction(LOOKUP_RSC_ADDR, 'pointer', ['uint32']);

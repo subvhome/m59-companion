@@ -142,7 +142,7 @@ def perform_vault_scan(main_hwnd, char_name, vault_type="barloque", progress_cb=
         time.sleep(0.5) # Wait for server update
         qty = get_listbox_row(hwnd_qtys, i)
         
-        item_data = {"item": item_name, "quantity": qty.strip() or "0"}
+        item_data = {"item": item_name, "quantity": qty.strip() or "1"}
         inventory.append(item_data)
         if progress_cb:
             progress_cb(i + 1, total_rows, item_name, qty)
