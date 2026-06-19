@@ -318,29 +318,38 @@ class M59Dashboard(tk.Tk):
         """Helper to scale pixel values by the current scaling factor."""
         return int(px * self.scaling_factor)
 
+    def hide_tooltip(self):
+        """Destroys the active hover tooltip, if any."""
+        tip = getattr(self, "tooltip", None)
+        if tip is None:
+            return
+        try:
+            tip.destroy()
+        except tk.TclError:
+            pass
+        self.tooltip = None
+
     def set_tooltip(self, widget, text):
         """Adds a simple hover tooltip to a widget."""
         def enter(event):
-            # Create a tooltip window
-            self.tooltip = tk.Toplevel(self)
-            self.tooltip.overrideredirect(True)
-            self.tooltip.attributes("-topmost", True)
-            
-            # Position it near the mouse
+            self.hide_tooltip()
+            tip = tk.Toplevel(widget.winfo_toplevel())
+            tip.overrideredirect(True)
+            tip.attributes("-topmost", True)
+
             x = event.x_root + 20
             y = event.y_root + 10
-            self.tooltip.geometry(f"+{x}+{y}")
-            
-            label = tk.Label(self.tooltip, text=text, bg="#ffffca", fg="#333", 
+            tip.geometry(f"+{x}+{y}")
+
+            label = tk.Label(tip, text=text, bg="#ffffca", fg="#333",
                              font=("Arial", 9), relief=tk.SOLID, borderwidth=1, padx=5, pady=2)
             label.pack()
-            
-        def leave(event):
-            if hasattr(self, "tooltip"):
-                self.tooltip.destroy()
-                
+            self.tooltip = tip
+
         widget.bind("<Enter>", enter, add="+")
-        widget.bind("<Leave>", leave, add="+")
+        widget.bind("<Leave>", lambda e: self.hide_tooltip(), add="+")
+        widget.bind("<Button-1>", lambda e: self.hide_tooltip(), add="+")
+        widget.bind("<Destroy>", lambda e: self.hide_tooltip(), add="+")
 
     def apply_ui_scaling(self):
         """Configures ttk styles for correct scaling (especially rowheight)."""
@@ -879,6 +888,7 @@ class M59Dashboard(tk.Tk):
 
     def setup_who_list_panel(self, parent=None):
         # Cleanup existing panel if it exists
+        self.hide_tooltip()
         if hasattr(self, "who_list_panel") and self.who_list_panel:
             try: self.who_list_panel.destroy()
             except: pass
@@ -1050,6 +1060,7 @@ class M59Dashboard(tk.Tk):
 
     def toggle_who_list_dock(self):
         """Toggles the Who List between an integrated panel and a desktop-docked AppBar."""
+        self.hide_tooltip()
         if self.who_list_docked.get():
             # Undock
             self.unregister_appbar()

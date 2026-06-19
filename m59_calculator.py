@@ -48,22 +48,40 @@ class SchoolCalculator:
                 "character": {"intellect": 25}
             }
 
-    def get_school_status(self, knowledge_cache, levels):
+    def _riija_blink_only(self, knowledge_cache, school_data):
+        """Riija is excluded from progress when Blink is the only known spell."""
+        known = {
+            s.lower()
+            for lvl in range(1, 7)
+            for s in school_data.get(f"Level_{lvl}", [])
+            if s.lower() in knowledge_cache
+        }
+        return known == {"blink"}
+
+    def _level_skills(self, school_data, level, school_name=None):
+        skills = [s.lower() for s in school_data.get(f"Level_{level}", [])]
+        if school_name == "Riija":
+            skills = [s for s in skills if s != "blink"]
+        return skills
+
+    def get_school_status(self, school_name, knowledge_cache, levels):
         """Returns (max_level_reached, points_for_max_level)"""
         # Based on system.kod vlLevelPoints = [1, 2, 4, 6, 8, 10]
         point_values = {0: 0, 1: 1, 2: 2, 3: 4, 4: 6, 5: 8, 6: 10}
+        if school_name == "Riija" and self._riija_blink_only(knowledge_cache, levels):
+            return 0, 0
+
         max_lvl = 0
         for i in range(6, 0, -1):
             lvl_key = f"Level_{i}"
-            if lvl_key not in levels: continue
-            
-            # Check for any skill at this level in a case-insensitive way
-            # Special Rule: Blink doesn't count toward Riija level progress as everyone gets it
-            skills = [s.lower() for s in levels[lvl_key] if s.lower() != "blink"]
+            if lvl_key not in levels:
+                continue
+
+            skills = self._level_skills(levels, i, school_name)
             if any(s in knowledge_cache for s in skills):
                 max_lvl = i
                 break
-                
+
         return max_lvl, point_values.get(max_lvl, 0)
 
     def calculate_progression(self, knowledge_cache, intellect=None):
@@ -96,7 +114,7 @@ class SchoolCalculator:
         school_stats = {}
         total_base_points = 0
         for name, levels in self.schools.items():
-            max_lvl, pts = self.get_school_status(knowledge_cache, levels)
+            max_lvl, pts = self.get_school_status(name, knowledge_cache, levels)
             if max_lvl > 0:
                 school_stats[name] = max_lvl
                 total_base_points += pts
@@ -123,12 +141,15 @@ class SchoolCalculator:
                 continue
 
             # Determine the target level we are working towards
-            skills_at_lvl = [s.lower() for s in school_data.get(f"Level_{current_lvl}", [])]
+            skills_at_lvl = self._level_skills(school_data, current_lvl, name)
             known_at_lvl = sum(1 for s in skills_at_lvl if s in knowledge_cache)
-            
-            # Rule: Level > 2 or 2+ skills known means you've "passed" this level
+
+            # Rule: Level > 2 or 2+ skills known means you've "passed" this level.
+            # A single L1 spell still means you're at level 1, working toward level 2.
             if current_lvl > 2 or known_at_lvl >= 2:
                 target_lvl = current_lvl + 1
+            elif current_lvl == 1:
+                target_lvl = 2
             else:
                 target_lvl = current_lvl
 
@@ -148,7 +169,7 @@ class SchoolCalculator:
             
             # Scarcity adjustment
             if target_lvl > 1:
-                prev_lvl_skills = [s.lower() for s in school_data.get(f"Level_{target_lvl-1}", [])]
+                prev_lvl_skills = self._level_skills(school_data, target_lvl - 1, name)
                 num_in_prev = len(prev_lvl_skills)
                 if num_in_prev == 1:
                     t_sum = t_sum / 3.0
@@ -161,7 +182,7 @@ class SchoolCalculator:
             if target_lvl == 1:
                 c_sum = 297
             else:
-                prev_lvl_skills = [s.lower() for s in school_data.get(f"Level_{target_lvl-1}", [])]
+                prev_lvl_skills = self._level_skills(school_data, target_lvl - 1, name)
                 percents = sorted([knowledge_cache.get(s, 0) for s in prev_lvl_skills], reverse=True)
                 c_sum = sum(percents[:3])
             
