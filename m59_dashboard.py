@@ -80,6 +80,7 @@ from m59_bank import BankManager
 from m59_lifecycle import InstanceManager
 from m59_inventory import InventoryScraper
 from m59_wholist import WhoListMonitor
+from m59_time import get_game_time, format_game_time
 import inventory
 
 SETTINGS_FILE = "gui_settings.json"
@@ -197,6 +198,7 @@ class M59Dashboard(tk.Tk):
         self.who_list_players = {} # Dict of {name: status}
         self.who_dock_window = None
         self.who_list_monitor = None
+        self.game_time_mode_24h = tk.BooleanVar(value=True)
         
         # --- Chat Filtering State ---
         self.filters_enabled = tk.BooleanVar(value=True)
@@ -312,6 +314,7 @@ class M59Dashboard(tk.Tk):
 
         self.minsize(400, 300)
         self.after(100, self.background_update_check)
+        self.after(100, self.update_game_time)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def scale_px(self, px):
@@ -840,6 +843,7 @@ class M59Dashboard(tk.Tk):
                     self.who_list_enabled.set(s.get("who_list_enabled", True))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
                     self.who_list_width.set(s.get("who_list_width", 250))
+                    self.game_time_mode_24h.set(s.get("game_time_mode_24h", True))
                     
                     # Force Who List to be in-app on startup (don't remember desktop dock)
                     self.who_list_docked.set(False)
@@ -872,6 +876,7 @@ class M59Dashboard(tk.Tk):
                     "who_list_enabled": self.who_list_enabled.get(),
                     "who_list_docked": self.who_list_docked.get(),
                     "who_list_side": self.who_list_side.get(),
+                    "game_time_mode_24h": self.game_time_mode_24h.get(),
                     "filters_enabled": self.filters_enabled.get(),
                     "filter_states": fs_save
                 }, f)
@@ -930,9 +935,35 @@ class M59Dashboard(tk.Tk):
         self.who_list_header.pack(fill="x", side="top")
         
         tk.Label(
-            self.who_list_header, text="Status Dock", font=("Segoe UI", 10, "bold"), 
+            self.who_list_header, text="M59 Companion", font=("Segoe UI", 10, "bold"), 
             bg="#1e1f22", fg="#4CAF50", pady=7, bd=0
         ).pack(side="left", padx=10)
+        
+        # Game Time Row
+        self.time_frame = tk.Frame(self.who_list_panel, bg="#1e1f22")
+        self.time_frame.pack(fill="x", side="top")
+        
+        self.game_time_lbl = tk.Label(
+            self.time_frame, text="Game Time: --:--:--", font=("Segoe UI", 9),
+            bg="#1e1f22", fg="#e0e0e0"
+        )
+        self.game_time_lbl.pack(side="left", padx=10, pady=2)
+        
+        self.game_time_toggle_btn = tk.Button(
+            self.time_frame, text="12/24", font=("Segoe UI", 8, "bold"),
+            bg="#323338", fg="#fff", activebackground="#2b2d31", activeforeground="#fff",
+            bd=0, padx=5, pady=1, cursor="hand2", command=self.toggle_game_time_mode
+        )
+        self.game_time_toggle_btn.pack(side="right", padx=10, pady=2)
+
+        # Separator under Game Time
+        tk.Frame(self.who_list_panel, height=1, bg="#323338").pack(fill="x", side="top")
+
+        # Who's Online Label
+        tk.Label(
+            self.who_list_panel, text="[Who's Online]", font=("Segoe UI", 9, "bold"),
+            bg="#2b2d31", fg="#888", anchor="w"
+        ).pack(fill="x", side="top", padx=10, pady=(5, 0))
         
         # Dock/Toggle Button
         dock_text = "↙" if self.who_list_docked.get() else "↗"
@@ -955,6 +986,9 @@ class M59Dashboard(tk.Tk):
         )
         self.who_list_count_lbl.pack(side="bottom", fill="x")
 
+        # Separator above dynamic player count
+        tk.Frame(self.who_list_panel, height=1, bg="#323338").pack(side="bottom", fill="x")
+
         # Status Footer
         footer_bg = "#1e1f22"
         self.who_footer = tk.Frame(self.who_list_panel, bg=footer_bg, bd=0)
@@ -967,9 +1001,24 @@ class M59Dashboard(tk.Tk):
         )
         gps_header.pack(fill="x")
         
-        # 2. GPS Data Row (Full width, centered)
-        # Using a higher wraplength and centering for the new 2-liner format
         wrap = self.who_list_width.get() - self.scale_px(40)
+
+        # 2. CURRENT LOCATION (Dynamic)
+        self.gps_who_loc_lbl = tk.Label(
+            self.who_footer, text="Unknown Location", font=("Segoe UI", 9, "bold"),
+            bg=footer_bg, fg="#4CAF50", wraplength=wrap, justify="center"
+        )
+        self.gps_who_loc_lbl.pack(fill="x", pady=(0, 2))
+        
+        # 3. PVP Status Placeholder
+        self.pvp_status_lbl = tk.Label(
+            self.who_footer, text="PVP | Guild PVP | NO PVP", font=("Segoe UI", 8),
+            bg=footer_bg, fg="#555555"
+        )
+        self.pvp_status_lbl.pack(fill="x", pady=(0, 5))
+        self.set_tooltip(self.pvp_status_lbl, "Coming Soon")
+        
+        # 4. GPS Route instruction (No active route)
         self.gps_dock_lbl = tk.Label(
             self.who_footer, text="No active route", font=("Segoe UI", 8, "bold"), 
             bg=footer_bg, fg="#fff", wraplength=wrap, justify="center"
@@ -1223,6 +1272,8 @@ class M59Dashboard(tk.Tk):
         current_w = self.who_list_width.get()
         for lbl in self.who_footer_labels.values():
             lbl.config(wraplength=current_w - self.scale_px(40))
+        if hasattr(self, "gps_who_loc_lbl") and self.gps_who_loc_lbl:
+            self.gps_who_loc_lbl.config(wraplength=current_w - self.scale_px(40))
             
         self.refresh_who_footer()
 
@@ -1234,6 +1285,10 @@ class M59Dashboard(tk.Tk):
         """Updates the status footer labels with the latest session data."""
         if not self.who_footer_labels:
             return
+
+        if hasattr(self, "gps_who_loc_lbl") and hasattr(self, "gps_current_loc_lbl"):
+            loc_val = self.gps_current_loc_lbl.cget("text")
+            self.gps_who_loc_lbl.config(text=loc_val)
 
         # GPS Status
         gps_text = "No active route"
@@ -2036,6 +2091,21 @@ class M59Dashboard(tk.Tk):
         except Exception as e:
             self.debug_log("INIT", f"Post-connection error: {e}")
 
+    def toggle_game_time_mode(self):
+        self.game_time_mode_24h.set(not self.game_time_mode_24h.get())
+        self.update_game_time()
+        self.save_settings()
+
+    def update_game_time(self):
+        if hasattr(self, "game_time_lbl") and self.game_time_lbl:
+            try:
+                info = get_game_time()
+                time_str = format_game_time(info, use_24h=self.game_time_mode_24h.get())
+                self.game_time_lbl.config(text=f"Game Time: {time_str}")
+            except Exception as e:
+                logger.debug(f"Clock update error: {e}")
+        self.after(1000, self.update_game_time)
+
     def update_hud(self):
         if not self.main_hwnd or not self.is_running:
             return
@@ -2055,6 +2125,8 @@ class M59Dashboard(tk.Tk):
                     # Clear Who List on logout
                     self.who_list_players = {}
                     self.refresh_who_list_ui()
+                    if hasattr(self, "gps_who_loc_lbl") and self.gps_who_loc_lbl:
+                        self.gps_who_loc_lbl.config(text="Unknown Location")
             
             elif is_logged_in:
                 room = current_title.split(" --- ", 1)[1].strip()
@@ -2067,6 +2139,8 @@ class M59Dashboard(tk.Tk):
                     self.manual_sync_btn.config(state="normal", text=" ↻ FULL SYNC REQUIRED ")
                 
                 self.gps_current_loc_lbl.config(text=room)
+                if hasattr(self, "gps_who_loc_lbl") and self.gps_who_loc_lbl:
+                    self.gps_who_loc_lbl.config(text=room)
                 self.monitor_gps_navigation(room)
                 
                 # Always track travel times in background (Weighted Pathfinding)
