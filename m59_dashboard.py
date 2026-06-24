@@ -2045,25 +2045,24 @@ class M59Dashboard(tk.Tk):
         self.who_list_players = {}
         self.inventory_items = []
         self.inventory_scraper = None
-        self.refresh_who_list_ui()
-        self.update_inventory_tree()
-        
-        self.show_waiting_overlay()
-        self.status_var.set(f"Game Lost ({self.char_name}) - Searching...")
-        self.title(f"M59 Companion v{self.version} - Waiting...")
-        
-        # Clear Vitals visually
-        for v in self.hud_values.values():
-            v.config(text="---")
-            
         self.main_hwnd = None
         self.pm_obj = None
         self.target_pid = None
-        # PK Frame might be invalid now
-        if self.pk_frame:
-            try: self.pk_frame.destroy()
-            except: pass
-            self.pk_frame = None
+        
+        def safe_ui_reset():
+            self.refresh_who_list_ui()
+            # self.update_inventory_tree() # REMOVED: Fake name cause error
+            self.show_waiting_overlay()
+            self.status_var.set(f"Game Lost ({self.char_name}) - Searching...")
+            self.title(f"M59 Companion v{self.version} - Waiting...")
+            for v in self.hud_values.values():
+                v.config(text="---")
+            if self.pk_frame:
+                try: self.pk_frame.destroy()
+                except: pass
+                self.pk_frame = None
+
+        self.after(0, safe_ui_reset)
 
     def _post_connection_init(self, passive=False):
         if not self.is_running:
