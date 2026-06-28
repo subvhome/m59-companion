@@ -6,7 +6,8 @@ import sys
 # --- FIXED SERVER ALIGNMENT CONSTANT ---
 # Aligns the universal Unix timeline with Server 101's internal engine loop.
 # This is identical for all players globally.
-ALIGNMENT_OFFSET = -3900  
+# Adjusted by +3600s to correct the 12-hour day/night shift.
+ALIGNMENT_OFFSET = -300  
 REAL_SECONDS_PER_GAME_DAY = 7200 
 REAL_SECONDS_PER_GAME_HOUR = 300 
 

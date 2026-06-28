@@ -81,7 +81,7 @@ from m59_lifecycle import InstanceManager
 from m59_inventory import InventoryScraper
 from m59_wholist import WhoListMonitor
 from m59_time import get_game_time, format_game_time
-import inventory
+import m59_inventory as inventory
 
 SETTINGS_FILE = "gui_settings.json"
 

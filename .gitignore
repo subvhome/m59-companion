@@ -1,3 +1,4 @@
+.codegraph/
 logs/
 prev-code/
 __pycache__/
@@ -28,3 +29,10 @@ SESSION_RESUME.md
 complex_room_files.txt
 inv_hunt.txt
 wholist-perfect.py
+blakston.pal
+extract_roo.py
+extract_rooms.py
+Follow
+inventory_reader.py
+inventory_weight.py
+m59.pal

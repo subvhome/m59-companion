@@ -1,11 +1,151 @@
+import os
+import sys
+import re
+import json
+import time
+import struct
 import ctypes
 import ctypes.wintypes
-import struct
 import logging
 from m59_utils import resource_path
 
+# --- Meridian 59 Unified Inventory Manager ---
+# Combines live memory scraping (Pymem-style direct memory read & Frida instrumentation) 
+# and weight/bulk calculation logic.
+
 logger = logging.getLogger("m59.inventory")
 
+def load_config():
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "items.json")
+    try:
+        with open(config_path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[-] Error loading items.json: {e}")
+        return None
+
+CONFIG = load_config()
+
+# --- Frida Instrumentation Standalone Logic ---
+JS_CODE = """
+const log = (msg) => send({type: 'log', data: msg});
+
+const GET_PLAYER_INFO_ADDR = Module.findExportByName(null, "GetPlayerInfo");
+const LOOKUP_RSC_ADDR = Module.findExportByName(null, "LookupNameRsc");
+
+var getPlayerInfo = new NativeFunction(GET_PLAYER_INFO_ADDR, 'pointer', []);
+var lookupRsc = new NativeFunction(LOOKUP_RSC_ADDR, 'pointer', ['uint32']);
+
+rpc.exports = {
+    getinventory: function() {
+        try {
+            var playerPtr = getPlayerInfo();
+            if (playerPtr.isNull()) return {error: "Player pointer is null"};
+
+            var inventoryListPtr = playerPtr.add(68).readPointer();
+            if (inventoryListPtr.isNull()) return {items: []};
+
+            var items = [];
+            var currNode = inventoryListPtr;
+            var safety = 0;
+            
+            while (!currNode.isNull() && safety < 500) {
+                var objPtr = currNode.readPointer(); 
+                if (!objPtr.isNull()) {
+                    var id = objPtr.readU32();
+                    var nameResId = objPtr.add(8).readU32();
+                    var amount = objPtr.add(12).readU32();
+                    
+                    var name = "Unknown";
+                    if (nameResId !== 0) {
+                        var nameStrPtr = lookupRsc(nameResId);
+                        if (!nameStrPtr.isNull()) {
+                            name = nameStrPtr.readCString();
+                        }
+                    }
+                    
+                    var isQuantity = (id & 0x10000000) !== 0;
+                    items.push({
+                        id: id.toString(16).toUpperCase(),
+                        name: name,
+                        amount: isQuantity ? amount : 1,
+                        isQuantity: isQuantity
+                    });
+                }
+                currNode = currNode.add(8).readPointer();
+                safety++;
+            }
+            return {items: items};
+        } catch (e) {
+            return {error: e.message};
+        }
+    }
+};
+"""
+
+def on_message(message, data):
+    if message['type'] == 'send':
+        print(f"[*] {message['payload']['data']}")
+
+def process_inventory(items):
+    """Calculates cumulative weight, bulk, lists items, and returns unmapped/unknown items."""
+    item_db = {}
+    defaults = {"default_weight": 10, "default_bulk": 10}
+    if CONFIG:
+        item_db = CONFIG.get("items", {})
+        defaults = CONFIG.get("settings", {"default_weight": 10, "default_bulk": 10})
+    
+    total_weight = 0
+    total_bulk = 0
+    detailed_items = []
+    unknowns = []
+
+    for item in items:
+        name = item.get('name', 'Unknown')
+        name_lower = name.lower()
+        qty = item.get('amount', item.get('qty', 1))
+        if qty == 0:
+            qty = 1 # Safe fallback for items with quantity 0 (representing single items)
+        
+        # Determine weight/bulk for this item
+        item_data = None
+        if name_lower in item_db:
+            item_data = item_db[name_lower]
+        else:
+            # Try partial match
+            for key, data in item_db.items():
+                if key in name_lower:
+                    item_data = data
+                    break
+        
+        if item_data:
+            w = item_data.get("weight", defaults["default_weight"])
+            b = item_data.get("bulk", defaults["default_bulk"])
+        else:
+            if name_lower != "unknown":
+                unknowns.append(name)
+            w = defaults["default_weight"]
+            b = defaults["default_bulk"]
+            
+        # Add to totals
+        total_weight += (w * qty)
+        total_bulk += (b * qty)
+        
+        # Add to detailed list for display
+        detailed_items.append({
+            "id": item.get('id', '0'),
+            "name": name,
+            "qty": qty,
+            "weight": w * qty,
+            "bulk": b * qty
+        })
+        
+    # Sort alphabetically
+    detailed_items.sort(key=lambda x: x['name'])
+    
+    return total_weight, total_bulk, detailed_items, list(set(unknowns))
+
+# --- Direct Windows API Memory-Scraping Logic (used by GUI Dashboard) ---
 class InventoryScraper:
     def __init__(self, pm):
         self.pm = pm
@@ -96,15 +236,14 @@ class InventoryScraper:
         return f"ID:{res_id}"
 
     def get_max_weight(self, might):
-        """Calculates total weight capacity based on Might (1.6.0 formula)."""
-        # Formula from player.kod: viWeight_hold_max (1700) + (Might * 20)
+        """Calculates total weight capacity based on Might."""
         try:
             return 1700 + (int(might) * 20)
         except (ValueError, TypeError):
             return 1700
 
     def scan_inventory(self):
-        """Traverses the inventory linked list."""
+        """Traverses the inventory linked list in the target process."""
         if not self.player_addr: self.calibrate()
         if not self.player_addr: return []
 
@@ -133,19 +272,63 @@ class InventoryScraper:
         
         return items
 
+def main():
+    """Standalone mode: Runs Frida instrumentation of the inventory list."""
+    import frida
+    if not CONFIG:
+        print("[-] items.json config is required for calculations.")
+        return
+
+    try:
+        session = frida.attach("meridian.exe")
+        script = session.create_script(JS_CODE)
+        script.on('message', on_message)
+        script.load()
+        
+        char = CONFIG["character"]
+        max_cap = char["base_capacity"] + (char["might"] * char["might_factor"])
+        
+        print(f"[+] Character Might: {char['might']}")
+        print(f"[+] Max Capacity: {max_cap}")
+        print("[+] Unified Inventory Manager Active. Press Ctrl+C to stop.\n")
+        
+        while True:
+            try:
+                result = script.exports_sync.getinventory()
+                if 'error' in result:
+                    print(f"[-] {result['error']}")
+                else:
+                    items = result['items']
+                    weight, bulk, detailed, unknowns = process_inventory(items)
+                    
+                    # 1. Print Capacity Summary
+                    w_perc = (weight / max_cap) * 100
+                    b_perc = (bulk / max_cap) * 100
+                    
+                    print("=" * 45)
+                    print(f" CAPACITY STATUS")
+                    print(f" Weight: {weight:>6} / {max_cap} [{w_perc:5.1f}%]")
+                    print(f" Bulk:   {bulk:>6} / {max_cap} [{b_perc:5.1f}%]")
+                    print("-" * 45)
+                    
+                    # 2. Print Detailed Item List
+                    print(f" ITEMS ({len(detailed)})")
+                    for item in detailed:
+                        qty_str = f"x{item['qty']}" if item['qty'] > 1 or item['qty'] == 0 else "  "
+                        print(f" [{item['id']:>8}] {item['name'][:25]:<25} {qty_str:>5} (W:{item['weight']:>3}, B:{item['bulk']:>3})")
+                    
+                    if unknowns:
+                        print(f"\n [!] Unmapped: {', '.join(unknowns[:5])}")
+                    
+                    print("=" * 45 + "\n")
+                    
+            except Exception as e:
+                print(f"[-] RPC Error: {e}")
+            
+            time.sleep(10)
+            
+    except Exception as e:
+        print(f"[-] Error: {e}")
+
 if __name__ == "__main__":
-    import pymem
-    import win32process
-    import win32gui
-    
-    hwnd = win32gui.FindWindow(None, "Meridian 59")
-    if hwnd:
-        _, pid = win32process.GetWindowThreadProcessId(hwnd)
-        pm = pymem.Pymem(pid)
-        scraper = InventoryScraper(pm)
-        items = scraper.scan_inventory()
-        for i in items:
-            q = f" ({i['qty']})" if i['qty'] > 0 else ""
-            print(f"- {i['name']}{q}")
-    else:
-        print("Game not found.")
+    main()
