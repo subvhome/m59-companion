@@ -25,7 +25,7 @@ class CombatMonitor:
                     for line in f:
                         if "," in line:
                             name = line.split(",")[1].strip().lower().rstrip('"')
-                            cleaned_name = ''.join(c for c in name if c.isalnum() or c.isspace() or c == "'")
+                            cleaned_name = ''.join(c for c in name if c.isalnum() or c.isspace() or c == "'" or c == "-")
                             if cleaned_name:
                                 mobs.add(cleaned_name)
                                 if cleaned_name.startswith("the "): mobs.add(cleaned_name[4:])
