@@ -8,6 +8,9 @@ import time
 FRIDA_JS_CODE = """
 const log = (msg) => send({type: 'log', data: msg});
 
+var currentUsersPtrAddr = null;
+var LookupRscAddr = null;
+
 function start() {
     var meridian = Process.findModuleByName("meridian.exe") || Process.findModuleByName("Meridian.exe");
     if (!meridian) {
@@ -15,23 +18,98 @@ function start() {
         return;
     }
 
-    // ASLR-Safe Offset: current_users pointer is at this distance from module base
-    var offset = 0x2A89A0; 
-    var currentUsersPtrAddr = meridian.base.add(offset);
-    
-    var LookupRscAddr = null;
-    var exps = meridian.enumerateExports();
-    for (var i = 0; i < exps.length; i++) {
-        if (exps[i].name === "LookupRsc") LookupRscAddr = exps[i].address;
+    var base = meridian.base;
+    var size = meridian.size;
+
+    // 1. Resolve LookupRsc using exports
+    try {
+        var exps = meridian.enumerateExports();
+        for (var i = 0; i < exps.length; i++) {
+            if (exps[i].name === "LookupRsc" || exps[i].name === "LookupNameRsc") {
+                LookupRscAddr = exps[i].address;
+                break;
+            }
+        }
+    } catch (e) {
+        log("Error enumerating exports: " + e.message);
     }
 
-    if (!LookupRscAddr) {
-        log("ERROR: LookupRsc export not found.");
+    if (LookupRscAddr) {
+        log("Found 'LookupRsc' export at: " + LookupRscAddr);
+    } else {
+        log("ERROR: 'LookupRsc' export not found!");
+    }
+
+    // 2. Dynamically scan and locate the correct current_users pointer
+    var traversalSig = "8B 0D ?? ?? ?? ?? 85 C9 74 ?? 8B 01";
+    log("Scanning for dynamic traversal pattern: " + traversalSig);
+    try {
+        if (LookupRscAddr) {
+            var lookupRsc = new NativeFunction(LookupRscAddr, 'pointer', ['uint32']);
+            var matches = Memory.scanSync(base, size, traversalSig);
+            log("Found " + matches.length + " traversal candidate(s). Verifying...");
+            
+            for (var idx = 0; idx < matches.length; idx++) {
+                var matchAddr = matches[idx].address;
+                var ptrAddr = matchAddr.add(2).readPointer();
+                
+                if (ptrAddr.isNull()) continue;
+                
+                try {
+                    var head = ptrAddr.readPointer();
+                    if (head.isNull()) continue;
+                    
+                    // Traverse first few nodes of the list to see if they look like players
+                    var currNode = head;
+                    var validCount = 0;
+                    var safety = 0;
+                    
+                    while (!currNode.isNull() && safety < 5) {
+                        try {
+                            var objPtr = currNode.readPointer();
+                            if (!objPtr.isNull()) {
+                                var nameResId = objPtr.add(8).readU32();
+                                if (nameResId > 0 && nameResId < 150000) {
+                                    var nameStrPtr = lookupRsc(nameResId);
+                                    if (!nameStrPtr.isNull()) {
+                                        var name = nameStrPtr.readCString();
+                                        // Player names are alphanumeric, starting with a capital letter, length 2 to 20
+                                        if (name && /^[A-Za-z0-9 ]+$/.test(name) && name.length >= 2 && name.length <= 20) {
+                                            validCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Not a valid list node
+                        }
+                        currNode = currNode.add(8).readPointer();
+                        safety++;
+                    }
+                    
+                    if (validCount > 0) {
+                        currentUsersPtrAddr = ptrAddr;
+                        log("Verification Success! Located player list pointer at: " + currentUsersPtrAddr + " (verified with " + validCount + " active player(s))");
+                        break;
+                    }
+                } catch (e) {
+                    // Invalid pointer dereference, skip
+                }
+            }
+        }
+    } catch (e) {
+        log("Error scanning/verifying candidates: " + e.message);
+    }
+
+    if (!currentUsersPtrAddr) {
+        var fallbackOffset = 0x2A89A0;
+        currentUsersPtrAddr = base.add(fallbackOffset);
+        log("Active player list not located dynamically. Using known offset fallback: 0x" + fallbackOffset.toString(16).toUpperCase());
     }
 
     rpc.exports = {
         getlist: function() {
-            if (!LookupRscAddr) return [];
+            if (!LookupRscAddr || !currentUsersPtrAddr) return [];
             try {
                 var lookupRsc = new NativeFunction(LookupRscAddr, 'pointer', ['uint32']);
                 var head = currentUsersPtrAddr.readPointer();
