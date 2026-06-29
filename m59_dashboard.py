@@ -1082,6 +1082,7 @@ class M59Dashboard(tk.Tk):
         self.who_list_text.tag_config("OUTLAW", foreground="#ff9f43")
         self.who_list_text.tag_config("MURDERER", foreground="#ff6b6b")
         self.who_list_text.tag_config("STAFF", foreground="#48dbfb")
+        self.who_list_text.tag_config("CREATOR", foreground="#ffd32a")
         
         if self.who_list_players:
             self.refresh_who_list_ui()

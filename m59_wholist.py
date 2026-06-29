@@ -50,16 +50,15 @@ function start() {
                             var name = nameStrPtr.readCString();
                             
                             // Protocol Flags (Fixed Bits)
-                            // PF_KILLER  = 0x4000
-                            // PF_OUTLAW  = 0x8000
-                            // PF_CREATOR = 0x10000
+                            // Bits 0x4000, 0x8000, 0x10000 describe player type
                             var flags = objPtr.add(20).readU32();
+                            var pType = flags & 0x1C000;
                             var status = "WHITE";
                             
-                            if (flags & 0x4000) status = "RED";
-                            else if (flags & 0x8000) status = "ORANGE";
-                            else if (flags & 0xC000) status = "BLUE";
-                            else if (flags & 0x10000 || name === "Zaphod") status = "YELLOW"; 
+                            if (pType === 0x10000 || name === "Zaphod") status = "YELLOW";
+                            else if (pType === 0xC000 || pType === 0x14000 || pType === 0x1C000) status = "BLUE";
+                            else if (pType === 0x4000) status = "RED";
+                            else if (pType === 0x8000) status = "ORANGE"; 
 
                             if (name && name.length > 1) {
                                 players.push({name: name, status: status});
@@ -140,7 +139,7 @@ class WhoListMonitor:
                         "ORANGE": "OUTLAW",
                         "RED": "MURDERER",
                         "BLUE": "STAFF",
-                        "YELLOW": "STAFF"
+                        "YELLOW": "CREATOR"
                     }
                     
                     new_players = {}
