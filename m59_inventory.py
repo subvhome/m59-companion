@@ -36,20 +36,114 @@ const LOOKUP_RSC_ADDR = Module.findExportByName(null, "LookupNameRsc");
 var getPlayerInfo = new NativeFunction(GET_PLAYER_INFO_ADDR, 'pointer', []);
 var lookupRsc = new NativeFunction(LOOKUP_RSC_ADDR, 'pointer', ['uint32']);
 
+var bestOffset = null;
+const INVENTORY_KEYWORDS = [
+    "robe", "shirt", "scroll", "potion", "sword", "shield", "shilling", 
+    "gem", "emerald", "ruby", "sapphire", "diamond", "mushroom", "wand", 
+    "leather", "plate", "scale", "armor", "fife", "reagent", "herb", 
+    "tooth", "pie", "meat", "bread", "apple", "scimitar", "dagger", "hammer"
+];
+
+function findInventoryOffset(playerPtr) {
+    var best_offset = 68;
+    var best_score = -1000;
+    
+    for (var offset = 0; offset <= 1024; offset += 4) {
+        try {
+            var listHeadPtr = playerPtr.add(offset).readPointer();
+            if (listHeadPtr.isNull()) continue;
+            
+            var currNode = listHeadPtr;
+            var visited = {};
+            var safety = 0;
+            var isValid = true;
+            var score = 0;
+            var count = 0;
+            
+            while (!currNode.isNull() && safety < 100) {
+                var nodeAddrStr = currNode.toString();
+                if (visited[nodeAddrStr]) break;
+                visited[nodeAddrStr] = true;
+                
+                var objPtr = currNode.readPointer();
+                if (objPtr.isNull()) {
+                    isValid = false;
+                    break;
+                }
+                
+                var id = objPtr.readU32();
+                var nameResId = objPtr.add(8).readU32();
+                var amount = objPtr.add(12).readU32();
+                
+                if (nameResId > 0 && nameResId < 150000) {
+                    var nameStrPtr = lookupRsc(nameResId);
+                    if (!nameStrPtr.isNull()) {
+                        var name = nameStrPtr.readCString();
+                        if (name && name.length >= 2 && name.length <= 64 && /^[A-Za-z0-9'\\\\- ]+$/.test(name)) {
+                            count++;
+                            var lowerName = name.toLowerCase();
+                            if (lowerName === "sun" || lowerName === "moon") {
+                                score -= 150;
+                            } else {
+                                score += 10;
+                                for (var k = 0; k < INVENTORY_KEYWORDS.length; k++) {
+                                    if (lowerName.indexOf(INVENTORY_KEYWORDS[k]) !== -1) {
+                                        score += 50;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            isValid = false;
+                            break;
+                        }
+                    } else {
+                        isValid = false;
+                        break;
+                    }
+                } else {
+                    isValid = false;
+                    break;
+                }
+                
+                currNode = currNode.add(8).readPointer();
+                safety++;
+            }
+            
+            if (isValid && count > 0) {
+                if (score > best_score) {
+                    best_score = score;
+                    best_offset = offset;
+                }
+            }
+        } catch (e) {}
+    }
+    return best_offset;
+}
+
 rpc.exports = {
     getinventory: function() {
         try {
             var playerPtr = getPlayerInfo();
             if (playerPtr.isNull()) return {error: "Player pointer is null"};
 
-            var inventoryListPtr = playerPtr.add(68).readPointer();
+            if (bestOffset === null) {
+                bestOffset = findInventoryOffset(playerPtr);
+            }
+
+            var inventoryListPtr = playerPtr.add(bestOffset).readPointer();
             if (inventoryListPtr.isNull()) return {items: []};
 
             var items = [];
             var currNode = inventoryListPtr;
             var safety = 0;
+            var visited = {};
             
             while (!currNode.isNull() && safety < 500) {
+                var nodeAddrStr = currNode.toString();
+                if (visited[nodeAddrStr]) break;
+                visited[nodeAddrStr] = true;
+
                 var objPtr = currNode.readPointer(); 
                 if (!objPtr.isNull()) {
                     var id = objPtr.readU32();
@@ -193,7 +287,7 @@ class InventoryScraper:
         return None
 
     def calibrate(self):
-        """Calibrates addresses via game exports."""
+        """Calibrates addresses via game exports and dynamically scans for the inventory list offset."""
         # Find 'player' address
         api_player = self.find_export_addr("GetPlayerInfo")
         if api_player:
@@ -210,8 +304,80 @@ class InventoryScraper:
                     self.table_ptr_addr = struct.unpack("<I", code_rsc[i+2:i+6])[0]
                     break
         
+        self.inventory_offset = 68  # default fallback
         if self.player_addr and self.table_ptr_addr:
             logger.info(f"Inventory Scraper Calibrated: Player={hex(self.player_addr)}, Table={hex(self.table_ptr_addr)}")
+            
+            # Dynamically scan player structure (offsets 0 to 1024) to locate real inventory list
+            INVENTORY_KEYWORDS = [
+                "robe", "shirt", "scroll", "potion", "sword", "shield", "shilling", 
+                "gem", "emerald", "ruby", "sapphire", "diamond", "mushroom", "wand", 
+                "leather", "plate", "scale", "armor", "fife", "reagent", "herb", 
+                "tooth", "pie", "meat", "bread", "apple", "scimitar", "dagger", "hammer"
+            ]
+            
+            best_offset = None
+            best_score = -1000
+            
+            for offset in range(0, 1025, 4):
+                try:
+                    list_head = self._read_u32(self.player_addr + offset)
+                    if not list_head:
+                        continue
+                        
+                    curr = list_head
+                    visited = set()
+                    safety = 0
+                    is_valid = True
+                    score = 0
+                    items_count = 0
+                    
+                    while curr and curr not in visited and safety < 200:
+                        visited.add(curr)
+                        data_ptr = self._read_u32(curr)
+                        if not data_ptr:
+                            is_valid = False
+                            break
+                            
+                        res_id = self._read_u32(data_ptr + 8)
+                        qty = self._read_u32(data_ptr + 12)
+                        
+                        if 0 < res_id < 150000:
+                            name = self.lookup_item_name(res_id)
+                            # Basic sanitization
+                            if name and len(name) >= 2 and len(name) <= 64 and re.match(r"^[A-Za-z0-9'\- ]+$", name):
+                                items_count += 1
+                                name_lower = name.toLowerCase() if hasattr(name, 'toLowerCase') else name.lower()
+                                if name_lower in ["sun", "moon"]:
+                                    score -= 150
+                                else:
+                                    score += 10
+                                    for kw in INVENTORY_KEYWORDS:
+                                        if kw in name_lower:
+                                            score += 50
+                                            break
+                            else:
+                                is_valid = False
+                                break
+                        else:
+                            is_valid = False
+                            break
+                            
+                        curr = self._read_u32(curr + 8)
+                        safety += 1
+                        
+                    if is_valid and items_count > 0:
+                        if score > best_score:
+                            best_score = score
+                            best_offset = offset
+                except Exception:
+                    pass
+                    
+            if best_offset is not None:
+                self.inventory_offset = best_offset
+                logger.info(f"Dynamic scan identified active player inventory offset: {best_offset} (0x{best_offset:02X}) with score: {best_score}")
+            else:
+                logger.warning("Dynamic scan did not find a strong candidate list. Using default offset fallback 68")
         else:
             logger.warning("Scraper calibration failed.")
 
@@ -247,7 +413,7 @@ class InventoryScraper:
         if not self.player_addr: self.calibrate()
         if not self.player_addr: return []
 
-        inventory_head = self._read_u32(self.player_addr + 68)
+        inventory_head = self._read_u32(self.player_addr + self.inventory_offset)
         if not inventory_head: return []
 
         items = []
