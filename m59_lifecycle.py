@@ -5,6 +5,59 @@ from m59_bridge import get_unclaimed_instances, release_pid, is_pid_locked, clai
 
 logger = get_logger("lifecycle")
 
+def cleanup_stale_locks():
+    """
+    Cleans up stale lock files from the m59_companion_locks temp directory
+    if the corresponding PID is not running, or is not an instance of Meridian.exe.
+    """
+    import os
+    import tempfile
+    import pymem
+    from m59_bridge import release_pid
+
+    lock_dir = os.path.join(tempfile.gettempdir(), "m59_companion_locks")
+    if not os.path.exists(lock_dir):
+        return
+
+    logger.info("Lifecycle: Scanning for stale lock files in temp directory...")
+    try:
+        for filename in os.listdir(lock_dir):
+            if filename.endswith(".lock"):
+                pid_str = filename.split(".")[0]
+                try:
+                    pid = int(pid_str)
+                except ValueError:
+                    continue
+
+                # Verify if this PID is still a running Meridian.exe process
+                is_stale = False
+                try:
+                    # Try attaching with Pymem to see if it exists
+                    pm = pymem.Pymem(pid)
+                    # Check if the process name is Meridian.exe (case-insensitive)
+                    if pm.process_name.lower() != "meridian.exe":
+                        is_stale = True
+                except Exception:
+                    # If Pymem cannot open it (ProcessNotFound or AccessDenied), it's not a running game process we can monitor
+                    is_stale = True
+
+                if is_stale:
+                    logger.info(f"Lifecycle: Releasing stale lock for PID {pid} (process not running or not Meridian.exe)")
+                    try:
+                        release_pid(pid)
+                    except Exception as e:
+                        logger.error(f"Lifecycle: Failed to release PID {pid} via release_pid: {e}")
+                    
+                    # Direct file cleanup as a robust fallback
+                    lock_file_path = os.path.join(lock_dir, filename)
+                    if os.path.exists(lock_file_path):
+                        try:
+                            os.remove(lock_file_path)
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.error(f"Lifecycle: Error during stale locks cleanup: {e}")
+
 class InstanceManager:
     """
     Modular manager to handle the 'Always-On' state for game instances.
@@ -27,6 +80,12 @@ class InstanceManager:
         """Starts the background monitor thread."""
         if self._thread and self._thread.is_alive():
             return
+        
+        # Clean up stale lock files on startup
+        try:
+            cleanup_stale_locks()
+        except Exception as e:
+            logger.error(f"Lifecycle: Failed to run startup locks cleanup: {e}")
         
         self._stop_event.clear()
         self.is_monitoring = True
