@@ -17,7 +17,7 @@ class CombatMonitor:
     def _load_moblist(self):
         """Loads mob names from the second column of moblist.csv."""
         mobs = set()
-        csv_path = resource_path("moblist.csv")
+        csv_path = resource_path("settings/moblist.csv")
         
         if os.path.exists(csv_path):
             try:

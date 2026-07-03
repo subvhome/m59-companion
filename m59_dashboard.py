@@ -83,7 +83,7 @@ from m59_wholist import WhoListMonitor
 from m59_time import get_game_time, format_game_time
 import m59_inventory as inventory
 
-SETTINGS_FILE = "gui_settings.json"
+SETTINGS_FILE = "settings/gui_settings.json"
 
 class DraggableNotebook(ttk.Notebook):
     """A ttk.Notebook with drag-and-drop tab reordering."""
@@ -149,6 +149,11 @@ class M59Dashboard(tk.Tk):
     def __init__(self):
         super().__init__()
         
+        try:
+            self.withdraw()
+            self.attributes("-alpha", 0.0)
+        except: pass
+        
         # --- UI Scaling & DPI Setup ---
         # Calculate scaling factor based on system DPI
         # Standard DPI is 96. winfo_fpixels('1i') returns the number of pixels in one inch.
@@ -188,10 +193,10 @@ class M59Dashboard(tk.Tk):
         self.pk_sound_path = tk.StringVar(value="SystemExclamation")
         self.debug_enabled = tk.BooleanVar(value=False)
         self.debug_enabled.trace_add("write", lambda *a: setup_logging(self.debug_enabled.get()))
-        self.gps_discovery_enabled = tk.BooleanVar(value=False)
+        
         
         # --- Who List State ---
-        self.who_list_enabled = tk.BooleanVar(value=True)
+        
         self.who_list_docked = tk.BooleanVar(value=False)
         self.who_list_side = tk.StringVar(value="Right")
         self.who_list_width = tk.IntVar(value=250)
@@ -224,9 +229,8 @@ class M59Dashboard(tk.Tk):
         self.alert_active = False
         self.comms_mode = "live" # 'live' or 'history'
         # Initialize GPS with fallback logic
-        map_p = "logs/travel_times.json"
-        dataset_p = resource_path("meridian_rooms_dataset.json")
-        self.gps_manager = GPSManager(map_path=map_p, dataset_path=dataset_p)
+        dataset_p = resource_path("settings/meridian_rooms_dataset.json")
+        self.gps_manager = GPSManager(dataset_path=dataset_p)
         self.waiting_overlay = None
         
         # --- Lifecycle State ---
@@ -376,9 +380,9 @@ class M59Dashboard(tk.Tk):
         self.filter_vars["Show All"] = tk.BooleanVar(value=True)
         
         # Check local directory first, then fallback to bundled assets
-        p = "m59_filters.json"
+        p = "settings/m59_filters.json"
         if not os.path.exists(p):
-            p = resource_path("m59_filters.json")
+            p = resource_path("settings/m59_filters.json")
 
         if os.path.exists(p):
             try:
@@ -721,7 +725,7 @@ class M59Dashboard(tk.Tk):
     def save_filters_to_disk(self):
         """Saves dynamic filters back to m59_filters.json."""
         try:
-            with open("m59_filters.json", "w") as f:
+            with open("settings/m59_filters.json", "w") as f:
                 json.dump(self.filter_data, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save filters: {e}")
@@ -839,8 +843,6 @@ class M59Dashboard(tk.Tk):
                     self.pk_frame_enabled.set(s.get("pk_frame_enabled", True))
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
                     self.debug_enabled.set(s.get("debug_enabled", False))
-                    self.gps_discovery_enabled.set(s.get("gps_discovery_enabled", False))
-                    self.who_list_enabled.set(s.get("who_list_enabled", True))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
                     self.who_list_width.set(s.get("who_list_width", 250))
                     self.game_time_mode_24h.set(s.get("game_time_mode_24h", True))
@@ -872,8 +874,6 @@ class M59Dashboard(tk.Tk):
                     "pk_frame_enabled": self.pk_frame_enabled.get(),
                     "pk_sound_path": self.pk_sound_path.get(),
                     "debug_enabled": self.debug_enabled.get(),
-                    "gps_discovery_enabled": self.gps_discovery_enabled.get(),
-                    "who_list_enabled": self.who_list_enabled.get(),
                     "who_list_docked": self.who_list_docked.get(),
                     "who_list_side": self.who_list_side.get(),
                     "game_time_mode_24h": self.game_time_mode_24h.get(),
@@ -888,7 +888,7 @@ class M59Dashboard(tk.Tk):
         logger.debug(f"[{category}] {message}")
 
     def gps_log(self, message):
-        if self.debug_enabled.get() or self.gps_discovery_enabled.get():
+        if self.debug_enabled.get():
             self.debug_log("GPS", message)
 
     def setup_who_list_panel(self, parent=None):
@@ -1101,7 +1101,7 @@ class M59Dashboard(tk.Tk):
             self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
             return
 
-        if self.who_list_enabled.get() and hasattr(self, "who_list_outer"):
+        if hasattr(self, "who_list_outer"):
             side = self.who_list_side.get().lower()
             self.who_list_outer.pack(side=side, fill="y", padx=2)
             if self.target_pid:
@@ -1206,7 +1206,7 @@ class M59Dashboard(tk.Tk):
 
     def safe_refresh_who_list(self):
         """Sends a /who command to the game safely using Windows messages."""
-        if not self.main_hwnd or not self.who_list_enabled.get():
+        if not self.main_hwnd:
             return
             
         logger.debug("WhoList: Triggering safe refresh via /who command.")
@@ -1221,7 +1221,7 @@ class M59Dashboard(tk.Tk):
 
     def start_who_list_monitor(self):
         """Initializes WhoList monitor using the modular WhoListMonitor class."""
-        if not self.target_pid or not self.who_list_enabled.get():
+        if not self.target_pid:
             return
             
         if self.who_list_monitor:
@@ -1244,18 +1244,15 @@ class M59Dashboard(tk.Tk):
 
     def trigger_silent_who_update(self):
         """Triggers the silent population update via the monitor's RPC wrapper."""
-        if not self.who_list_enabled.get() or not self.who_list_monitor:
-            return
-            
         if getattr(self, "sync_in_progress", False):
             logger.info("WhoList: Tab Dance Sync is running, deferring silent population update...")
             self.after(1500, self.trigger_silent_who_update)
             return
             
-        self.who_list_monitor.trigger_silent_update()
+        if self.who_list_monitor:
+            self.who_list_monitor.trigger_silent_update()
 
     def refresh_who_list_ui(self):
-        if not self.who_list_enabled.get(): return
         self.who_list_text.config(state="normal")
         self.who_list_text.delete("1.0", tk.END)
         
@@ -1848,31 +1845,23 @@ class M59Dashboard(tk.Tk):
     def setup_tab_settings(self):
         c = tk.Frame(self.tab_settings, bg="#f0f0f0")
         c.pack(fill="both", expand=True, padx=20, pady=20)
+        
         tk.Label(c, text="Companion Settings", font=("Arial", 14, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(0, 20))
-
+        
         pg = tk.LabelFrame(c, text=" Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         pg.pack(fill="x")
         tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
         
         wr_g = tk.LabelFrame(c, text=" Status Dock Side Panel ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         wr_g.pack(fill="x", pady=10)
-        tk.Checkbutton(wr_g, text="Show Status Dock Panel", variable=self.who_list_enabled, 
-                       command=self.update_who_list_visibility, bg="#f0f0f0").pack(anchor="w")
-        
-        tk.Checkbutton(wr_g, text="Dock to Desktop (Stand-alone)", variable=self.who_list_docked,
-                       command=self.toggle_who_list_dock, bg="#f0f0f0").pack(anchor="w", pady=(5, 0))
         
         side_f = tk.Frame(wr_g, bg="#f0f0f0")
         side_f.pack(fill="x", pady=5)
         tk.Label(side_f, text="Panel Side:", bg="#f0f0f0").pack(side="left")
-        tk.Radiobutton(side_f, text="Left", variable=self.who_list_side, value="Left", 
-                       command=self.update_who_list_visibility, bg="#f0f0f0").pack(side="left", padx=10)
-        tk.Radiobutton(side_f, text="Right", variable=self.who_list_side, value="Right", 
-                       command=self.update_who_list_visibility, bg="#f0f0f0").pack(side="left")
-
-        gg = tk.LabelFrame(c, text=" GPS & Navigation ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
-        gg.pack(fill="x", pady=10)
-        tk.Checkbutton(gg, text="Enable GPS Discovery", variable=self.gps_discovery_enabled, bg="#f0f0f0").pack(anchor="w")
+        tk.Radiobutton(side_f, text="Left", variable=self.who_list_side, value="Left",
+                        command=self.update_who_list_visibility, bg="#f0f0f0").pack(side="left", padx=10)
+        tk.Radiobutton(side_f, text="Right", variable=self.who_list_side, value="Right",
+                        command=self.update_who_list_visibility, bg="#f0f0f0").pack(side="left")
         
         dg = tk.LabelFrame(c, text=" Diagnostics ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         dg.pack(fill="x")
@@ -1927,12 +1916,19 @@ class M59Dashboard(tk.Tk):
             logger.error(f"LifeCycle: Found PID {pid} but could not locate its window.")
             return
 
-        # Transition overlay to 'Waiting for Login' state
-        self.show_waiting_overlay(mode="login")
-        
+        # Transition overlay to appropriate state based on current login status
+        try:
+            import win32gui
+            title = win32gui.GetWindowText(self.main_hwnd)
+            if " --- " in title:
+                self.show_waiting_overlay(mode="initializing")
+            else:
+                self.show_waiting_overlay(mode="login")
+        except:
+            self.show_waiting_overlay(mode="login")
+            
         # Start Who List if enabled
-        if self.who_list_enabled.get():
-            self.start_who_list_monitor()
+        self.start_who_list_monitor()
 
         # Start Inventory Polling
         self.after(2000, self.poll_inventory)
@@ -1947,7 +1943,8 @@ class M59Dashboard(tk.Tk):
             title = win32gui.GetWindowText(self.main_hwnd)
             if " --- " in title:
                 logger.info(f"LifeCycle: Login detected via title: {title}")
-                self.hide_waiting_overlay()
+                self.show_waiting_overlay(mode="initializing")
+                # overlay will be hidden after initial sync
                 
                 # Start the intelligent identity capture loop
                 logger.info("LifeCycle: Starting character identification handshake...")
@@ -2147,7 +2144,7 @@ class M59Dashboard(tk.Tk):
                 was_t, msg = self.gps_manager.process_room_update(room)
                 if msg:
                     # Log to console/debug only if debug is on or discovery is on
-                    if self.debug_enabled.get() or self.gps_discovery_enabled.get():
+                    if self.debug_enabled.get():
                         self.gps_log(msg)
 
         except Exception as e:
@@ -2284,6 +2281,8 @@ class M59Dashboard(tk.Tk):
                             # Use char_name for logging path in case it changed
                             current_safe_n = self.char_name.replace(" ", "_")
                             current_log_p = os.path.join("logs", f"{current_safe_n}_chat.log")
+                            if not os.path.exists("logs"):
+                                os.makedirs("logs", exist_ok=True)
                             
                             with open(current_log_p, "a", encoding="utf-8") as f:
                                 for l in new:
@@ -2496,6 +2495,7 @@ class M59Dashboard(tk.Tk):
             logger.error(f"Sync: Automatic sync error: {e}")
         finally:
             self.sync_in_progress = False
+            self.after(100, self.hide_waiting_overlay)
             self.after(0, lambda: self.sync_btn.config(state="normal"))
 
     def _apply_sync_results(self, kn, st):
@@ -2679,7 +2679,7 @@ class M59Dashboard(tk.Tk):
             if win32gui.IsWindowVisible(h) and "Meridian 59" in win32gui.GetWindowText(h):
                 _, p = win32process.GetWindowThreadProcessId(h)
                 try:
-                    if psutil.Process(p).name().lower() == "meridian.exe":
+                    if psutil.Process(p).name().lower() == self.target_name.lower():
                         insts.append({"pid": p, "title": win32gui.GetWindowText(h), "hwnd": h})
                 except:
                     pass
@@ -2712,59 +2712,134 @@ class M59Dashboard(tk.Tk):
             pass
 
     def show_waiting_overlay(self, mode="searching"):
-        """Displays a non-blocking splash window when searching for game or waiting for login."""
+        """Displays a splash screen and keeps the main UI hidden until initialization is complete."""
+        try:
+            # Keep main window completely invisible during initialization
+            self.attributes("-alpha", 0.0)
+        except: pass
+
         if self.waiting_overlay and self.waiting_overlay.winfo_exists():
             # Update existing overlay text
             if mode == "login":
-                self.waiting_title_lbl.config(text=" ↻ WAITING FOR LOGIN... ", fg="#2196F3")
-                self.waiting_msg_lbl.config(text="Please select a character and enter the world.")
-                self.waiting_frame.config(highlightbackground="#2196F3")
+                self.waiting_title_lbl.config(text=" ↻  WAITING FOR LOGIN ", fg="#64B5F6")
+                self.waiting_msg_lbl.config(text="Please select a character and enter the world")
+            elif mode == "initializing":
+                self.waiting_title_lbl.config(text=" ↻  INITIALIZING ", fg="#FFCA28")
+                self.waiting_msg_lbl.config(text="Synchronizing game state...")
             else:
-                self.waiting_title_lbl.config(text=" ↻ SCANNING FOR GAME... ", fg="#4CAF50")
-                self.waiting_msg_lbl.config(text="Please launch Meridian 59 to continue.")
-                self.waiting_frame.config(highlightbackground="#4CAF50")
+                self.waiting_title_lbl.config(text=" ↻  SCANNING FOR GAME ", fg="#81C784")
+                self.waiting_msg_lbl.config(text="Please launch Meridian 59 to continue")
+            self.waiting_overlay.update_idletasks()
             return
             
-        logger.info(f"UI: Displaying 'Waiting' overlay (Mode: {mode}).")
+        logger.info(f"UI: Displaying 'Splash' overlay (Mode: {mode}).")
+        
         overlay = tk.Toplevel(self)
-        overlay.title("Connecting...")
-        overlay.geometry("450x200")
+        overlay.title("M59 Companion - Connecting...")
+        
+        # Center the splash screen on the screen
+        window_width = 450
+        window_height = 250
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        center_x = int(screen_width/2 - window_width / 2)
+        center_y = int(screen_height/2 - window_height / 2)
+        
+        overlay.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
         overlay.resizable(False, False)
+        overlay.overrideredirect(True)
         overlay.attributes("-topmost", True)
         
-        # Center over main window
-        self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - 225
-        y = self.winfo_y() + (self.winfo_height() // 2) - 100
-        overlay.geometry(f"+{max(0, x)}+{max(0, y)}")
-        overlay.overrideredirect(True)
+        try: overlay.attributes("-alpha", 0.95)
+        except: pass
+            
+        overlay.configure(bg="#0F0F0F")
         
-        self.waiting_frame = tk.Frame(overlay, bg="#333333", highlightthickness=2)
-        self.waiting_frame.config(highlightbackground="#4CAF50" if mode == "searching" else "#2196F3")
-        self.waiting_frame.pack(fill="both", expand=True)
+        # Inner padding frame
+        inner = tk.Frame(overlay, bg="#181818", highlightthickness=1, highlightbackground="#333333")
+        inner.pack(expand=True, fill="both", padx=2, pady=2)
         
-        title_text = " ↻ SCANNING FOR GAME... " if mode == "searching" else " ↻ WAITING FOR LOGIN... "
-        title_color = "#4CAF50" if mode == "searching" else "#2196F3"
-        msg_text = "Please launch Meridian 59." if mode == "searching" else "Please enter the world."
+        tk.Label(inner, text="M59 COMPANION", font=("Segoe UI", 22, "bold"), fg="#FFFFFF", bg="#181818").pack(pady=(35, 10))
         
-        self.waiting_title_lbl = tk.Label(self.waiting_frame, text=title_text, font=("Arial", 16, "bold"), fg=title_color, bg="#333333", pady=20)
+        if mode == "initializing":
+            title_text = " ↻  INITIALIZING "
+            title_color = "#FFCA28"
+            msg_text = "Synchronizing game state..."
+        elif mode == "login":
+            title_text = " ↻  WAITING FOR LOGIN "
+            title_color = "#64B5F6"
+            msg_text = "Please select a character and enter the world"
+        else:
+            title_text = " ↻  SCANNING FOR GAME "
+            title_color = "#81C784"
+            msg_text = "Please launch Meridian 59 to continue"
+        
+        self.waiting_title_lbl = tk.Label(inner, text=title_text, font=("Segoe UI", 12, "bold"), fg=title_color, bg="#181818", pady=5)
         self.waiting_title_lbl.pack()
-        self.waiting_msg_lbl = tk.Label(self.waiting_frame, text=msg_text, font=("Arial", 11), fg="white", bg="#333333")
-        self.waiting_msg_lbl.pack()
-        tk.Label(self.waiting_frame, text="The Companion will automatically connect once ready.", font=("Arial", 9, "italic"), fg="#aaaaaa", bg="#333333", pady=15).pack()
+        
+        self.waiting_msg_lbl = tk.Label(inner, text=msg_text, font=("Segoe UI", 10), fg="#B0B0B0", bg="#181818")
+        self.waiting_msg_lbl.pack(pady=(5, 15))
         
         self.waiting_overlay = overlay
 
     def hide_waiting_overlay(self):
-        """Destroys the waiting overlay if it exists."""
+        """Materializes the main UI and destroys the splash screen."""
+        if getattr(self, "_is_materializing", False):
+            return
+            
         if self.waiting_overlay:
             try:
                 if self.waiting_overlay.winfo_exists():
-                    logger.info("UI: Hiding 'Waiting for Game' overlay.")
-                    self.waiting_overlay.destroy()
+                    logger.info("UI: Materializing main interface...")
+                    self._is_materializing = True
+                    try: self.deiconify()
+                    except: pass
+                    self._materialize_ui(self.waiting_overlay, 0.0)
+                    return
             except:
                 pass
             self.waiting_overlay = None
+            
+        # Fallback if no overlay
+        try:
+            self.deiconify()
+            self.attributes("-alpha", 1.0)
+        except: pass
+
+    def _materialize_ui(self, overlay, main_alpha):
+        if main_alpha < 1.0:
+            main_alpha += 0.05  # Slower fade
+            if main_alpha > 1.0:
+                main_alpha = 1.0
+            
+            try:
+                self.attributes("-alpha", main_alpha)
+                
+                # Keep splash fully opaque until main UI is partially visible to avoid black flashes
+                splash_alpha = 1.0
+                if main_alpha > 0.3:
+                    splash_alpha = 1.0 - ((main_alpha - 0.3) / 0.7)
+                
+                if splash_alpha < 0: splash_alpha = 0.0
+                overlay.attributes("-alpha", splash_alpha)
+                
+                self.after(30, self._materialize_ui, overlay, main_alpha)
+            except Exception as e:
+                logger.error(f"UI Fade Error: {e}")
+                self.attributes("-alpha", 1.0)
+                try: overlay.destroy()
+                except: pass
+                self.waiting_overlay = None
+                self._is_materializing = False
+        else:
+            try:
+                overlay.destroy()
+            except:
+                pass
+            self.attributes("-alpha", 1.0)
+            self.waiting_overlay = None
+            self._is_materializing = False
+            logger.info("UI: Interface completely materialized.")
 
 if __name__ == "__main__":
     # Enable High DPI awareness to fix scaling issues with AppBar and screen coordinates

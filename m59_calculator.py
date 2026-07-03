@@ -13,9 +13,9 @@ def resource_path(relative_path):
 class SchoolCalculator:
     def __init__(self, data_path=None, config_path=None):
         if data_path is None:
-            data_path = resource_path("m59_data.json")
+            data_path = resource_path("settings/m59_data.json")
         if config_path is None:
-            config_path = resource_path("config.json")
+            config_path = resource_path("settings/config.json")
             
         self.data_path = data_path
         self.config_path = config_path

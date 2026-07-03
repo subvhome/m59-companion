@@ -7,7 +7,7 @@ import win32process
 import tempfile
 
 # Configuration Path
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "settings/config.json")
 
 def load_config():
     try:

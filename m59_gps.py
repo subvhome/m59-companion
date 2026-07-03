@@ -10,10 +10,8 @@ from datetime import datetime
 logger = logging.getLogger("dashboard")
 
 class GPSManager:
-    def __init__(self, map_path="logs/travel_times.json", dataset_path="meridian_rooms_dataset.json"):
-        self.map_path = map_path
+    def __init__(self, dataset_path="settings/meridian_rooms_dataset.json"):
         self.dataset_path = dataset_path
-        self.m59_map = self.load_map_data()
         self.dataset = self.load_dataset()
         self.last_room = None
         self.transition_start_time = 0
@@ -24,25 +22,6 @@ class GPSManager:
         self.current_step_index = 0
         self.last_known_rid = None
         self.last_known_from_rid = None
-
-    def load_map_data(self):
-        """Loads the discovered travel time data from JSON."""
-        os.makedirs("logs", exist_ok=True)
-        # Migration from old m59_map.json if it exists
-        old_path = "m59_map.json"
-        if os.path.exists(old_path) and not os.path.exists(self.map_path):
-            try:
-                os.rename(old_path, self.map_path)
-                logger.info(f"GPS: Migrated {old_path} to {self.map_path}")
-            except: pass
-
-        if os.path.exists(self.map_path):
-            try:
-                with open(self.map_path, "r") as f:
-                    return json.load(f)
-            except:
-                return {}
-        return {}
 
     def load_dataset(self):
         """Loads the comprehensive room connectivity dataset."""
@@ -59,13 +38,13 @@ class GPSManager:
             logger.error(f"GPS: World dataset NOT FOUND at {self.dataset_path}")
         return {}
 
-    def save_map_data(self):
-        """Saves travel time data to JSON."""
+    def save_dataset(self):
+        """Saves the world dataset, including learned travel times."""
         try:
-            with open(self.map_path, "w") as f:
-                json.dump(self.m59_map, f, indent=4)
-        except:
-            pass
+            with open(self.dataset_path, "w") as f:
+                json.dump(self.dataset, f, indent=4)
+        except Exception as e:
+            logger.error(f"GPS: Failed to save dataset: {e}")
 
     def get_room_options(self):
         """Returns a list of all unique room names with 'Nearby' hints for duplicates."""
@@ -237,10 +216,7 @@ class GPSManager:
 
             for to_rid, (exit_info, dist) in destination_map.items():
                 # Get weight from learned travel times
-                weight = DEFAULT_TRANSITION_TIME
-                if curr_rid in self.m59_map:
-                    conn_key = f"Unknown:{to_rid}"
-                    weight = self.m59_map[curr_rid].get("connections", {}).get(conn_key, DEFAULT_TRANSITION_TIME)
+                weight = exit_info.get('travel_time', DEFAULT_TRANSITION_TIME)
                 
                 # Destination Arrival Point
                 to_pos = exit_info.get('to_pos')
@@ -273,18 +249,22 @@ class GPSManager:
 
     def record_transition(self, from_rid, to_rid, duration):
         """Updates travel history. Always saves first time, then only if faster."""
-        if from_rid not in self.m59_map:
-            self.m59_map[from_rid] = {"connections": {}}
-        
-        conn_key = f"Unknown:{to_rid}" 
-        existing_time = self.m59_map[from_rid]["connections"].get(conn_key)
-        
+        if not self.dataset or from_rid not in self.dataset:
+            return False, duration, None
+            
+        exits = self.dataset[from_rid].get('exits', [])
         updated = False
-        # Always save if first time, otherwise only if shorter
-        if existing_time is None or duration < existing_time:
-            self.m59_map[from_rid]["connections"][conn_key] = duration
-            updated = True
-            self.save_map_data()
+        existing_time = None
+        
+        for exit_info in exits:
+            if exit_info.get('to_rid') == to_rid:
+                existing_time = exit_info.get('travel_time')
+                if existing_time is None or duration < existing_time:
+                    exit_info['travel_time'] = duration
+                    updated = True
+        
+        if updated:
+            self.save_dataset()
             logger.info(f"GPS: Learned faster path {from_rid}->{to_rid}: {duration}s")
             
         return updated, duration, existing_time

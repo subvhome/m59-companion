@@ -8,7 +8,7 @@ logger = get_logger("lifecycle")
 def cleanup_stale_locks():
     """
     Cleans up stale lock files from the m59_companion_locks temp directory
-    if the corresponding PID is not running, or is not an instance of Meridian.exe.
+    if the corresponding PID is not running, or is not an instance of target exe.
     """
     import os
     import tempfile
@@ -35,14 +35,14 @@ def cleanup_stale_locks():
                     # Try attaching with Pymem to see if it exists
                     pm = pymem.Pymem(pid)
                     # Check if the process name is Meridian.exe (case-insensitive)
-                    if pm.process_name.lower() != "meridian.exe":
+                    if pm.process_name.lower() != self.target_name.lower():
                         is_stale = True
                 except Exception:
                     # If Pymem cannot open it (ProcessNotFound or AccessDenied), it's not a running game process we can monitor
                     is_stale = True
 
                 if is_stale:
-                    logger.info(f"Lifecycle: Releasing stale lock for PID {pid} (process not running or not Meridian.exe)")
+                    logger.info(f"Lifecycle: Releasing stale lock for PID {pid} (process not running or not target exe)")
                     try:
                         release_pid(pid)
                     except Exception as e:

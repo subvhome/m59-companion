@@ -16,7 +16,7 @@ from m59_utils import resource_path
 logger = logging.getLogger("m59.inventory")
 
 def load_config():
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "items.json")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings/items.json")
     try:
         with open(config_path, "r") as f:
             return json.load(f)
@@ -446,7 +446,14 @@ def main():
         return
 
     try:
-        session = frida.attach("meridian.exe")
+        import json
+        exe_name = "meridian.exe"
+        try:
+            with open(config_path, "r") as f:
+                c = json.load(f)
+                exe_name = c.get("process", {}).get("target_name", "meridian.exe")
+        except: pass
+        session = frida.attach(exe_name)
         script = session.create_script(JS_CODE)
         script.on('message', on_message)
         script.load()

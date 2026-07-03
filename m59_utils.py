@@ -46,7 +46,16 @@ def find_game_hwnd(pid):
     return found[0]
 
 # --- Global Constants ---
+import json
+import os
+
 GAME_EXE = "Meridian.exe"
+try:
+    with open("settings/config.json", "r") as f:
+        c = json.load(f)
+        GAME_EXE = c.get("process", {}).get("target_name", "Meridian.exe")
+except:
+    pass
 GAME_TITLE_BASE = "Meridian 59"
 LOGIN_MARKER = " --- "
 UI_REFRESH_RATE = 1000 # ms

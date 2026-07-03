@@ -12,9 +12,16 @@ var currentUsersPtrAddr = null;
 var LookupRscAddr = null;
 
 function start() {
-    var meridian = Process.findModuleByName("meridian.exe") || Process.findModuleByName("Meridian.exe");
+    var config = {};
+    try {
+        var file = new File("settings\\config.json", "r");
+        config = JSON.parse(file.read());
+        file.close();
+    } catch(e) {}
+    var target = (config && config.process && config.process.target_name) ? config.process.target_name : "meridian.exe";
+    var meridian = Process.findModuleByName(target) || Process.findModuleByName("meridian.exe") || Process.findModuleByName("Meridian.exe");
     if (!meridian) {
-        log("ERROR: Target module 'meridian.exe' not found.");
+        log("ERROR: Target module " + target + " not found.");
         return;
     }
 
