@@ -865,7 +865,7 @@ class M59Dashboard(tk.Tk):
         try:
             # Prepare filter states for JSON
             fs_save = {cat: var.get() for cat, var in self.filter_vars.items()}
-            os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+            
             with open(SETTINGS_FILE, "w") as f:
                 json.dump({
                     "geometry": self.geometry(),
@@ -2654,33 +2654,24 @@ class M59Dashboard(tk.Tk):
 
     def background_update_check(self):
         def check():
-            u, rv = check_for_updates(self.version)
+            u, rv, notes = check_for_updates(self.version)
             if not u: 
                 self.after(0, self.establish_connection)
                 return
             def show_prompt():
-                choice = messagebox.askquestion("Update", f"v{rv} available. Update?", icon="info", type="yesnocancel")
+                msg = f"v{rv} available.\n\n"
+                if notes:
+                    msg += f"Release Notes:\n{notes}\n\n"
+                msg += "Update?"
+                choice = messagebox.askquestion("Update", msg, icon="info", type="yesnocancel")
                 if choice == "yes":
                     self.status_var.set("Updating...")
-                    self.show_waiting_overlay(mode="updating")
-                    
-                    def do_update():
-                        from m59_updater import download_update, apply_update
-                        
-                        def update_progress(percent):
-                            if self.waiting_overlay and self.waiting_overlay.winfo_exists() and self.waiting_progress:
-                                self.after(0, lambda: self.waiting_progress.config(value=percent))
-                                self.after(0, lambda: self.waiting_msg_lbl.config(text=f"Downloading... {percent:.1f}%"))
-                                
-                        new_path = download_update(progress_callback=update_progress)
-                        if new_path:
-                            self.after(0, lambda: self.waiting_msg_lbl.config(text="Applying Update..."))
-                            apply_update(new_path)
-                            self.after(100, self.destroy)
-                        else:
-                            self.after(0, self.establish_connection)
-                            
-                    threading.Thread(target=do_update, daemon=True).start()
+                    from m59_updater import download_update, apply_update
+                    new_path = download_update()
+                    if new_path:
+                        apply_update(new_path)
+                    else:
+                        self.after(0, self.establish_connection)
                 else:
                     self.after(0, self.establish_connection)
             self.after(0, show_prompt)
@@ -2782,10 +2773,6 @@ class M59Dashboard(tk.Tk):
             title_text = " ↻  WAITING FOR LOGIN "
             title_color = "#64B5F6"
             msg_text = "Please select a character and enter the world"
-        elif mode == "updating":
-            title_text = " ↓  UPDATING COMPANION "
-            title_color = "#AB47BC"
-            msg_text = "Downloading latest version..."
         else:
             title_text = " ↻  SCANNING FOR GAME "
             title_color = "#81C784"
@@ -2797,11 +2784,6 @@ class M59Dashboard(tk.Tk):
         self.waiting_msg_lbl = tk.Label(inner, text=msg_text, font=("Segoe UI", 10), fg="#B0B0B0", bg="#181818")
         self.waiting_msg_lbl.pack(pady=(5, 15))
         
-        self.waiting_progress = None
-        if mode == "updating":
-            self.waiting_progress = ttk.Progressbar(inner, orient="horizontal", length=300, mode="determinate")
-            self.waiting_progress.pack(pady=(5, 15))
-            
         self.waiting_overlay = overlay
 
     def hide_waiting_overlay(self):
