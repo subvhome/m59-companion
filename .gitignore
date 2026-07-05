@@ -36,3 +36,14 @@ Follow
 inventory_reader.py
 inventory_weight.py
 m59.pal
+metadata.json
+patch2.py
+
+# AI Studio environment files
+.env.example
+package.json
+package-lock.json
+vite.config.ts
+tsconfig.json
+node_modules/
+dist/

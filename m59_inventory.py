@@ -16,7 +16,7 @@ from m59_utils import resource_path
 logger = logging.getLogger("m59.inventory")
 
 def load_config():
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings/items.json")
+    config_path = resource_path("settings/items.json")
     try:
         with open(config_path, "r") as f:
             return json.load(f)
