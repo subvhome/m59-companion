@@ -1874,16 +1874,37 @@ class M59Dashboard(tk.Tk):
             import m59_map
             import shutil
             import os
-            from tkinter import messagebox
+            
+            def show_styled_msg(title, msg, icon="✅"):
+                pop = tk.Toplevel(self)
+                pop.title("M59 Companion")
+                pop.overrideredirect(True)
+                pop.attributes("-topmost", True)
+                try: pop.attributes("-alpha", 0.95)
+                except: pass
+                pop.configure(bg="#0F0F0F")
+                inner_pop = tk.Frame(pop, bg="#181818", highlightthickness=1, highlightbackground="#333333")
+                inner_pop.pack(expand=True, fill="both", padx=2, pady=2)
+                
+                color = "#FF5252" if "Error" in title else "#81C784" if "Success" in title else "#FFCA28"
+                tk.Label(inner_pop, text=f" {icon}  {title.upper()} ", font=("Consolas", 14, "bold"), fg=color, bg="#181818").pack(pady=(30, 10))
+                tk.Label(inner_pop, text=msg, font=("Arial", 11), fg="#FFFFFF", bg="#181818", justify="center", wraplength=540).pack(pady=(10, 20))
+                tk.Button(inner_pop, text=" OK ", bg="#424242", fg="white", font=("Arial", 10, "bold"), command=pop.destroy).pack(pady=(0, 20))
+
+                pop.update_idletasks()
+                w = 580
+                h = max(260, pop.winfo_reqheight())
+                pop.geometry(f"{w}x{h}+{int(self.winfo_screenwidth()/2 - w/2)}+{int(self.winfo_screenheight()/2 - h/2)}")
+
             rooms_dir, map_file, is_running = m59_map.detect_installation()
             if map_file and os.path.exists(map_file + ".backup"):
                 try:
                     shutil.copy2(map_file + ".backup", map_file)
-                    messagebox.showinfo("Success", "Restored game.map from backup!")
+                    show_styled_msg("Success", "Restored game.map from backup!", "✅")
                 except Exception as e:
-                    messagebox.showerror("Error", f"Failed to restore: {e}")
+                    show_styled_msg("Error", f"Failed to restore: {e}", "❌")
             else:
-                messagebox.showwarning("Not Found", "No backup found.")
+                show_styled_msg("Not Found", "No backup found.", "⚠️")
 
         tk.Button(map_g, text="Restore game.map from Backup", command=restore_map, font=("Arial", 9)).pack(anchor="w")
         
@@ -1981,11 +2002,6 @@ class M59Dashboard(tk.Tk):
                 
                 def proceed_with_update(anno_choice):
                     overlay.destroy()
-                    
-                    close_msg = "Meridian 59 must be closed to safely update the map file.\n\nClick OK to automatically close the game and apply the update. You can restart it afterwards."
-                    if not messagebox.askokcancel("Close Game Required", close_msg):
-                        callback()
-                        return
 
                     def do_map_update():
                         try:
@@ -2010,9 +2026,47 @@ class M59Dashboard(tk.Tk):
                                 existing_annos = m59_map.extract_existing_annotations(map_file, unique_rooms)
                             
                             m59_map.generate_map(map_file, unique_rooms, debug=False, preserve_annotations=not anno_choice, existing_annotations=existing_annos)
-                            self.after(0, lambda: messagebox.showinfo("Map Updated", "Map update complete! A backup was saved in your mail folder.\nYou can safely restart Meridian 59 now."))
+                            
+                            def show_success():
+                                pop = tk.Toplevel(self)
+                                pop.title("M59 Companion")
+                                pop.overrideredirect(True)
+                                pop.attributes("-topmost", True)
+                                try: pop.attributes("-alpha", 0.95)
+                                except: pass
+                                pop.configure(bg="#0F0F0F")
+                                inner_pop = tk.Frame(pop, bg="#181818", highlightthickness=1, highlightbackground="#333333")
+                                inner_pop.pack(expand=True, fill="both", padx=2, pady=2)
+                                tk.Label(inner_pop, text=" ✅  MAP UPDATED ", font=("Consolas", 14, "bold"), fg="#81C784", bg="#181818").pack(pady=(30, 10))
+                                tk.Label(inner_pop, text="Map update complete! A backup was saved in your mail folder.\nYou can safely restart Meridian 59 now.", font=("Arial", 11), fg="#FFFFFF", bg="#181818", justify="center", wraplength=540).pack(pady=(10, 20))
+                                tk.Button(inner_pop, text=" OK ", bg="#2e7d32", fg="white", font=("Arial", 10, "bold"), command=pop.destroy).pack(pady=(0, 20))
+                                
+                                pop.update_idletasks()
+                                w = 580
+                                h = max(260, pop.winfo_reqheight())
+                                pop.geometry(f"{w}x{h}+{int(self.winfo_screenwidth()/2 - w/2)}+{int(self.winfo_screenheight()/2 - h/2)}")
+                                
+                            self.after(0, show_success)
                         except Exception as e:
-                            self.after(0, lambda err=e: messagebox.showerror("Map Error", f"Failed to update map: {err}"))
+                            def show_error(err=e):
+                                pop = tk.Toplevel(self)
+                                pop.title("M59 Companion")
+                                pop.overrideredirect(True)
+                                pop.attributes("-topmost", True)
+                                try: pop.attributes("-alpha", 0.95)
+                                except: pass
+                                pop.configure(bg="#0F0F0F")
+                                inner_pop = tk.Frame(pop, bg="#181818", highlightthickness=1, highlightbackground="#333333")
+                                inner_pop.pack(expand=True, fill="both", padx=2, pady=2)
+                                tk.Label(inner_pop, text=" ❌  MAP ERROR ", font=("Consolas", 14, "bold"), fg="#FF5252", bg="#181818").pack(pady=(30, 10))
+                                tk.Label(inner_pop, text=f"Failed to update map: {err}", font=("Arial", 11), fg="#FFFFFF", bg="#181818", justify="center", wraplength=550).pack(pady=(10, 20))
+                                tk.Button(inner_pop, text=" OK ", bg="#424242", fg="white", font=("Arial", 10, "bold"), command=pop.destroy).pack(pady=(0, 20))
+                                
+                                pop.update_idletasks()
+                                w = 580
+                                h = max(260, pop.winfo_reqheight())
+                                pop.geometry(f"{w}x{h}+{int(self.winfo_screenwidth()/2 - w/2)}+{int(self.winfo_screenheight()/2 - h/2)}")
+                            self.after(0, show_error)
                         finally:
                             def _ui_waiting():
                                 if self.waiting_overlay and self.waiting_overlay.winfo_exists():
@@ -2020,8 +2074,43 @@ class M59Dashboard(tk.Tk):
                                     self.waiting_msg_lbl.config(text="Please launch Meridian 59 to continue")
                                 self.status_var.set("Waiting for Game...")
                             self.after(0, _ui_waiting)
-                    
-                    threading.Thread(target=do_map_update, daemon=True).start()
+
+                    def show_close_prompt():
+                        close_overlay = tk.Toplevel(self)
+                        close_overlay.title("M59 Companion")
+                        
+                        close_overlay.resizable(False, False)
+                        close_overlay.overrideredirect(True)
+                        close_overlay.attributes("-topmost", True)
+                        try: close_overlay.attributes("-alpha", 0.95)
+                        except: pass
+                        close_overlay.configure(bg="#0F0F0F")
+                        
+                        inner_close = tk.Frame(close_overlay, bg="#181818", highlightthickness=1, highlightbackground="#333333")
+                        inner_close.pack(expand=True, fill="both", padx=2, pady=2)
+                        
+                        tk.Label(inner_close, text=" ⚠️  CLOSE GAME REQUIRED ", font=("Consolas", 14, "bold"), fg="#FFCA28", bg="#181818").pack(pady=(30, 10))
+                        tk.Label(inner_close, text="Meridian 59 must be closed to safely update the map file.\n\nClick YES to automatically close the game and apply the update.\nYou can restart it afterwards.", font=("Arial", 11), fg="#FFFFFF", bg="#181818", justify="center", wraplength=540).pack(pady=(10, 20))
+                        
+                        def on_close_cancel():
+                            close_overlay.destroy()
+                            callback()
+                            
+                        def on_close_ok():
+                            close_overlay.destroy()
+                            threading.Thread(target=do_map_update, daemon=True).start()
+
+                        btn_f_close = tk.Frame(inner_close, bg="#181818")
+                        btn_f_close.pack(pady=(0, 20))
+                        tk.Button(btn_f_close, text=" YES (Close Game) ", bg="#2e7d32", fg="white", font=("Arial", 10, "bold"), command=on_close_ok).pack(side="left", padx=10)
+                        tk.Button(btn_f_close, text=" CANCEL ", bg="#424242", fg="white", font=("Arial", 10, "bold"), command=on_close_cancel).pack(side="left", padx=10)
+
+                        close_overlay.update_idletasks()
+                        w = 580
+                        h = max(260, close_overlay.winfo_reqheight())
+                        close_overlay.geometry(f"{w}x{h}+{int(self.winfo_screenwidth()/2 - w/2)}+{int(self.winfo_screenheight()/2 - h/2)}")
+
+                    show_close_prompt()
                 
                 btn_f2 = tk.Frame(inner, bg="#181818")
                 btn_f2.pack(pady=10)
