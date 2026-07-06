@@ -1,2 +1,2 @@
-2.7.3
-Preparations for Auto completing all maps in progress. This will auto complete all walls of all maps and add annotations if desired.  this update is just for a placeholder.
+2.7.4
+game.map fog of war completion has been implemented. functional wit =h a few styling issues to iron out.

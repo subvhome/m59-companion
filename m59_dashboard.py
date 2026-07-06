@@ -172,7 +172,7 @@ class M59Dashboard(tk.Tk):
             v_p = resource_path("VERSION")
             if os.path.exists(v_p):
                 with open(v_p, "r") as f:
-                    self.version = f.read().strip()
+                    self.version = f.read().strip().split("\n")[0]
         except:
             pass
         
@@ -1867,6 +1867,26 @@ class M59Dashboard(tk.Tk):
         dg.pack(fill="x")
         tk.Checkbutton(dg, text="Verbose Debug Mode", variable=self.debug_enabled, bg="#f0f0f0").pack(anchor="w")
         
+        map_g = tk.LabelFrame(c, text=" Game.map Tools ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        map_g.pack(fill="x", pady=10)
+        
+        def restore_map():
+            import m59_map
+            import shutil
+            import os
+            from tkinter import messagebox
+            rooms_dir, map_file, is_running = m59_map.detect_installation()
+            if map_file and os.path.exists(map_file + ".backup"):
+                try:
+                    shutil.copy2(map_file + ".backup", map_file)
+                    messagebox.showinfo("Success", "Restored game.map from backup!")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to restore: {e}")
+            else:
+                messagebox.showwarning("Not Found", "No backup found.")
+
+        tk.Button(map_g, text="Restore game.map from Backup", command=restore_map, font=("Arial", 9)).pack(anchor="w")
+        
         tk.Button(c, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
 
     def trigger_pk_alert(self):
@@ -1893,6 +1913,127 @@ class M59Dashboard(tk.Tk):
     def reset_pk_alert(self):
         self.alert_active = False
 
+
+
+
+    def map_initialization_check(self, pid, callback):
+        import m59_map
+        import os
+        import threading
+        import subprocess
+        import time
+        from tkinter import messagebox
+        
+        rooms_dir, map_file, is_running = m59_map.detect_installation()
+        if not rooms_dir or not map_file or not os.path.isdir(rooms_dir):
+            callback()
+            return
+
+        unique_rooms = m59_map.get_unique_rooms(rooms_dir)
+        if not unique_rooms:
+            callback()
+            return
+            
+        percent = m59_map.analyze_map(map_file, unique_rooms)
+        if percent >= 100.0:
+            callback()
+            return
+
+        def show_styled_map_prompt():
+            overlay = tk.Toplevel(self)
+            overlay.title("M59 Companion - Map Update")
+            
+            # Center the splash screen on the screen
+            window_width = 580
+            window_height = 260
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+            center_x = int(screen_width/2 - window_width / 2)
+            center_y = int(screen_height/2 - window_height / 2)
+            
+            overlay.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
+            overlay.resizable(False, False)
+            overlay.overrideredirect(True)
+            overlay.attributes("-topmost", True)
+            try: overlay.attributes("-alpha", 0.95)
+            except: pass
+            
+            overlay.configure(bg="#0F0F0F")
+            
+            inner = tk.Frame(overlay, bg="#181818", highlightthickness=1, highlightbackground="#333333")
+            inner.pack(expand=True, fill="both", padx=2, pady=2)
+            
+            tk.Label(inner, text=" 🗺️  MAP UPDATE AVAILABLE ", font=("Consolas", 14, "bold"), fg="#FFCA28", bg="#181818").pack(pady=(20, 10))
+            tk.Label(inner, text=f"Your game.map file is {percent:.1f}% complete.", font=("Arial", 11), fg="#FFFFFF", bg="#181818").pack()
+            tk.Label(inner, text="Do you want to update and unlock your map to 100%?", font=("Arial", 10), fg="#CCCCCC", bg="#181818").pack(pady=(5, 15))
+            
+            def on_no():
+                overlay.destroy()
+                callback()
+                
+            def on_yes():
+                for widget in inner.winfo_children():
+                    widget.destroy()
+                    
+                tk.Label(inner, text=" 📍  AUTO-ANNOTATIONS ", font=("Consolas", 14, "bold"), fg="#64B5F6", bg="#181818").pack(pady=(20, 10))
+                tk.Label(inner, text="Automatically add map annotations for all exits/doors?", font=("Arial", 10), fg="#FFFFFF", bg="#181818").pack()
+                tk.Label(inner, text="Warning: YES overwrites custom annotations.\nNO preserves your existing custom annotations.", font=("Arial", 9, "italic"), fg="#FF5252", bg="#181818", justify="center", wraplength=550).pack(pady=(10, 15))
+                
+                def proceed_with_update(anno_choice):
+                    overlay.destroy()
+                    
+                    close_msg = "Meridian 59 must be closed to safely update the map file.\n\nClick OK to automatically close the game and apply the update. You can restart it afterwards."
+                    if not messagebox.askokcancel("Close Game Required", close_msg):
+                        callback()
+                        return
+
+                    def do_map_update():
+                        try:
+                            def _ui_closing():
+                                if self.waiting_overlay and self.waiting_overlay.winfo_exists():
+                                    self.waiting_title_lbl.config(text=" 🗺️  UPDATING MAP ", fg="#FFCA28")
+                                    self.waiting_msg_lbl.config(text="Closing game to release file locks...")
+                                self.status_var.set("Closing game for map update...")
+                            self.after(0, _ui_closing)
+                            
+                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                            time.sleep(1)
+
+                            def _ui_updating():
+                                if self.waiting_overlay and self.waiting_overlay.winfo_exists():
+                                    self.waiting_msg_lbl.config(text="Generating game.map file...")
+                                self.status_var.set("Updating game.map...")
+                            self.after(0, _ui_updating)
+                            
+                            existing_annos = {}
+                            if not anno_choice:
+                                existing_annos = m59_map.extract_existing_annotations(map_file, unique_rooms)
+                            
+                            m59_map.generate_map(map_file, unique_rooms, debug=False, preserve_annotations=not anno_choice, existing_annotations=existing_annos)
+                            self.after(0, lambda: messagebox.showinfo("Map Updated", "Map update complete! A backup was saved in your mail folder.\nYou can safely restart Meridian 59 now."))
+                        except Exception as e:
+                            self.after(0, lambda err=e: messagebox.showerror("Map Error", f"Failed to update map: {err}"))
+                        finally:
+                            def _ui_waiting():
+                                if self.waiting_overlay and self.waiting_overlay.winfo_exists():
+                                    self.waiting_title_lbl.config(text=" ↻  SCANNING FOR GAME ", fg="#81C784")
+                                    self.waiting_msg_lbl.config(text="Please launch Meridian 59 to continue")
+                                self.status_var.set("Waiting for Game...")
+                            self.after(0, _ui_waiting)
+                    
+                    threading.Thread(target=do_map_update, daemon=True).start()
+                
+                btn_f2 = tk.Frame(inner, bg="#181818")
+                btn_f2.pack(pady=10)
+                tk.Button(btn_f2, text=" YES (Overwrite) ", bg="#2e7d32", fg="white", font=("Arial", 10, "bold"), command=lambda: proceed_with_update(True)).pack(side="left", padx=10)
+                tk.Button(btn_f2, text=" NO (Preserve) ", bg="#424242", fg="white", font=("Arial", 10, "bold"), command=lambda: proceed_with_update(False)).pack(side="left", padx=10)
+
+            btn_f = tk.Frame(inner, bg="#181818")
+            btn_f.pack(pady=10)
+            tk.Button(btn_f, text=" YES ", bg="#2e7d32", fg="white", font=("Arial", 10, "bold"), command=on_yes, width=10).pack(side="left", padx=10)
+            tk.Button(btn_f, text=" NO ", bg="#424242", fg="white", font=("Arial", 10, "bold"), command=on_no, width=10).pack(side="left", padx=10)
+            
+        self.after(0, show_styled_map_prompt)
     def establish_connection(self):
         self.status_var.set("Scanning for game...")
         self.debug_log("CONN", "Starting Lifecycle Monitor...")
@@ -1902,38 +2043,52 @@ class M59Dashboard(tk.Tk):
     def on_game_connect(self, pm, pid):
         """Callback when InstanceManager attaches to a new game process."""
         logger.info(f"LifeCycle: New Game Instance Detected (PID {pid})")
-        self.pm_obj = pm
-        self.target_pid = pid
-
-        # Initialize Scraper
-        self.inventory_scraper = InventoryScraper(pm)
-
-        # Find the HWND for this PID
-
-        self.main_hwnd = find_game_hwnd(pid)
         
-        if not self.main_hwnd:
-            logger.error(f"LifeCycle: Found PID {pid} but could not locate its window.")
-            return
+        def _continue_init():
+            self.pm_obj = pm
+            self.target_pid = pid
 
-        # Transition overlay to appropriate state based on current login status
-        try:
-            import win32gui
-            title = win32gui.GetWindowText(self.main_hwnd)
-            if " --- " in title:
-                self.show_waiting_overlay(mode="initializing")
-            else:
-                self.show_waiting_overlay(mode="login")
-        except:
-            self.show_waiting_overlay(mode="login")
-            
-        # Start Who List if enabled
-        self.start_who_list_monitor()
+            # Initialize Scraper
+            self.inventory_scraper = InventoryScraper(pm)
 
-        # Start Inventory Polling
-        self.after(2000, self.poll_inventory)
+            # Find the HWND for this PID
+            def _wait_for_hwnd(retries=10):
+                self.main_hwnd = find_game_hwnd(pid)
+                if not self.main_hwnd:
+                    if retries > 0:
+                        self.after(500, lambda: _wait_for_hwnd(retries - 1))
+                    else:
+                        logger.error(f"LifeCycle: Found PID {pid} but could not locate its window after waiting.")
+                    return
 
-        self.after(500, self.check_for_login)
+                # Transition overlay to appropriate state based on current login status
+                try:
+                    import win32gui
+                    title = win32gui.GetWindowText(self.main_hwnd)
+                    if " --- " in title:
+                        self.show_waiting_overlay(mode="initializing")
+                    else:
+                        self.show_waiting_overlay(mode="login")
+                except:
+                    self.show_waiting_overlay(mode="login")
+                    
+                # Start Who List if enabled
+                self.start_who_list_monitor()
+                
+                # Start Inventory Polling
+                self.after(2000, self.poll_inventory)
+                self.after(500, self.check_for_login)
+
+            _wait_for_hwnd()
+
+        if not getattr(self, "has_checked_map", False):
+            self.has_checked_map = True
+            # Transition to a generic connecting overlay first
+            self.show_waiting_overlay(mode="searching")
+            self.after(500, lambda: self.map_initialization_check(pid, _continue_init))
+        else:
+            _continue_init()
+
     def check_for_login(self):
         """Polls the window title to detect when a character has entered the world."""
         if not self.main_hwnd or not self.is_running:
@@ -2742,8 +2897,8 @@ class M59Dashboard(tk.Tk):
         overlay.title("M59 Companion - Connecting...")
         
         # Center the splash screen on the screen
-        window_width = 450
-        window_height = 250
+        window_width = 580
+        window_height = 260
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         center_x = int(screen_width/2 - window_width / 2)
