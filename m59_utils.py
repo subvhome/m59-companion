@@ -5,8 +5,42 @@ import win32gui
 import win32process
 import win32con
 import logging
+import json
+import shutil
 
 logger = logging.getLogger("m59.utils")
+
+def migrate_settings():
+    old_locations = ["logs", "."]
+    settings_dir = "settings"
+    
+    if not os.path.exists(settings_dir):
+        os.makedirs(settings_dir, exist_ok=True)
+        
+    for loc in old_locations:
+        if not os.path.exists(loc):
+            continue
+        for f in os.listdir(loc):
+            if f.endswith(".json"):
+                if f in ["config.json", "gui_settings.json", "m59_filters.json", "m59_data.json", "items.json", "meridian_rooms_dataset.json", "travel_times.json"]:
+                    if loc != "settings":
+                        old_path = os.path.join(loc, f)
+                        new_path = os.path.join(settings_dir, f)
+                        try:
+                            if not os.path.exists(new_path):
+                                shutil.move(old_path, new_path)
+                                logger.info(f"MIGRATION: Moved {f} from {loc} to {settings_dir}")
+                        except Exception as e:
+                            logger.error(f"MIGRATION ERROR: Failed to move {f}: {e}")
+                else:
+                    old_path = os.path.join(loc, f)
+                    new_path = os.path.join(settings_dir, f)
+                    try:
+                        if not os.path.exists(new_path):
+                            shutil.move(old_path, new_path)
+                            logger.info(f"MIGRATION: Moved {f} from {loc} to {settings_dir}")
+                    except Exception as e:
+                        logger.error(f"MIGRATION ERROR: Failed to move {f}: {e}")
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """

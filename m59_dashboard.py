@@ -82,6 +82,8 @@ from m59_inventory import InventoryScraper
 from m59_wholist import WhoListMonitor
 from m59_time import get_game_time, format_game_time
 import m59_inventory as inventory
+import m59_bgf
+import m59_map
 
 SETTINGS_FILE = "settings/gui_settings.json"
 
@@ -307,6 +309,15 @@ class M59Dashboard(tk.Tk):
         self.setup_tab_gps()
         self.setup_tab_progression()
         self.setup_tab_vault()
+
+        # Init BGF Manager
+        try:
+            rooms_dir, _, _ = m59_map.detect_installation()
+            self.bgf_manager = m59_bgf.BGFManager(rooms_dir)
+            self.bgf_manager.load_mob_mapping(resource_path("settings/moblist.csv"))
+        except:
+            self.bgf_manager = None
+            
         self.setup_tab_book()
         self.setup_tab_settings()
         
@@ -566,7 +577,7 @@ class M59Dashboard(tk.Tk):
         btn_row = tk.Frame(sidebar, bg="#f0f0f0")
         btn_row.pack(fill="x", padx=5, pady=5)
         tk.Button(btn_row, text="Refresh", command=self.refresh_log_list, font=("Arial", 8)).pack(side="left", fill="x", expand=True)
-        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("logs")),
+        tk.Button(btn_row, text="Folder", command=lambda: os.startfile(os.path.abspath("settings")),
                   font=("Arial", 8)).pack(side="left", fill="x", expand=True, padx=2)
         
         right_frame = tk.Frame(paned, bg="#f0f0f0")
@@ -770,11 +781,11 @@ class M59Dashboard(tk.Tk):
         if self.comms_mode == "live":
             if self.char_name == "Unknown": return
             safe_n = get_safe_name(self.char_name)
-            path = os.path.join("logs", f"{safe_n}_chat.log")
+            path = os.path.join("settings", f"{safe_n}_chat.log")
         else:
             selection = self.log_file_list.curselection()
             if not selection: return
-            path = os.path.join("logs", self.log_file_list.get(selection[0]))
+            path = os.path.join("settings", self.log_file_list.get(selection[0]))
 
         if not os.path.exists(path): return
 
@@ -1360,7 +1371,7 @@ class M59Dashboard(tk.Tk):
         
         if self.comms_mode == "live" and self.char_name != "Unknown":
             safe_n = get_safe_name(self.char_name)
-            log_p = os.path.join("logs", f"{safe_n}_chat.log")
+            log_p = os.path.join("settings", f"{safe_n}_chat.log")
             
             if os.path.exists(log_p):
                 try:
@@ -1405,7 +1416,7 @@ class M59Dashboard(tk.Tk):
         self.comms_header_lbl.config(text=f"📂 HISTORY: {fn}", fg="#1565C0")
         self.live_feed_btn.config(bg="#f0f0f0") # Dim the live button
         
-        path = os.path.join("logs", fn)
+        path = os.path.join("settings", fn)
         try:
             self.comms_view.config(state="normal")
             self.comms_view.delete("1.0", tk.END)
@@ -1426,10 +1437,10 @@ class M59Dashboard(tk.Tk):
         # Tracker/PKAlert still use the synchronous feed provided by the chat monitor
 
     def refresh_log_list(self):
-        if not os.path.exists("logs"):
-            os.makedirs("logs", exist_ok=True)
-        files = [f for f in os.listdir("logs") if f.endswith(".log") and "debug" not in f.lower()]
-        files.sort(key=lambda x: os.path.getmtime(os.path.join("logs", x)), reverse=True)
+        if not os.path.exists("settings"):
+            os.makedirs("settings", exist_ok=True)
+        files = [f for f in os.listdir("settings") if f.endswith(".log") and "debug" not in f.lower()]
+        files.sort(key=lambda x: os.path.getmtime(os.path.join("settings", x)), reverse=True)
         
         self.log_file_list.delete(0, tk.END)
         for f in files:
@@ -1820,19 +1831,34 @@ class M59Dashboard(tk.Tk):
         self.update_vault_ui()
 
     def setup_tab_book(self):
-        cont = tk.Frame(self.tab_book, bg="#f0f0f0")
-        cont.pack(fill="both", expand=True, padx=5, pady=5)
+        # Main vertical paned window or frames
+        main_pane = tk.PanedWindow(self.tab_book, orient=tk.VERTICAL, bg="#e0e0e0", sashwidth=4, sashrelief=tk.RAISED)
+        main_pane.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Top Frame (Lists)
+        top_frame = tk.Frame(main_pane, bg="#f0f0f0")
+        main_pane.add(top_frame, stretch="always", minsize=150)
+        
+        # Bottom Frame (Image)
+        bottom_frame = tk.Frame(main_pane, bg="#333333")
+        main_pane.add(bottom_frame, stretch="always", minsize=150)
+        
+        # --- Top Half: Lists ---
         self.book_widgets = {}
         for kt in ["monsters", "players"]:
-            f = tk.LabelFrame(cont, text=f" {kt.title()} ", bg="#f0f0f0", font=("Arial", 10, "bold"))
+            f = tk.LabelFrame(top_frame, text=f" {kt.title()} ", bg="#f0f0f0", font=("Arial", 10, "bold"))
             f.pack(side="left", fill="both", expand=True, padx=5)
+            
             row = tk.Frame(f, bg="#f0f0f0")
             row.pack(fill="x", padx=5, pady=5)
+            
             fv = tk.StringVar()
             fv.trace_add("write", lambda *a, k=kt: self.update_book_tree(k))
+            
             tk.Label(row, text="Filter:", bg="#f0f0f0", font=("Arial", 8)).pack(side="left")
             tk.Entry(row, textvariable=fv, width=15).pack(side="left", padx=2)
-            tr = ttk.Treeview(f, columns=("Name", "AllTime", "Session"), show="headings", height=15)
+            
+            tr = ttk.Treeview(f, columns=("Name", "AllTime", "Session"), show="headings", height=8)
             tr.heading("Name", text="Victim")
             tr.heading("AllTime", text="Total")
             tr.heading("Session", text="Session")
@@ -1840,8 +1866,86 @@ class M59Dashboard(tk.Tk):
             tr.column("AllTime", width=self.scale_px(60), anchor="center")
             tr.column("Session", width=self.scale_px(60), anchor="center")
             tr.pack(fill="both", expand=True, padx=5, pady=2)
+            
             self.book_widgets[kt] = {"tree": tr, "filter_var": fv}
+            
+            # Bind selection for Monsters to update image
+            if kt == "monsters":
+                tr.bind("<<TreeviewSelect>>", self.on_monster_select)
 
+        # --- Bottom Half: Image Viewer ---
+        self.bgf_canvas = tk.Canvas(bottom_frame, bg="#333333", highlightthickness=0)
+        self.bgf_canvas.pack(fill="both", expand=True, pady=(5,0))
+        
+        # Slider for frames
+        self.bgf_frame_slider = tk.Scale(bottom_frame, from_=0, to=0, orient=tk.HORIZONTAL, bg="#333333", fg="white", highlightthickness=0, command=self.on_bgf_slider_move)
+        self.bgf_frame_slider.pack(fill="x", padx=20, pady=5)
+        
+        self.current_bgf_frames = []
+        self.current_bgf_image_on_canvas = None
+        self.bgf_empty_text = self.bgf_canvas.create_text(
+            self.winfo_width()//2, 100, text="Select a monster to view", fill="gray", font=("Arial", 12, "italic")
+        )
+        # Handle canvas resize
+        self.bgf_canvas.bind("<Configure>", self.center_bgf_image)
+
+    def center_bgf_image(self, event=None):
+        if self.bgf_empty_text:
+            self.bgf_canvas.coords(self.bgf_empty_text, self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2)
+        if self.current_bgf_image_on_canvas:
+            self.bgf_canvas.coords(self.current_bgf_image_on_canvas, self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2)
+
+    def on_monster_select(self, event):
+        selection = event.widget.selection()
+        if not selection: return
+        item = event.widget.item(selection[0])
+        monster_name = item['values'][0]
+        
+        logger.info(f"Killbook: Monster selected: {monster_name}")
+        
+        self.bgf_canvas.delete("all")
+        self.current_bgf_frames = []
+        self.bgf_frame_slider.config(to=0, state="disabled")
+        
+        if getattr(self, "bgf_manager", None):
+            internal_name = self.bgf_manager.mob_mapping.get(monster_name.lower())
+            logger.info(f"Killbook: Internal name for '{monster_name.lower()}' is '{internal_name}'")
+            if internal_name:
+                bgf_path = self.bgf_manager.find_bgf_for_monster(internal_name)
+                logger.info(f"Killbook: Found BGF path: {bgf_path}")
+                if bgf_path:
+                    frames = self.bgf_manager.load_bgf_frames(bgf_path)
+                    logger.info(f"Killbook: Loaded {len(frames) if frames else 0} frames")
+                    if frames:
+                        self.current_bgf_frames = frames
+                        self.bgf_frame_slider.config(to=len(frames)-1, state="normal")
+                        self.bgf_frame_slider.set(0)
+                        self.show_bgf_frame(0)
+                        return
+            else:
+                logger.warning(f"Killbook: No internal name mapping found for '{monster_name.lower()}'")
+                        
+        self.bgf_empty_text = self.bgf_canvas.create_text(
+            self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2, 
+            text="No image available", fill="gray", font=("Arial", 12, "italic")
+        )
+        self.current_bgf_image_on_canvas = None
+
+    def on_bgf_slider_move(self, val):
+        self.show_bgf_frame(int(val))
+        
+    def show_bgf_frame(self, index):
+        if not self.current_bgf_frames: return
+        if index < 0 or index >= len(self.current_bgf_frames): return
+        
+        photo = self.current_bgf_frames[index]
+        self.bgf_canvas.delete("all")
+        self.bgf_empty_text = None
+        
+        self.current_bgf_image_on_canvas = self.bgf_canvas.create_image(
+            self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2, 
+            image=photo, anchor="center"
+        )
     def setup_tab_settings(self):
         c = tk.Frame(self.tab_settings, bg="#f0f0f0")
         c.pack(fill="both", expand=True, padx=20, pady=20)
@@ -2441,7 +2545,7 @@ class M59Dashboard(tk.Tk):
                     raise
 
             safe_n = get_safe_name(self.char_name)
-            log_p = os.path.join("logs", f"{safe_n}_chat.log")
+            log_p = os.path.join("settings", f"{safe_n}_chat.log")
             
             # Initial baseline
             cur_text = get_text_from_hwnd(ch) if ch else ""
@@ -2524,9 +2628,9 @@ class M59Dashboard(tk.Tk):
                         try:
                             # Use char_name for logging path in case it changed
                             current_safe_n = self.char_name.replace(" ", "_")
-                            current_log_p = os.path.join("logs", f"{current_safe_n}_chat.log")
-                            if not os.path.exists("logs"):
-                                os.makedirs("logs", exist_ok=True)
+                            current_log_p = os.path.join("settings", f"{current_safe_n}_chat.log")
+                            if not os.path.exists("settings"):
+                                os.makedirs("settings", exist_ok=True)
                             
                             with open(current_log_p, "a", encoding="utf-8") as f:
                                 for l in new:
@@ -2612,6 +2716,7 @@ class M59Dashboard(tk.Tk):
             if ft in v.lower():
                 at = self.all_time_kills[ktype].get(v, 0)
                 se = self.session_kills[ktype].get(v, 0)
+                
                 tr.insert("", "end", values=(v, max(at, se), f"+{se}" if se > 0 else ""))
 
     def on_closing(self):
@@ -2856,7 +2961,7 @@ class M59Dashboard(tk.Tk):
             return
         sn = get_safe_name(self.char_name)
         for vt in ["barloque", "hungry"]:
-            p = next((x for x in [f"logs/{sn}_vault_{vt}.json"] if os.path.exists(x)), None)
+            p = next((x for x in [f"settings/{sn}_vault_{vt}.json"] if os.path.exists(x)), None)
             if p:
                 try:
                     with open(p, "r") as f:
@@ -2870,7 +2975,7 @@ class M59Dashboard(tk.Tk):
         if self.char_name == "Unknown":
             return
         sn = get_safe_name(self.char_name)
-        p = f"logs/{sn}_kills.json"
+        p = f"settings/{sn}_kills.json"
         if os.path.exists(p):
             try:
                 with open(p, "r") as f:

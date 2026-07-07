@@ -37,7 +37,7 @@ class CombatMonitor:
 
     def _load_kill_book(self):
         """Loads persistent kill counts from JSON."""
-        file_path = f"logs/{self.safe_name}_kills.json"
+        file_path = f"settings/{self.safe_name}_kills.json"
         if os.path.exists(file_path):
             try:
                 with open(file_path, "r") as f:
@@ -48,9 +48,9 @@ class CombatMonitor:
 
     def _save_kill_book(self):
         """Saves kill counts to JSON."""
-        if not os.path.exists("logs"):
-            os.makedirs("logs")
-        file_path = f"logs/{self.safe_name}_kills.json"
+        if not os.path.exists("settings"):
+            os.makedirs("settings")
+        file_path = f"settings/{self.safe_name}_kills.json"
         try:
             with open(file_path, "w") as f:
                 json.dump(self.kill_book, f, indent=4)
