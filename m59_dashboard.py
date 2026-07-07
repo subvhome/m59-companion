@@ -1877,9 +1877,17 @@ class M59Dashboard(tk.Tk):
         self.bgf_canvas = tk.Canvas(bottom_frame, bg="#333333", highlightthickness=0)
         self.bgf_canvas.pack(fill="both", expand=True, pady=(5,0))
         
-        # Slider for frames
-        self.bgf_frame_slider = tk.Scale(bottom_frame, from_=0, to=0, orient=tk.HORIZONTAL, bg="#333333", fg="white", highlightthickness=0, command=self.on_bgf_slider_move)
-        self.bgf_frame_slider.pack(fill="x", padx=20, pady=5)
+        # Sliders for Angle and Pose
+        sliders_frame = tk.Frame(bottom_frame, bg="#333333")
+        sliders_frame.pack(fill="x", padx=20, pady=5)
+        
+        tk.Label(sliders_frame, text="Pose:", bg="#333333", fg="white").pack(side="left")
+        self.bgf_pose_slider = tk.Scale(sliders_frame, from_=0, to=0, orient=tk.HORIZONTAL, bg="#333333", fg="white", highlightthickness=0, command=self.on_bgf_slider_move)
+        self.bgf_pose_slider.pack(side="left", fill="x", expand=True, padx=(5, 10))
+        
+        tk.Label(sliders_frame, text="Angle:", bg="#333333", fg="white").pack(side="left")
+        self.bgf_angle_slider = tk.Scale(sliders_frame, from_=0, to=5, orient=tk.HORIZONTAL, bg="#333333", fg="white", highlightthickness=0, command=self.on_bgf_slider_move)
+        self.bgf_angle_slider.pack(side="left", fill="x", expand=True, padx=(5, 0))
         
         self.current_bgf_frames = []
         self.current_bgf_image_on_canvas = None
@@ -1892,8 +1900,11 @@ class M59Dashboard(tk.Tk):
     def center_bgf_image(self, event=None):
         if self.bgf_empty_text:
             self.bgf_canvas.coords(self.bgf_empty_text, self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2)
-        if self.current_bgf_image_on_canvas:
-            self.bgf_canvas.coords(self.current_bgf_image_on_canvas, self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2)
+        if getattr(self, "current_bgf_frames", None) and self.current_bgf_image_on_canvas:
+            pose = int(self.bgf_pose_slider.get())
+            angle = int(self.bgf_angle_slider.get())
+            index = pose * 6 + angle
+            self.show_bgf_frame(index)
 
     def on_monster_select(self, event):
         selection = event.widget.selection()
@@ -1905,7 +1916,8 @@ class M59Dashboard(tk.Tk):
         
         self.bgf_canvas.delete("all")
         self.current_bgf_frames = []
-        self.bgf_frame_slider.config(to=0, state="disabled")
+        self.bgf_pose_slider.config(to=0, state="disabled")
+        self.bgf_angle_slider.config(state="disabled")
         
         if getattr(self, "bgf_manager", None):
             internal_name = self.bgf_manager.mob_mapping.get(monster_name.lower())
@@ -1918,8 +1930,11 @@ class M59Dashboard(tk.Tk):
                     logger.info(f"Killbook: Loaded {len(frames) if frames else 0} frames")
                     if frames:
                         self.current_bgf_frames = frames
-                        self.bgf_frame_slider.config(to=len(frames)-1, state="normal")
-                        self.bgf_frame_slider.set(0)
+                        max_pose = max(0, (len(frames) // 6) - 1) if len(frames) >= 6 else max(0, len(frames)-1)
+                        self.bgf_pose_slider.config(to=max_pose, state="normal")
+                        self.bgf_pose_slider.set(0)
+                        self.bgf_angle_slider.config(to=5 if len(frames) >= 6 else 0, state="normal")
+                        self.bgf_angle_slider.set(0)
                         self.show_bgf_frame(0)
                         return
             else:
@@ -1931,20 +1946,40 @@ class M59Dashboard(tk.Tk):
         )
         self.current_bgf_image_on_canvas = None
 
-    def on_bgf_slider_move(self, val):
-        self.show_bgf_frame(int(val))
+    def on_bgf_slider_move(self, val=None):
+        pose = int(self.bgf_pose_slider.get())
+        angle = int(self.bgf_angle_slider.get())
+        index = pose * 6 + angle
+        self.show_bgf_frame(index)
         
     def show_bgf_frame(self, index):
         if not self.current_bgf_frames: return
         if index < 0 or index >= len(self.current_bgf_frames): return
         
-        photo = self.current_bgf_frames[index]
+        from PIL import ImageTk, Image
+        raw_img = self.current_bgf_frames[index]
+        
+        cw = max(10, self.bgf_canvas.winfo_width())
+        ch = max(10, self.bgf_canvas.winfo_height())
+        
+        # Calculate scale to fit
+        iw, ih = raw_img.size
+        scale = min(cw/iw, ch/ih) * 0.9 # 90% of canvas
+        if scale > 0:
+            new_w, new_h = int(iw * scale), int(ih * scale)
+            # Crop bounding box of non-transparent area? For now just resize the whole 400x400
+            resized = raw_img.resize((new_w, new_h), Image.LANCZOS)
+        else:
+            resized = raw_img
+            
+        self._current_tk_bgf = ImageTk.PhotoImage(resized)
+        
         self.bgf_canvas.delete("all")
         self.bgf_empty_text = None
         
         self.current_bgf_image_on_canvas = self.bgf_canvas.create_image(
-            self.bgf_canvas.winfo_width()//2, self.bgf_canvas.winfo_height()//2, 
-            image=photo, anchor="center"
+            cw//2, ch//2, 
+            image=self._current_tk_bgf, anchor="center"
         )
     def setup_tab_settings(self):
         c = tk.Frame(self.tab_settings, bg="#f0f0f0")
