@@ -61,12 +61,7 @@ class BGFManager:
                     x_off, y_off = struct.unpack("<ii", f.read(8))
                     
                     num_hotspots = struct.unpack("B", f.read(1))[0]
-                    hotspots = {}
-                    for _ in range(num_hotspots):
-                        hn = struct.unpack("b", f.read(1))[0]
-                        hx, hy = struct.unpack("<ii", f.read(8))
-                        hotspots[hn] = (hx, hy)
-                        hotspots[abs(hn)] = (hx, hy)
+                    for _ in range(num_hotspots): f.read(9)
                         
                     is_comp = struct.unpack("B", f.read(1))[0]
                     if is_comp == 1:
@@ -97,8 +92,7 @@ class BGFManager:
                     frames.append({
                         "image": rgba_img,
                         "x_off": x_off,
-                        "y_off": y_off,
-                        "hotspots": hotspots
+                        "y_off": y_off
                     })
             return frames
         except Exception as e:
@@ -114,151 +108,22 @@ class BGFManager:
         for p in paths:
             frames = self._load_raw_frames(p)
             if frames:
-                all_layers_frames.append((p, frames))
+                all_layers_frames.append(frames)
                 
         if not all_layers_frames:
             return None
             
-        ROLE_HOTSPOTS = {
-            "head": 1,         # HS_HEAD = 1
-            "legs": 41,        # HS_LEGS = 41
-            "left_arm": 31,    # HS_LEFT_HAND = 31
-            "right_arm": 21,   # HS_RIGHT_HAND = 21
-            "weapon": 22,      # HS_RIGHT_WEAPON = 22
-            "eyes": 11,        # HS_EYES = 11
-            "mouth": 12,       # HS_MOUTH = 12
-            "hair": 13,        # HS_TOUPEE = 13
-            "nose": 14,        # HS_NOSE = 14
-        }
-        
-        ROLE_PARENTS = {
-            "eyes": "head",
-            "mouth": "head",
-            "hair": "head",
-            "nose": "head",
-        }
-        
-        def get_layer_role(path):
-            fn = os.path.basename(path).lower()
-            if "hed" in fn or "head" in fn or "phax" in fn or "phkx" in fn or "herhead" in fn:
-                return "head"
-            elif "legs" in fn or "feet" in fn or "bfa" in fn or "bfb" in fn or "bfc" in fn or "bfd" in fn or "bfg" in fn or "iceper_feet" in fn:
-                return "legs"
-            elif "leftarm" in fn or "larm" in fn or "bla" in fn or "blb" in fn or "blg" in fn:
-                return "left_arm"
-            elif "rightarm" in fn or "rarm" in fn or "bra" in fn or "brb" in fn or "brg" in fn or "iceper_rightarm" in fn:
-                return "right_arm"
-            elif "sword" in fn or "weapon" in fn or "mace" in fn or "scimitar" in fn or "shswd" in fn or "hamr" in fn or "axe" in fn or "iceper_sword" in fn:
-                return "weapon"
-            elif "eyes" in fn or "peax" in fn or "pekx" in fn or "pebx" in fn or "pecx" in fn or "pedx" in fn:
-                return "eyes"
-            elif "mouth" in fn or "pmax" in fn or "pmkx" in fn or "pmbx" in fn or "pmcx" in fn:
-                return "mouth"
-            elif "nose" in fn or "pnax" in fn or "pnkx" in fn or "pnbx" in fn or "pncx" in fn:
-                return "nose"
-            elif "hair" in fn or "toupee" in fn or "ptac" in fn or "ptcd" in fn or "ptba" in fn or "ptad" in fn or "ptbb" in fn or "ptxa" in fn or "ptbc" in fn or "ptca" in fn or "ptdb" in fn or "ptq" in fn:
-                return "hair"
-            elif "torso" in fn or "body" in fn or "bta" in fn or "btb" in fn or "btg" in fn or "iceper_torso" in fn:
-                return "base"
-            else:
-                return "unknown"
-
-        def get_processing_order(role):
-            if role == "base": return 0
-            elif role == "head": return 1
-            elif role in ["legs", "left_arm", "right_arm", "weapon"]: return 2
-            elif role in ["eyes", "mouth", "nose", "hair"]: return 3
-            else: return 4
-
-        assigned_layers = []
-        has_base = False
-        for p, f in all_layers_frames:
-            role = get_layer_role(p)
-            if role == "base":
-                has_base = True
-            assigned_layers.append((role, f))
-            
-        if not has_base and assigned_layers:
-            first_role, first_frames = assigned_layers[0]
-            assigned_layers[0] = ("base", first_frames)
-
-        assigned_layers.sort(key=lambda item: get_processing_order(item[0]))
-        
-        base_role, base_frames = assigned_layers[0]
+        base_frames = all_layers_frames[0]
         num_frames = len(base_frames)
         final_photos = []
+        cw, ch = 400, 400
+        cx, cy = 200, 300
         
         for i in range(num_frames):
-            layers_to_paste = []
-            world_hotspots = {}
-            
-            base_f = base_frames[i]
-            base_draw_x = base_f['x_off']
-            base_draw_y = base_f['y_off']
-            layers_to_paste.append((base_f['image'], base_draw_x, base_draw_y))
-            
-            for hs_id, (hx, hy) in base_f.get('hotspots', {}).items():
-                world_hotspots[("base", hs_id)] = (hx, hy)
-                
-            for layer_role, layer_frames in assigned_layers[1:]:
+            comp_img = Image.new("RGBA", (cw, ch), (255, 255, 255, 0))
+            for layer_frames in all_layers_frames:
                 f = layer_frames[i % len(layer_frames)]
-                child_hotspots = f.get('hotspots', {})
-                
-                parent_role = ROLE_PARENTS.get(layer_role, "base")
-                target_hs = ROLE_HOTSPOTS.get(layer_role)
-                
-                aligned = False
-                if target_hs is not None:
-                    parent_hs_key = (parent_role, target_hs)
-                    if parent_hs_key in world_hotspots:
-                        target_x, target_y = world_hotspots[parent_hs_key]
-                        child_origin_x = target_x
-                        child_origin_y = target_y
-                        child_draw_x = child_origin_x + f['x_off']
-                        child_draw_y = child_origin_y + f['y_off']
-                        aligned = True
-                        
-                if not aligned:
-                    flat_world_hotspots = {}
-                    for (r, h_id), coords in world_hotspots.items():
-                        flat_world_hotspots[h_id] = coords
-                        
-                    common = set(flat_world_hotspots.keys()).intersection(child_hotspots.keys())
-                    if common:
-                        hs_id = list(common)[0]
-                        target_x, target_y = flat_world_hotspots[hs_id]
-                        child_origin_x = target_x - child_hotspots[hs_id][0]
-                        child_origin_y = target_y - child_hotspots[hs_id][1]
-                        child_draw_x = child_origin_x + f['x_off']
-                        child_draw_y = child_origin_y + f['y_off']
-                        aligned = True
-                        
-                if not aligned:
-                    child_origin_x = 0
-                    child_origin_y = 0
-                    child_draw_x = f['x_off']
-                    child_draw_y = f['y_off']
-                    
-                layers_to_paste.append((f['image'], child_draw_x, child_draw_y))
-                
-                for hs_id, (hx, hy) in child_hotspots.items():
-                    world_hotspots[(layer_role, hs_id)] = (child_origin_x + hx, child_origin_y + hy)
-                    
-            min_x = min(item[1] for item in layers_to_paste)
-            max_x = max(item[1] + item[0].width for item in layers_to_paste)
-            min_y = min(item[2] for item in layers_to_paste)
-            max_y = max(item[2] + item[0].height for item in layers_to_paste)
-            
-            width = max_x - min_x
-            height = max_y - min_y
-            
-            if width <= 0 or height <= 0:
-                comp_img = Image.new("RGBA", (1, 1), (255, 255, 255, 0))
-            else:
-                comp_img = Image.new("RGBA", (width, height), (255, 255, 255, 0))
-                for img, x, y in layers_to_paste:
-                    comp_img.paste(img, (x - min_x, y - min_y), img)
-                    
+                comp_img.paste(f['image'], (cx + f['x_off'], cy + f['y_off']), f['image'])
             bbox = comp_img.getbbox()
             if bbox:
                 comp_img = comp_img.crop(bbox)
@@ -337,7 +202,10 @@ class BGFManager:
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"BGF: Searching for {class_name} in resource_dir={self.resource_dir}")
-        
+        if not self.resource_dir:
+            logger.warning("BGF: resource_dir is None!")
+            return None
+            
         if "|" in class_name:
             paths = []
             for part in class_name.split("|"):
@@ -352,49 +220,19 @@ class BGFManager:
     def _find_single_bgf(self, class_name):
         import logging
         logger = logging.getLogger(__name__)
+        search_dirs = [self.resource_dir, os.path.join(self.resource_dir, "graphics")]
         
-        search_dirs = []
-        if self.resource_dir:
-            search_dirs.append(self.resource_dir)
-            try:
-                search_dirs.append(os.path.join(self.resource_dir, "graphics"))
-            except:
-                pass
-            try:
-                parent = os.path.dirname(self.resource_dir)
-                if parent:
-                    search_dirs.append(parent)
-                    search_dirs.append(os.path.join(parent, "graphics"))
-            except:
-                pass
-                
-        # Always add standard fallback paths relative to working directory
-        local_base = os.getcwd()
-        search_dirs.extend([
-            os.path.join(local_base, "m59_codebase", "resource", "graphics"),
-            os.path.join(local_base, "m59_codebase", "resource"),
-            os.path.join(local_base, "resource", "graphics"),
-            os.path.join(local_base, "resource"),
-            local_base
-        ])
-        
-        # Clean candidates list
         if class_name.lower().endswith('.bgf'):
             candidates = [class_name, class_name.lower(), class_name.upper()]
         else:
-            candidates = [
-                f"{class_name}.bgf", f"{class_name.lower()}.bgf", f"{class_name.upper()}.bgf",
-                f"{class_name[:8]}.bgf", f"{class_name[:8].lower()}.bgf", f"{class_name[:8].upper()}.bgf"
-            ]
-            
+            candidates = [f"{class_name}.bgf", f"{class_name.lower()}.bgf", f"{class_name[:8]}.bgf", f"{class_name[:8].lower()}.bgf"]
+        
         for d in search_dirs:
-            if not d or not os.path.exists(d): 
-                continue
+            if not os.path.exists(d): continue
             for c in candidates:
                 p = os.path.join(d, c)
                 if os.path.exists(p):
                     return p
-            # Try a case-insensitive directory scan
             try:
                 files = os.listdir(d)
                 for f in files:
@@ -402,7 +240,6 @@ class BGFManager:
                         return os.path.join(d, f)
             except:
                 pass
-                
         return None
 
     def load_mob_mapping(self, csv_path):
@@ -412,8 +249,8 @@ class BGFManager:
                 with open(csv_path, "r", encoding="utf-8") as f:
                     for line in f:
                         parts = line.strip().split(",")
-                        if len(parts) >= 2:
-                            internal_name = parts[0].split(" is ")[0].strip()
+                        if len(parts) >= 2 and " is Monster" in parts[0]:
+                            internal_name = parts[0].split(" is Monster")[0].strip()
                             display_name = parts[1].strip().lower().rstrip('"')
                             cleaned_name = ''.join(c for c in display_name if c.isalnum() or c.isspace() or c == "'" or c == "-")
                             
@@ -422,21 +259,10 @@ class BGFManager:
                             
                             if cleaned_name:
                                 mapping[cleaned_name] = target_name
-                                no_spaces = cleaned_name.replace(" ", "")
-                                if no_spaces not in mapping:
-                                    mapping[no_spaces] = target_name
-                                    
                                 if cleaned_name.startswith("the "):
                                     mapping[cleaned_name[4:]] = target_name
-                                    no_spaces_the = cleaned_name[4:].replace(" ", "")
-                                    if no_spaces_the not in mapping:
-                                        mapping[no_spaces_the] = target_name
-                                        
                                 if cleaned_name.startswith("a "):
                                     mapping[cleaned_name[2:]] = target_name
-                                    no_spaces_a = cleaned_name[2:].replace(" ", "")
-                                    if no_spaces_a not in mapping:
-                                        mapping[no_spaces_a] = target_name
             except Exception as e:
                 print(f"BGF ERROR: Could not read moblist: {e}")
         self.mob_mapping = mapping

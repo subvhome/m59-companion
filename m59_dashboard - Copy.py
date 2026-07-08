@@ -1874,9 +1874,12 @@ class M59Dashboard(tk.Tk):
                 tr.bind("<<TreeviewSelect>>", self.on_monster_select)
 
         # --- Bottom Half: Image Viewer ---
-        # Sliders for Angle and Pose (Pack FIRST at bottom)
+        self.bgf_canvas = tk.Canvas(bottom_frame, bg="#333333", highlightthickness=0)
+        self.bgf_canvas.pack(fill="both", expand=True, pady=(5,0))
+        
+        # Sliders for Angle and Pose
         sliders_frame = tk.Frame(bottom_frame, bg="#333333")
-        sliders_frame.pack(side="bottom", fill="x", padx=20, pady=5)
+        sliders_frame.pack(fill="x", padx=20, pady=5)
         
         tk.Label(sliders_frame, text="Pose:", bg="#333333", fg="white").pack(side="left")
         self.bgf_pose_slider = tk.Scale(sliders_frame, from_=0, to=0, orient=tk.HORIZONTAL, bg="#333333", fg="white", highlightthickness=0, command=self.on_bgf_slider_move)
@@ -1885,10 +1888,6 @@ class M59Dashboard(tk.Tk):
         tk.Label(sliders_frame, text="Angle:", bg="#333333", fg="white").pack(side="left")
         self.bgf_angle_slider = tk.Scale(sliders_frame, from_=0, to=5, orient=tk.HORIZONTAL, bg="#333333", fg="white", highlightthickness=0, command=self.on_bgf_slider_move)
         self.bgf_angle_slider.pack(side="left", fill="x", expand=True, padx=(5, 0))
-
-        # Canvas (Pack SECOND to fill remaining top space)
-        self.bgf_canvas = tk.Canvas(bottom_frame, bg="#333333", highlightthickness=0)
-        self.bgf_canvas.pack(side="top", fill="both", expand=True, pady=(5,0))
         
         self.current_bgf_frames = []
         self.current_bgf_image_on_canvas = None
@@ -1921,13 +1920,7 @@ class M59Dashboard(tk.Tk):
         self.bgf_angle_slider.config(state="disabled")
         
         if getattr(self, "bgf_manager", None):
-            cleaned_sel = ''.join(c for c in monster_name.lower() if c.isalnum() or c.isspace() or c == "'" or c == "-")
-            internal_name = self.bgf_manager.mob_mapping.get(cleaned_sel)
-            if not internal_name:
-                internal_name = self.bgf_manager.mob_mapping.get(cleaned_sel.replace(" ", ""))
-            if not internal_name:
-                internal_name = self.bgf_manager.mob_mapping.get(monster_name.lower())
-                
+            internal_name = self.bgf_manager.mob_mapping.get(monster_name.lower())
             logger.info(f"Killbook: Internal name for '{monster_name.lower()}' is '{internal_name}'")
             if internal_name:
                 bgf_path = self.bgf_manager.find_bgf_for_monster(internal_name)

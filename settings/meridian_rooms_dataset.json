@@ -163,7 +163,7 @@
                     21,
                     3
                 ],
-                "travel_time": 32.25
+                "travel_time": 10.11
             }
         ]
     },
@@ -1060,7 +1060,7 @@
                     5,
                     32
                 ],
-                "travel_time": 22.22
+                "travel_time": 16.13
             }
         ]
     },
@@ -1616,7 +1616,8 @@
                 "to_pos": [
                     14,
                     16
-                ]
+                ],
+                "travel_time": 10.16
             },
             {
                 "type": "point",
@@ -1628,7 +1629,8 @@
                 "to_pos": [
                     14,
                     16
-                ]
+                ],
+                "travel_time": 10.16
             }
         ]
     },
@@ -1863,7 +1865,8 @@
                 "to_pos": [
                     5,
                     4
-                ]
+                ],
+                "travel_time": 13.17
             },
             {
                 "type": "point",
@@ -4249,7 +4252,8 @@
                 "to_pos": [
                     42,
                     25
-                ]
+                ],
+                "travel_time": 2.07
             }
         ]
     },
@@ -4274,7 +4278,8 @@
                 "to_pos": [
                     43,
                     37
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4286,7 +4291,8 @@
                 "to_pos": [
                     44,
                     37
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4298,7 +4304,8 @@
                 "to_pos": [
                     45,
                     37
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4310,7 +4317,8 @@
                 "to_pos": [
                     51,
                     35
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4322,7 +4330,8 @@
                 "to_pos": [
                     52,
                     35
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4334,7 +4343,8 @@
                 "to_pos": [
                     60,
                     32
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4346,7 +4356,8 @@
                 "to_pos": [
                     60,
                     32
-                ]
+                ],
+                "travel_time": 50.67
             },
             {
                 "type": "point",
@@ -4555,7 +4566,8 @@
                 "to_pos": [
                     63,
                     20
-                ]
+                ],
+                "travel_time": 31.35
             }
         ]
     },
@@ -4664,7 +4676,8 @@
                 "to_pos": [
                     3,
                     8
-                ]
+                ],
+                "travel_time": 5.12
             },
             {
                 "type": "point",
@@ -4676,7 +4689,8 @@
                 "to_pos": [
                     3,
                     8
-                ]
+                ],
+                "travel_time": 5.12
             },
             {
                 "type": "point",
@@ -4688,7 +4702,8 @@
                 "to_pos": [
                     3,
                     6
-                ]
+                ],
+                "travel_time": 6.13
             },
             {
                 "type": "point",
@@ -4700,7 +4715,8 @@
                 "to_pos": [
                     3,
                     6
-                ]
+                ],
+                "travel_time": 6.13
             },
             {
                 "type": "point",
@@ -4810,7 +4826,8 @@
                 "from": [
                     5,
                     61
-                ]
+                ],
+                "travel_time": 39.57
             }
         ]
     },
@@ -7641,7 +7658,7 @@
                     27,
                     49
                 ],
-                "travel_time": 106.14
+                "travel_time": 8.09
             },
             {
                 "type": "edge",
@@ -7655,7 +7672,7 @@
                     27,
                     49
                 ],
-                "travel_time": 106.14
+                "travel_time": 8.09
             },
             {
                 "type": "edge",
@@ -7748,7 +7765,8 @@
                 "from": [
                     2,
                     21
-                ]
+                ],
+                "travel_time": 33.38
             },
             {
                 "type": "edge",
@@ -7838,7 +7856,8 @@
                 "from": [
                     9,
                     75
-                ]
+                ],
+                "travel_time": 3.08
             },
             {
                 "type": "edge",
@@ -7851,7 +7870,8 @@
                 "from": [
                     9,
                     75
-                ]
+                ],
+                "travel_time": 3.08
             },
             {
                 "type": "edge",
@@ -7890,7 +7910,8 @@
                 "from": [
                     2,
                     19
-                ]
+                ],
+                "travel_time": 5.12
             },
             {
                 "type": "edge",
@@ -8075,7 +8096,8 @@
                 "from": [
                     14,
                     7
-                ]
+                ],
+                "travel_time": 34.45
             },
             {
                 "type": "edge",
@@ -8464,7 +8486,8 @@
                 "from": [
                     128,
                     71
-                ]
+                ],
+                "travel_time": 17.24
             },
             {
                 "type": "edge",
@@ -8516,7 +8539,8 @@
                 "from": [
                     115,
                     88
-                ]
+                ],
+                "travel_time": 12.21
             }
         ]
     },
@@ -8554,7 +8578,8 @@
                 "from": [
                     36,
                     3
-                ]
+                ],
+                "travel_time": 58.7
             },
             {
                 "type": "edge",
@@ -8567,7 +8592,8 @@
                 "from": [
                     2,
                     13
-                ]
+                ],
+                "travel_time": 33.34
             },
             {
                 "type": "edge",
@@ -8766,7 +8792,7 @@
                     46,
                     14
                 ],
-                "travel_time": 5.04
+                "travel_time": 5.03
             },
             {
                 "type": "edge",
@@ -8780,7 +8806,7 @@
                     46,
                     14
                 ],
-                "travel_time": 5.04
+                "travel_time": 5.03
             }
         ]
     },
@@ -8889,7 +8915,7 @@
                     45,
                     6
                 ],
-                "travel_time": 9.09
+                "travel_time": 4.12
             }
         ]
     },
@@ -8915,7 +8941,8 @@
                 "from": [
                     46,
                     66
-                ]
+                ],
+                "travel_time": 30.4
             },
             {
                 "type": "edge",
@@ -8929,7 +8956,7 @@
                     8,
                     66
                 ],
-                "travel_time": 4.02
+                "travel_time": 3.02
             },
             {
                 "type": "edge",
@@ -8942,7 +8969,8 @@
                 "from": [
                     5,
                     1
-                ]
+                ],
+                "travel_time": 18.15
             },
             {
                 "type": "point",
@@ -8995,7 +9023,7 @@
                     46,
                     30
                 ],
-                "travel_time": 7.08
+                "travel_time": 6.75
             },
             {
                 "type": "point",
@@ -9008,7 +9036,7 @@
                     46,
                     31
                 ],
-                "travel_time": 7.08
+                "travel_time": 6.75
             },
             {
                 "type": "edge",
@@ -9236,7 +9264,8 @@
                 "from": [
                     60,
                     23
-                ]
+                ],
+                "travel_time": 14.15
             }
         ]
     },
@@ -9263,7 +9292,7 @@
                     2,
                     27
                 ],
-                "travel_time": 37.26
+                "travel_time": 35.43
             },
             {
                 "type": "edge",
@@ -9290,7 +9319,7 @@
                     67,
                     3
                 ],
-                "travel_time": 25.22
+                "travel_time": 19.26
             }
         ]
     },
@@ -13775,7 +13804,8 @@
                 "from": [
                     2,
                     30
-                ]
+                ],
+                "travel_time": 13.16
             },
             {
                 "type": "edge",
@@ -14158,7 +14188,8 @@
                 "to_pos": [
                     2,
                     5
-                ]
+                ],
+                "travel_time": 4.04
             },
             {
                 "type": "point",
@@ -14634,7 +14665,7 @@
                     25,
                     22
                 ],
-                "travel_time": 17.24
+                "travel_time": 7.07
             }
         ]
     },
@@ -15118,7 +15149,8 @@
                 "to_pos": [
                     2,
                     2
-                ]
+                ],
+                "travel_time": 2.02
             },
             {
                 "type": "point",
@@ -15130,7 +15162,8 @@
                 "to_pos": [
                     2,
                     2
-                ]
+                ],
+                "travel_time": 2.02
             },
             {
                 "type": "point",
@@ -15142,7 +15175,8 @@
                 "to_pos": [
                     4,
                     9
-                ]
+                ],
+                "travel_time": 10.18
             }
         ]
     },
@@ -15398,7 +15432,8 @@
                 "to_pos": [
                     6,
                     11
-                ]
+                ],
+                "travel_time": 4.1
             }
         ]
     },
@@ -15522,7 +15557,8 @@
                 "to_pos": [
                     51,
                     12
-                ]
+                ],
+                "travel_time": 8.12
             },
             {
                 "type": "point",
