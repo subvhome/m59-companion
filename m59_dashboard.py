@@ -193,6 +193,10 @@ class M59Dashboard(tk.Tk):
         self.pk_sound_enabled = tk.BooleanVar(value=True)
         self.pk_frame_enabled = tk.BooleanVar(value=True)
         self.pk_sound_path = tk.StringVar(value="SystemExclamation")
+        self.elusion_phrase = tk.StringVar(value='say "I wish to travel to {loc}."')
+        self.elusion_geometry = tk.StringVar(value="320x35+100+100")
+        self.guildhall_name = tk.StringVar(value="")
+        self.custom_elusion_phrases = []
         self.debug_enabled = tk.BooleanVar(value=False)
         self.debug_enabled.trace_add("write", lambda *a: setup_logging(self.debug_enabled.get()))
         
@@ -853,6 +857,10 @@ class M59Dashboard(tk.Tk):
                     self.pk_sound_enabled.set(s.get("pk_sound_enabled", True))
                     self.pk_frame_enabled.set(s.get("pk_frame_enabled", True))
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
+                    self.elusion_phrase.set(s.get("elusion_phrase", 'say "I wish to travel to {loc}."'))
+                    self.elusion_geometry.set(s.get("elusion_geometry", "320x35+100+100"))
+                    self.guildhall_name.set(s.get("guildhall_name", ""))
+                    self.custom_elusion_phrases = s.get("custom_elusion_phrases", [])
                     self.debug_enabled.set(s.get("debug_enabled", False))
                     self.who_list_side.set(s.get("who_list_side", "Right"))
                     self.who_list_width.set(s.get("who_list_width", 250))
@@ -884,6 +892,10 @@ class M59Dashboard(tk.Tk):
                     "pk_sound_enabled": self.pk_sound_enabled.get(),
                     "pk_frame_enabled": self.pk_frame_enabled.get(),
                     "pk_sound_path": self.pk_sound_path.get(),
+                    "elusion_phrase": self.elusion_phrase.get(),
+                    "elusion_geometry": self.elusion_geometry.get(),
+                    "guildhall_name": self.guildhall_name.get(),
+                    "custom_elusion_phrases": self.custom_elusion_phrases,
                     "debug_enabled": self.debug_enabled.get(),
                     "who_list_docked": self.who_list_docked.get(),
                     "who_list_side": self.who_list_side.get(),
@@ -1723,6 +1735,9 @@ class M59Dashboard(tk.Tk):
         self.countdown_lbl = tk.Label(top, text="10s", font=("Arial", 8), bg="#f0f0f0", fg="gray")
         self.countdown_lbl.pack(side="right", padx=10)
         
+        self.elude_btn = tk.Button(top, text="Elude Menu", bg="#8e44ad", fg="white", font=("Arial", 9, "bold"), command=self.launch_elusion_menu)
+        self.elude_btn.pack(side="right", padx=10)
+        
         # --- 2. Bottom Sync Section (Pack first to keep pinned) ---
         sync_f = tk.Frame(self.tab_dash, bg="#f0f0f0")
         sync_f.pack(side="bottom", fill="x", padx=10, pady=10)
@@ -1766,6 +1781,17 @@ class M59Dashboard(tk.Tk):
             self.kills_tree.heading(c, text=c)
             self.kills_tree.column(c, width=w, anchor="w" if c=="Name" else "center")
         self.kills_tree.pack(fill="both", expand=True)
+
+    def launch_elusion_menu(self):
+        try:
+            from m59_elude import ElusionMenu
+            if hasattr(self, 'elusion_menu') and self.elusion_menu.winfo_exists():
+                self.elusion_menu.focus_set()
+                return
+            hwnd = self.main_hwnd if hasattr(self, 'main_hwnd') and self.main_hwnd else None
+            self.elusion_menu = ElusionMenu(self, target_hwnd=hwnd)
+        except Exception as e:
+            logger.error(f"Failed to launch Elusion menu: {e}")
 
     def on_gps_loc_resize(self, event):
         """Dynamically adjusts text wrapping for the current location label."""
@@ -1997,6 +2023,42 @@ class M59Dashboard(tk.Tk):
         pg = tk.LabelFrame(c, text=" Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         pg.pack(fill="x")
         tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
+        
+        elude_g = tk.LabelFrame(c, text=" Elusion Settings ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
+        elude_g.pack(fill="x", pady=10)
+        
+        gh_frame = tk.Frame(elude_g, bg="#f0f0f0")
+        gh_frame.pack(fill="x", pady=(0, 10))
+        tk.Label(gh_frame, text="Your Guildhall Name:", bg="#f0f0f0").pack(side="left")
+        ttk.Entry(gh_frame, textvariable=self.guildhall_name, width=40).pack(side="left", padx=5)
+
+        tk.Label(elude_g, text="Elusion Phrase (Start with 'say' or 'emote', use {loc} for location):", bg="#f0f0f0").pack(anchor="w")
+        
+        base_phrases = [
+            'say "I wish to travel to {loc}."',
+            'say "By the grace of the High Council, I demand passage to {loc}!"',
+            "emote separates the earths and forms a path to {loc}",
+            "emote traces a rune in the air, opening a rift to {loc}",
+            "emote bends the fabric of space with Riija's chaotic magic, stepping towards {loc}"
+        ]
+        
+        all_phrases = list(dict.fromkeys(base_phrases + self.custom_elusion_phrases))
+        
+        phrase_frame = tk.Frame(elude_g, bg="#f0f0f0")
+        phrase_frame.pack(fill="x", pady=5)
+        
+        phrase_combo = ttk.Combobox(phrase_frame, textvariable=self.elusion_phrase, values=all_phrases, width=60)
+        phrase_combo.pack(side="left")
+        
+        def add_phrase():
+            current = self.elusion_phrase.get()
+            if current and current not in all_phrases:
+                self.custom_elusion_phrases.append(current)
+                all_phrases.append(current)
+                phrase_combo.configure(values=all_phrases)
+                self.save_settings()
+                
+        tk.Button(phrase_frame, text="Add", command=add_phrase, bg="#4CAF50", fg="white", relief="flat", padx=10).pack(side="left", padx=5)
         
         wr_g = tk.LabelFrame(c, text=" Status Dock Side Panel ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         wr_g.pack(fill="x", pady=10)
