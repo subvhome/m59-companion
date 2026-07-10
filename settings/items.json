@@ -132,6 +132,7 @@
     "mystic sword": { "weight": 60, "bulk": 60 },
     "necklace of jala": { "weight": 25, "bulk": 20 },
     "nerudite armor": { "weight": 500, "bulk": 500 },
+    "nerudite bow": { "weight": 100, "bulk": 100 },
     "nerudite arrows": { "weight": 5, "bulk": 4 },
     "nerudite sword": { "weight": 80, "bulk": 70 },
     "notice of delinquent taxes": { "weight": 3, "bulk": 10 },
