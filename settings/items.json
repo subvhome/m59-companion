@@ -15,6 +15,8 @@
     "apple": { "weight": 6, "bulk": 6 },
     "arrows": { "weight": 4, "bulk": 4 },
     "axe": { "weight": 90, "bulk": 90 },
+    "bow": { "weight": 70, "bulk": 80},
+    "battle bow": { "weight": 70, "bulk": 80},
     "berserker ring": { "weight": 10, "bulk": 5 },
     "black dagger": { "weight": 25, "bulk": 35 },
     "blood of the innocent": { "weight": 25, "bulk": 30 },

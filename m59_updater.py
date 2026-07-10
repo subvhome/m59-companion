@@ -41,14 +41,22 @@ def download_update():
 def apply_update(new_exe_path):
     """Uses PowerShell to swap files silently after app exit."""
     current_exe = sys.executable
-    # PowerShell Script: Wait 5s (to prevent MEI cleanup race), Swap, Alert, Restart
+    base, ext = os.path.splitext(current_exe)
+    backup_exe = base + "_backup" + ext
+    
+    # PowerShell Script: Wait 5s (to prevent MEI cleanup race), Swap, Alert
     ps_script = f"""
     Start-Sleep -s 5
     if (Test-Path '{new_exe_path}') {{
-        Move-Item -Path '{new_exe_path}' -Destination '{current_exe}' -Force
+        if (Test-Path '{backup_exe}') {{
+            Remove-Item -Path '{backup_exe}' -Force
+        }}
+        if (Test-Path '{current_exe}') {{
+            Rename-Item -Path '{current_exe}' -NewName '{os.path.basename(backup_exe)}' -Force
+        }}
+        Rename-Item -Path '{new_exe_path}' -NewName '{os.path.basename(current_exe)}' -Force
         [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null
-        [System.Windows.Forms.MessageBox]::Show('M59 Companion has been updated to the latest version.', 'Update Complete')
-        Start-Process '{current_exe}'
+        [System.Windows.Forms.MessageBox]::Show('M59 Companion has been updated to the latest version. Please relaunch the application.', 'Update Complete')
     }}
     """
     subprocess.Popen(["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_script], 
