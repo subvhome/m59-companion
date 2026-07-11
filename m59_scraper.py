@@ -50,6 +50,56 @@ def capture_identity(hwnd, target_pid):
         logger.debug("Identity: Face button not visible. UI not ready.")
         return None
 
+    def find_bio_window():
+        bio_hwnd = [None]
+        def find_bio_cb(h, param):
+            if win32gui.IsWindowVisible(h) and win32gui.GetClassName(h) == "#32770":
+                _, p = win32process.GetWindowThreadProcessId(h)
+                if p == target_pid:
+                    try:
+                        if win32gui.GetDlgItem(h, 1011):
+                            bio_hwnd[0] = h
+                            return False
+                    except:
+                        pass
+            return True
+        win32gui.EnumWindows(find_bio_cb, None)
+        return bio_hwnd[0]
+
+    # Check if it's already open
+    bio_win = find_bio_window()
+    if not bio_win:
+        # 2. Trigger the Bio Window
+        win32gui.SendMessage(face_btn, win32con.WM_RBUTTONDOWN, win32con.MK_RBUTTON, 0)
+        time.sleep(0.05)
+        win32gui.SendMessage(face_btn, win32con.WM_RBUTTONUP, 0, 0)
+        
+    start_time = time.time()
+    while time.time() - start_time < 5.0:
+        bio_win = find_bio_window()
+        if bio_win:
+            name_hwnd = win32gui.GetDlgItem(bio_win, 1011)
+            if name_hwnd:
+                time.sleep(0.2) # pause a few ms to ensure text is loaded
+                name = get_text_from_hwnd(name_hwnd)
+                logger.debug(f"Identity: Found window {bio_win}, text read: '{name}'")
+                
+                if name and name not in ["...", "Unknown", ""]:
+                    # SUCCESS: Clean up and return
+                    time.sleep(0.2) # pause a few ms before closing
+                    win32gui.SendMessage(bio_win, win32con.WM_COMMAND, 2, 0) # IDCANCEL (2)
+                    win32gui.SendMessage(bio_win, win32con.WM_CLOSE, 0, 0)
+                    return name
+        
+        time.sleep(0.5)
+        
+    # If we found a window but never got a valid name, close it anyway to clean up
+    if bio_win:
+        win32gui.SendMessage(bio_win, win32con.WM_COMMAND, 2, 0)
+        win32gui.SendMessage(bio_win, win32con.WM_CLOSE, 0, 0)
+        
+    return None
+
     # 2. Trigger the Bio Window
     win32gui.SendMessage(face_btn, win32con.WM_RBUTTONDOWN, win32con.MK_RBUTTON, 0)
     win32gui.SendMessage(face_btn, win32con.WM_RBUTTONUP, 0, 0)
@@ -81,6 +131,7 @@ def capture_identity(hwnd, target_pid):
                 
                 if name and name not in ["...", "Unknown", ""]:
                     # SUCCESS: Clean up and return
+                    win32gui.PostMessage(bio_hwnd[0], win32con.WM_COMMAND, win32con.IDCANCEL, 0)
                     win32gui.PostMessage(bio_hwnd[0], win32con.WM_CLOSE, 0, 0)
                     return name
         
@@ -88,6 +139,7 @@ def capture_identity(hwnd, target_pid):
         
     # If we found a window but never got a valid name, close it anyway to clean up
     if bio_hwnd[0]:
+        win32gui.PostMessage(bio_hwnd[0], win32con.WM_COMMAND, win32con.IDCANCEL, 0)
         win32gui.PostMessage(bio_hwnd[0], win32con.WM_CLOSE, 0, 0)
         
     return None

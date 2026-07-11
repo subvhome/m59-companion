@@ -57,12 +57,23 @@ class ElusionMenu(tk.Toplevel):
         self.close_btn = tk.Button(self, text="X", bg="#882222", fg="white", relief="flat", command=self.destroy)
         self.close_btn.pack(side="left", padx=2, pady=4)
         
-        self.docked = False
+        self.docked = True
         self.offset_x = 0
         self.offset_y = 0
         
         self.after(100, self.set_owner)
-        self.after(100, self.check_docking)
+        self.after(200, self.init_docking)
+        self.after(300, self.check_docking)
+
+    def init_docking(self):
+        if self.target_hwnd:
+            try:
+                self.update_idletasks()
+                rect = win32gui.GetWindowRect(self.target_hwnd)
+                self.offset_x = self.winfo_x() - rect[0]
+                self.offset_y = self.winfo_y() - rect[1]
+            except:
+                pass
 
     def set_owner(self):
         if self.target_hwnd:
@@ -79,7 +90,6 @@ class ElusionMenu(tk.Toplevel):
     def start_move(self, event):
         self.x = event.x
         self.y = event.y
-        self.docked = False
 
     def update_saved_geometry(self):
         if hasattr(self, 'dashboard') and hasattr(self.dashboard, 'elusion_geometry'):
@@ -96,12 +106,8 @@ class ElusionMenu(tk.Toplevel):
         if self.target_hwnd:
             try:
                 rect = win32gui.GetWindowRect(self.target_hwnd)
-                # Snap if close to the borders
-                if abs(new_x - rect[0]) < 40 and abs(new_y - rect[1]) < 40:
-                    self.docked = True
-                    self.offset_x = new_x - rect[0]
-                    self.offset_y = new_y - rect[1]
-                    self.geometry(f"+{rect[0]+self.offset_x}+{rect[1]+self.offset_y}")
+                self.offset_x = new_x - rect[0]
+                self.offset_y = new_y - rect[1]
             except:
                 pass
 

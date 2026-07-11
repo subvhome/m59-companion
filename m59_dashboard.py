@@ -84,6 +84,7 @@ from m59_time import get_game_time, format_game_time
 import m59_inventory as inventory
 import m59_bgf
 import m59_map
+import m59_commalias
 
 SETTINGS_FILE = "settings/gui_settings.json"
 
@@ -301,13 +302,14 @@ class M59Dashboard(tk.Tk):
         self.notebook.pack(side="left", fill="both", expand=True, padx=5, pady=5)
         
         # Tab Creation
-        tabs = [("Dashboard", "dash"), ("Inventory", "inv"), ("Communications", "comms"), ("GPS", "gps"), ("Progression", "prog"), ("Vault", "vault"), ("Kill Book", "book"), ("Settings", "settings")]
+        tabs = [("Dashboard", "dash"), ("Shortcuts", "shortcuts"), ("Inventory", "inv"), ("Communications", "comms"), ("GPS", "gps"), ("Progression", "prog"), ("Vault", "vault"), ("Kill Book", "book"), ("Settings", "settings")]
         for name, key in tabs:
             f = tk.Frame(self.notebook, bg="#f0f0f0")
             setattr(self, f"tab_{key}", f)
             self.notebook.add(f, text=f" {name} ")
         
         self.setup_tab_dashboard()
+        self.setup_tab_shortcuts()
         self.setup_tab_inventory()
         self.setup_tab_communications()
         self.setup_tab_gps()
@@ -409,6 +411,10 @@ class M59Dashboard(tk.Tk):
                             self.filter_vars[cat] = tk.BooleanVar(value=False)
             except Exception as e:
                 logger.error(f"Failed to load filters: {e}")
+
+    def setup_tab_shortcuts(self):
+        self.commalias_tab = m59_commalias.CommaliasTab(self.tab_shortcuts, self)
+        self.commalias_tab.pack(fill="both", expand=True)
 
     def setup_tab_inventory(self):
         """Creates the real-time Inventory list tab with Weight and Bulk metrics."""
@@ -1735,9 +1741,6 @@ class M59Dashboard(tk.Tk):
         self.countdown_lbl = tk.Label(top, text="10s", font=("Arial", 8), bg="#f0f0f0", fg="gray")
         self.countdown_lbl.pack(side="right", padx=10)
         
-        self.elude_btn = tk.Button(top, text="Elude Menu", bg="#8e44ad", fg="white", font=("Arial", 9, "bold"), command=self.launch_elusion_menu)
-        self.elude_btn.pack(side="right", padx=10)
-        
         # --- 2. Bottom Sync Section (Pack first to keep pinned) ---
         sync_f = tk.Frame(self.tab_dash, bg="#f0f0f0")
         sync_f.pack(side="bottom", fill="x", padx=10, pady=10)
@@ -2372,6 +2375,9 @@ class M59Dashboard(tk.Tk):
                 # Start Who List if enabled
                 self.start_who_list_monitor()
                 
+                if hasattr(self, 'commalias_tab'):
+                    self.commalias_tab.manager.update_float_buttons()
+                
                 # Start Inventory Polling
                 self.after(2000, self.poll_inventory)
                 self.after(500, self.check_for_login)
@@ -2400,10 +2406,10 @@ class M59Dashboard(tk.Tk):
                 
                 # Start the intelligent identity capture loop
                 logger.info("LifeCycle: Starting character identification handshake...")
-                self.attempt_identity_capture(0)
+                self.after(2000, lambda: self.attempt_identity_capture(0))
                 
                 # Trigger silent who update 1.5s after character is fully active in-game
-                self.after(1500, self.trigger_silent_who_update)
+                self.after(3500, self.trigger_silent_who_update)
             else:
                 # Still at selection screen, check again in 1s
                 self.after(1000, self.check_for_login)
@@ -2498,6 +2504,9 @@ class M59Dashboard(tk.Tk):
         self.main_hwnd = None
         self.pm_obj = None
         self.target_pid = None
+        
+        if hasattr(self, 'commalias_tab'):
+            self.commalias_tab.manager.update_float_buttons()
         
         def safe_ui_reset():
             self.refresh_who_list_ui()
