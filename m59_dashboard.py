@@ -2422,7 +2422,12 @@ class M59Dashboard(tk.Tk):
         # Update status bar with progress
         self.status_var.set(f"Finalizing Identity... (Attempt {count + 1}/10)")
         
-        name = capture_identity(self.main_hwnd, self.target_pid)
+        if hasattr(self, 'pre_scanned_names') and self.target_pid in self.pre_scanned_names:
+            name = self.pre_scanned_names[self.target_pid]
+            # remove it so it can be rescanned later if needed
+            del self.pre_scanned_names[self.target_pid]
+        else:
+            name = capture_identity(self.main_hwnd, self.target_pid)
         
         if name:
             logger.info(f"LifeCycle: Identity verified as '{name}' on attempt {count + 1}.")
@@ -2900,6 +2905,8 @@ class M59Dashboard(tk.Tk):
                     if inst.get("char_name") in ["Unscanned", "Unknown", "..."]:
                         name = capture_identity(inst["hwnd"], inst["pid"])
                         if name and popup.winfo_exists():
+                            if not hasattr(self, 'pre_scanned_names'): self.pre_scanned_names = {}
+                            self.pre_scanned_names[inst["pid"]] = name
                             # Update the specific row in the Treeview via the main thread
                             self.after(0, lambda p=inst["pid"], n=name: tree.set(str(p), "Character", n))
             except Exception as e:

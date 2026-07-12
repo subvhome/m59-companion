@@ -57,12 +57,10 @@ def parse_config_ini():
     return used_keys
 
 class AliasFloatBtn(tk.Toplevel):
-    def __init__(self, parent, main_hwnd, alias_name, command1, command2, delay=1.0, x_offset=0, y_offset=0):
+    def __init__(self, parent, main_hwnd, alias_name, command1, x_offset=0, y_offset=0):
         super().__init__(parent)
         self.main_hwnd = main_hwnd
         self.command1 = command1
-        self.command2 = command2
-        self.delay = delay
         self.title(alias_name)
         self.overrideredirect(True)
         self.attributes("-topmost", True)
@@ -151,9 +149,7 @@ class AliasFloatBtn(tk.Toplevel):
             try:
                 if self.command1:
                     send_chat_command(self.main_hwnd, self.command1)
-                if self.command2:
-                    time.sleep(self.delay)
-                    send_chat_command(self.main_hwnd, self.command2)
+
             except Exception as e:
                 print(f"Failed alias execution: {e}")
         threading.Thread(target=_run, daemon=True).start()
@@ -230,14 +226,10 @@ class CommaliasManager:
             
         def _run():
             cmd1 = alias.get('command1')
-            cmd2 = alias.get('command2')
-            delay = alias.get('delay', 1.0)
             try:
                 if cmd1:
                     send_chat_command(hwnd, cmd1)
-                if cmd2:
-                    time.sleep(delay)
-                    send_chat_command(hwnd, cmd2)
+
             except Exception as e:
                 print(f"Failed alias execution: {e}")
         threading.Thread(target=_run, daemon=True).start()
@@ -261,8 +253,7 @@ class CommaliasManager:
                     self.dashboard.main_hwnd, 
                     alias.get('name', 'Alias'),
                     alias.get('command1', ''),
-                    alias.get('command2', ''),
-                    delay=alias.get('delay', 1.0),
+
                     x_offset=x_offset,
                     y_offset=0
                 )
@@ -299,20 +290,16 @@ class CommaliasTab(tk.Frame):
         list_frame = tk.Frame(self, bg="#ffffff", bd=1, relief="solid")
         list_frame.pack(fill="both", expand=True, padx=10, pady=5)
         
-        columns = ("name", "hotkey", "cmd1", "cmd2", "delay", "float")
+        columns = ("name", "hotkey", "cmd1", "float")
         self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", selectmode="browse")
         self.tree.heading("name", text="Alias Name")
         self.tree.heading("hotkey", text="Hotkey")
-        self.tree.heading("cmd1", text="Command 1")
-        self.tree.heading("cmd2", text="Command 2")
-        self.tree.heading("delay", text="Delay (s)")
+        self.tree.heading("cmd1", text="Command")
         self.tree.heading("float", text="Floating Button")
         
         self.tree.column("name", width=100)
         self.tree.column("hotkey", width=80)
         self.tree.column("cmd1", width=150)
-        self.tree.column("cmd2", width=150)
-        self.tree.column("delay", width=60)
         self.tree.column("float", width=100)
         
         self.tree.bind("<Double-1>", self.on_tree_click)
@@ -328,8 +315,6 @@ class CommaliasTab(tk.Frame):
                 alias.get("name", ""),
                 alias.get("hotkey", ""),
                 alias.get("command1", ""),
-                alias.get("command2", ""),
-                str(alias.get("delay", 1.0)),
                 "Yes" if alias.get("show_float", False) else "No"
             ))
             
@@ -355,7 +340,7 @@ class CommaliasTab(tk.Frame):
         idx = int(row_id)
         alias = self.manager.aliases[idx]
         
-        if col_index == 5: # Float
+        if col_index == 3: # Float
             alias["show_float"] = not alias.get("show_float", False)
             self.manager.save_aliases()
             self.manager.update_float_buttons()
@@ -432,14 +417,6 @@ class CommaliasTab(tk.Frame):
                 alias["name"] = new_val
             elif col_index == 2:
                 alias["command1"] = new_val
-            elif col_index == 3:
-                alias["command2"] = new_val
-            elif col_index == 4:
-                try:
-                    alias["delay"] = float(new_val)
-                except ValueError:
-                    pass
-                new_val = str(alias.get("delay", 1.0))
                 
             self.manager.save_aliases()
             self.manager.update_float_buttons()
@@ -540,13 +517,7 @@ class CommaliasTab(tk.Frame):
         cmd1_var = tk.StringVar(value=alias.get("command1", ""))
         tk.Entry(win, textvariable=cmd1_var).pack(fill="x", padx=10, pady=2)
         
-        tk.Label(win, text="Command 2 (Optional post-cmd):", bg="#f0f0f0").pack(anchor="w", padx=10, pady=(10, 0))
-        cmd2_var = tk.StringVar(value=alias.get("command2", ""))
-        tk.Entry(win, textvariable=cmd2_var).pack(fill="x", padx=10, pady=2)
-        
-        tk.Label(win, text="Delay between commands (seconds):", bg="#f0f0f0").pack(anchor="w", padx=10, pady=(10, 0))
-        delay_var = tk.StringVar(value=str(alias.get("delay", 1.0)))
-        tk.Entry(win, textvariable=delay_var).pack(fill="x", padx=10, pady=2)
+
         
         show_float_var = tk.BooleanVar(value=alias.get("show_float", False))
         tk.Checkbutton(win, text="Create floating button tied to game window", variable=show_float_var, bg="#f0f0f0").pack(anchor="w", padx=10, pady=10)
@@ -558,17 +529,10 @@ class CommaliasTab(tk.Frame):
             except:
                 pass
                 
-            try:
-                delay_val = float(delay_var.get())
-            except ValueError:
-                delay_val = 1.0
-                
             new_alias = {
                 "name": name_var.get().strip(),
                 "hotkey": hotkey_var.get(),
                 "command1": cmd1_var.get().strip(),
-                "command2": cmd2_var.get().strip(),
-                "delay": delay_val,
                 "show_float": show_float_var.get(),
                 "enabled": True
             }

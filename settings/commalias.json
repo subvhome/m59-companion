@@ -1,10 +1,1 @@
-[
-    {
-        "name": "Blink",
-        "hotkey": "2+ctrl",
-        "command1": "cast blink",
-        "command2": "emote casted blink",
-        "show_float": true,
-        "enabled": true
-    }
-]
+[]

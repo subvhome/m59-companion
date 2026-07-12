@@ -1,2 +1,2 @@
-2.8.6
-adjusted initilization process. Added keyboard shortcuts and buttons. Moved elusion menu to Shortcut tab.
+2.8.7
+startup bug and refactored shortcuts
