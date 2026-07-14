@@ -37,7 +37,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BAZMANS_ROOM": {
         "name": "The Councilors' Chamber",
@@ -62,7 +64,9 @@
                     15
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JUNGLE_BOWMAKER_HUT": {
         "name": "The Bowmaker's Hut",
@@ -99,7 +103,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_CASTLE1C": {
         "name": "Outside Castle Victoria",
@@ -165,7 +171,9 @@
                 ],
                 "travel_time": 10.11
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CASTLE2A": {
         "name": "Banquet Hall of the Bourgeois Castle",
@@ -310,7 +318,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CASTLE2D": {
         "name": "Royal Library of the Bourgeois Castle",
@@ -599,7 +609,9 @@
                     10
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CASTLE2E": {
         "name": "Madelia's Fine Peacockeries",
@@ -636,7 +648,9 @@
                     15
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_CAVE3": {
         "name": "The Underground Lake",
@@ -661,7 +675,9 @@
                     30
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_DUKE1": {
         "name": "The Courtyard of Blackstone Keep",
@@ -830,7 +846,9 @@
                     29
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_DUKE2": {
         "name": "Blackstone Keep",
@@ -987,7 +1005,9 @@
                     24
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_DUKE3": {
         "name": "The Chambers of Duke Akardius",
@@ -1036,7 +1056,9 @@
                     15
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_DUNGEON": {
         "name": "Underbasement of Victoria",
@@ -1062,7 +1084,9 @@
                 ],
                 "travel_time": 16.13
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_FIELD1": {
         "name": "The Fields",
@@ -1074,7 +1098,9 @@
             42,
             15
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GALLERY": {
         "name": "object gallery",
@@ -1100,7 +1126,9 @@
                 ],
                 "object": "SpiderTree"
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_GODROOM": {
         "name": "The meeting place of the Gods",
@@ -1112,7 +1140,9 @@
             21,
             10
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUEST1": {
         "name": "The Inn of Hazar",
@@ -1124,7 +1154,9 @@
             7,
             4
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_GUEST_AREA | ROOM_SAFELOGOFF"
     },
     "RID_GUEST2": {
         "name": "Hazar",
@@ -1136,7 +1168,9 @@
             23,
             41
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA | ROOM_LAMPS"
     },
     "RID_GUEST3": {
         "name": "The Blacksmith of Hazar",
@@ -1148,7 +1182,9 @@
             6,
             8
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_GUEST4": {
         "name": "Ravi's Magicks of Hazar's Crossing",
@@ -1160,7 +1196,9 @@
             3,
             5
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_GUEST5": {
         "name": "The Home of Roderic D'Stane",
@@ -1172,7 +1210,9 @@
             2,
             2
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_GUEST7": {
         "name": "Eric's Stout Spirits",
@@ -1184,7 +1224,9 @@
             5,
             4
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA | ROOM_SANCTUARY"
     },
     "RID_GUEST8": {
         "name": "The Grand Museum of Hazar",
@@ -1196,7 +1238,9 @@
             9,
             11
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_HERMITHUT": {
         "name": "The Hermit's Hut",
@@ -1222,7 +1266,9 @@
                 ],
                 "travel_time": 18.16
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MOCKERS_ROOM": {
         "name": "Chamber of the Mocker",
@@ -1247,7 +1293,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BRAX_ARENA": {
         "name": "Goad's Grinder",
@@ -1270,7 +1318,9 @@
                 ],
                 "from": null
             }
-        ]
+        ],
+        "pvp_status": "Arena (No Death Penalty)",
+        "raw_flags": "ROOM_SAFE_DEATH"
     },
     "RID_OUTOFGRACE": {
         "name": "Out of Grace with the Higher Powers",
@@ -1282,7 +1332,9 @@
             4,
             5
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_PROFILE": {
         "name": "ProfileRoom",
@@ -1294,7 +1346,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TEMPLE_KRAANAN": {
         "name": "The Temple of Kraanan",
@@ -1320,7 +1374,9 @@
                     41
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TEMPLE": {
         "name": "The Temple of Shal'ille",
@@ -1346,7 +1402,9 @@
                     31
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TEMPLE_QOR": {
         "name": "The Temple of Qor",
@@ -1358,7 +1416,9 @@
             26,
             15
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TEMPLE_RIIJA": {
         "name": "The Temple of Riija",
@@ -1445,7 +1505,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JUNGLE_TRADING_POST": {
         "name": "The Remote Trading Post of Wulfgang zax'Ak",
@@ -1494,7 +1556,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_SAFELOGOFF"
     },
     "RID_JUNGLE_TRADING_POST_CELLAR": {
         "name": "The Cellar Rooms",
@@ -1519,7 +1583,9 @@
                     42
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_UNIVERSITY": {
         "name": "Meridian University",
@@ -1556,7 +1622,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_ASSHQ": {
         "name": "A shadowy corner",
@@ -1593,7 +1661,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BAR_APOTH": {
         "name": "Joguer's Herbs and Roots",
@@ -1632,7 +1702,9 @@
                 ],
                 "travel_time": 10.16
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_BAR_COURT": {
         "name": "Office of the Justicar",
@@ -1693,7 +1765,9 @@
                     11
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_BAR_HALL": {
         "name": "Adventurer's Hall of Barloque",
@@ -1718,7 +1792,9 @@
                     36
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_BAR_INN": {
         "name": "Brownestone Inn",
@@ -1743,7 +1819,9 @@
                     26
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_HOMETOWN | ROOM_SANCTUARY | ROOM_SAFELOGOFF"
     },
     "RID_BAR_JAIL": {
         "name": "Old Jailhouse",
@@ -1792,7 +1870,9 @@
                     5
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_BAR_NORTH": {
         "name": "North Barloque",
@@ -2080,7 +2160,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY | ROOM_LAMPS"
     },
     "RID_BAR_PORT": {
         "name": "The Ports of Barloque",
@@ -2144,7 +2226,9 @@
                 ],
                 "travel_time": 9.07
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_BAR_SOUTH": {
         "name": "South Barloque",
@@ -2333,7 +2417,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY | ROOM_LAMPS"
     },
     "RID_BAR_MERCHANT": {
         "name": "The Sparkling Stone Shop",
@@ -2394,7 +2480,9 @@
                     13
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_BAR_SMITHY": {
         "name": "The Royal Blacksmith of Barloque",
@@ -2419,7 +2507,9 @@
                     41
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_BAR_VAULT": {
         "name": "Office of the Barloque Vaultman",
@@ -2458,7 +2548,9 @@
                 ],
                 "travel_time": 96.87
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_GM_HALL": {
         "name": "The Guildmaster's Hall",
@@ -2495,7 +2587,9 @@
                     21
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY"
     },
     "RID_COR_GROCER": {
         "name": "Solomon's Edibles",
@@ -2520,7 +2614,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_COR_HALL": {
         "name": "The Adventurer's Hall of Cor Noth",
@@ -2611,7 +2707,9 @@
                 ],
                 "travel_time": 29.31
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_COR_INN": {
         "name": "Cibilo Creek Inn",
@@ -2636,7 +2734,9 @@
                     59
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_SAFELOGOFF"
     },
     "RID_CORNOTH": {
         "name": "Cor Noth",
@@ -2860,7 +2960,9 @@
                 ],
                 "travel_time": 79.72
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_COR_TAILOR": {
         "name": "The Spindle and the Spinster",
@@ -2885,7 +2987,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_COR_UNIV": {
         "name": "The Hall of Genealogy",
@@ -2910,7 +3014,9 @@
                     33
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_COR_WEAPONSMASTER": {
         "name": "The Weapon Master's Abode",
@@ -2959,7 +3065,9 @@
                     8
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_FORGOTTEN_TOO": {
         "name": "Chamber of the Forgotten Heroes",
@@ -2984,7 +3092,9 @@
                     15
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH1": {
         "name": "Mercenary Alley",
@@ -3009,7 +3119,9 @@
                     31
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH10": {
         "name": "Jaarba's Abode",
@@ -3034,7 +3146,9 @@
                     61
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH11": {
         "name": "The home of the Friends of the Forest",
@@ -3071,7 +3185,9 @@
                     23
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH12": {
         "name": "West Tower Guild Hall in Ko'catan",
@@ -3204,7 +3320,9 @@
                     14
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH13": {
         "name": "The Hall of the Slaughtered Command",
@@ -3277,7 +3395,9 @@
                     43
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH14": {
         "name": "The Bookmaker's Guild House",
@@ -3302,7 +3422,9 @@
                     16
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH15": {
         "name": "Inner Sanctum of Queen Venya'cyr",
@@ -3399,7 +3521,9 @@
                     27
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH2": {
         "name": "The Hall of Explorers",
@@ -3436,7 +3560,9 @@
                     43
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH3": {
         "name": "The Den of Shadows",
@@ -3473,7 +3599,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH4": {
         "name": "The Wryn's Keep",
@@ -3499,7 +3627,9 @@
                     27
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH5": {
         "name": "Konima's Abandoned Dwelling",
@@ -3536,7 +3666,9 @@
                     41
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH6": {
         "name": "The Ivory Chapel",
@@ -3561,7 +3693,9 @@
                     57
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH7": {
         "name": "The Old Dwarven Hall",
@@ -3610,7 +3744,9 @@
                     18
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH8": {
         "name": "The Sewer Hideout",
@@ -3647,7 +3783,9 @@
                     43
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUILDH9": {
         "name": "The Abandoned Warehouse",
@@ -3684,7 +3822,9 @@
                     6
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NEWB1": {
         "name": "Raza Inn",
@@ -3696,7 +3836,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_GUEST_AREA | ROOM_SAFELOGOFF"
     },
     "RID_NEWB2": {
         "name": "Raza",
@@ -3708,7 +3850,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA | ROOM_LAMPS"
     },
     "RID_NEWB3": {
         "name": "Raza Blacksmith",
@@ -3720,7 +3864,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_NEWB4": {
         "name": "Ravi's Magicks of Raza",
@@ -3732,7 +3878,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_NEWB5": {
         "name": "Raza Hut",
@@ -3744,7 +3892,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_NEWB7": {
         "name": "Raza Pub",
@@ -3756,7 +3906,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA | ROOM_SANCTUARY"
     },
     "RID_NEWB8": {
         "name": "The Grand Museum of Raza",
@@ -3768,7 +3920,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_GUEST_AREA"
     },
     "RID_JAS_AB1": {
         "name": "Old Granary ",
@@ -3793,7 +3947,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_JAS_AB10": {
         "name": "Disused Shop",
@@ -3818,7 +3974,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB11": {
         "name": "Abandoned Counting Room",
@@ -3843,7 +4001,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB12": {
         "name": "Old Barracks",
@@ -3868,7 +4028,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB13": {
         "name": "Dusty Chamber",
@@ -3893,7 +4055,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB14": {
         "name": "Warm Haven ",
@@ -3918,7 +4082,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB2": {
         "name": "Icehouse",
@@ -3943,7 +4109,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB3": {
         "name": "Old Schoolhouse",
@@ -3968,7 +4136,9 @@
                     38
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB4": {
         "name": "Deserted Eating House",
@@ -4005,7 +4175,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB5": {
         "name": "Abandoned Building",
@@ -4030,7 +4202,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB6": {
         "name": "Abandoned Building",
@@ -4055,7 +4229,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB7": {
         "name": "Abandoned Building",
@@ -4080,7 +4256,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB8": {
         "name": "Abandoned Building",
@@ -4105,7 +4283,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_AB9": {
         "name": "Abandoned Building",
@@ -4130,7 +4310,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_BANK": {
         "name": "The Royal Bank of Jasper",
@@ -4167,7 +4349,9 @@
                     21
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_JAS_ELDER_HUT": {
         "name": "The Home of the Wise Man",
@@ -4204,7 +4388,9 @@
                     26
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_JAS_HALL": {
         "name": "Adventurer's Hall of Jasper",
@@ -4229,7 +4415,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_JAS_INN": {
         "name": "Yonder Inn of Jasper",
@@ -4255,7 +4443,9 @@
                 ],
                 "travel_time": 2.07
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_SAFELOGOFF | ROOM_TRIPLE_HEAL"
     },
     "RID_JASPER": {
         "name": "East Jasper",
@@ -4481,7 +4671,9 @@
                     36
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_JAS_SMITHY": {
         "name": "Quintor's Smithy",
@@ -4506,7 +4698,9 @@
                     56
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_JAS_STORE": {
         "name": "General Store of Jasper",
@@ -4543,7 +4737,9 @@
                     38
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_JAS_TAVERN": {
         "name": "Pietro's Wicked Brews",
@@ -4569,7 +4765,9 @@
                 ],
                 "travel_time": 31.35
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_SAFELOGOFF"
     },
     "RID_JASWEST": {
         "name": "West Jasper",
@@ -4829,7 +5027,9 @@
                 ],
                 "travel_time": 39.57
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_KOC_APOTH": {
         "name": "Two Lizards Magic Shop",
@@ -4926,7 +5126,9 @@
                     14
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOCATAN": {
         "name": "Ko'catan, the Island Settlement",
@@ -5515,7 +5717,9 @@
                     26
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_KOC_BANK": {
         "name": "The Hungry Vaults",
@@ -5540,7 +5744,9 @@
                     44
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOC_SMITHY": {
         "name": "The Chimney House",
@@ -5577,7 +5783,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOC_HALL_OF_HEROES": {
         "name": "The Hall of Heroes",
@@ -5650,7 +5858,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_KOC_HALL_OF_HEROES_A": {
         "name": "The Hall of Heroes West",
@@ -5687,7 +5897,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOC_HALL_OF_HEROES_B": {
         "name": "The Hall of Heroes East",
@@ -5724,7 +5936,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOC_INN": {
         "name": "The Aerie Guest House",
@@ -5761,7 +5975,9 @@
                     17
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_SAFELOGOFF | ROOM_HOMETOWN"
     },
     "RID_KOC_SOUTH": {
         "name": "Ko'catan, the Island Settlement",
@@ -6074,7 +6290,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_KOC_STORE": {
         "name": "The Neglected Arsenal",
@@ -6123,7 +6341,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOC_TAILOR": {
         "name": "The Crooked Hem Garment Shop",
@@ -6196,7 +6416,9 @@
                     47
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KOC_TAVERN": {
         "name": "The Barking Monster",
@@ -6305,7 +6527,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_SAFELOGOFF"
     },
     "RID_KOC_GUARDTOWER_EAST": {
         "name": "The East Tower",
@@ -6414,7 +6638,9 @@
                     45
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_MAR_HALL": {
         "name": "The Adventurer's Hall of Marion",
@@ -6451,7 +6677,9 @@
                     22
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_MAR_HEALER_SHOP": {
         "name": "Lady Aftyn's Sanctuary",
@@ -6488,7 +6716,9 @@
                     17
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_MARION": {
         "name": "Marion",
@@ -6598,7 +6828,9 @@
                 ],
                 "travel_time": 2.03
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_LAMPS"
     },
     "RID_A5": {
         "name": "Seafarer's Peak",
@@ -6624,7 +6856,9 @@
                     31
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_A6": {
         "name": "The Hills",
@@ -6663,7 +6897,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BADLAND1": {
         "name": "The Badlands",
@@ -6702,7 +6938,9 @@
                     80
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BAR_SEWER": {
         "name": "The Sewers of Barloque",
@@ -6789,7 +7027,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BAR_SEWER2": {
         "name": "The Sewers of Barloque",
@@ -6828,7 +7068,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BAR_SEWER3": {
         "name": "The Sewers of Barloque",
@@ -6867,7 +7109,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_C4": {
         "name": "Deep Woods of Ileria",
@@ -6930,7 +7174,9 @@
                     31
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_C6": {
         "name": "Forest of Farol",
@@ -7019,7 +7265,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CASTLE1B": {
         "name": "Upstairs in Castle Victoria",
@@ -7080,7 +7328,9 @@
                     18
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_CASTLE2B": {
         "name": "Bourgeois Castle",
@@ -7214,7 +7464,9 @@
                     84
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CASTLE2C": {
         "name": "The Assembly Chamber",
@@ -7287,7 +7539,9 @@
                     29
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_D4": {
         "name": "Valley of Ileria",
@@ -7354,7 +7608,9 @@
                 ],
                 "travel_time": 9.12
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_D5": {
         "name": "West Merchant Way",
@@ -7463,7 +7719,9 @@
                     71
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_D6": {
         "name": "Deep in the Forest of Farol",
@@ -7515,7 +7773,9 @@
                     23
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_D7": {
         "name": "Deep in the Forest of Farol",
@@ -7580,7 +7840,9 @@
                     48
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_E2": {
         "name": "The Great Ocean",
@@ -7619,7 +7881,9 @@
                     28
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_E4": {
         "name": "East Merchant Way through Ilerian Woods",
@@ -7702,7 +7966,9 @@
                 ],
                 "travel_time": 10.11
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_E5": {
         "name": "The Forest Shrine",
@@ -7728,7 +7994,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_E7": {
         "name": "The Sweet Grass Prairies",
@@ -7781,7 +8049,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_F2": {
         "name": "The sandy shores of the Great Ocean",
@@ -7820,7 +8090,9 @@
                     3
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_F3": {
         "name": "Source of the River Ille",
@@ -7886,7 +8158,9 @@
                     66
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_F4": {
         "name": "East Merchant Way",
@@ -7969,7 +8243,9 @@
                 ],
                 "travel_time": 25.23
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_F6": {
         "name": "Off the beaten path",
@@ -8008,7 +8284,9 @@
                     29
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_F7": {
         "name": "Off the beaten path",
@@ -8047,7 +8325,9 @@
                     15
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_F8": {
         "name": "Lake of Jala's Song",
@@ -8124,7 +8404,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_FOREST2": {
         "name": "The Forests of Meridian",
@@ -8197,7 +8479,9 @@
                     47
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_FOREST3": {
         "name": "The Forests of Meridian",
@@ -8246,7 +8530,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_FOREST4": {
         "name": "The Deep Dark Woods of Tos",
@@ -8295,7 +8581,9 @@
                     56
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_G4": {
         "name": "Main gate to Cor Noth",
@@ -8386,7 +8674,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_G5": {
         "name": "The King's Way",
@@ -8462,7 +8752,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_G6": {
         "name": "The King's Way",
@@ -8542,7 +8834,9 @@
                 ],
                 "travel_time": 12.21
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_G8": {
         "name": "The Cragged Mountains",
@@ -8634,7 +8928,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_G9": {
         "name": "An ancient place, its origin forgotten",
@@ -8701,7 +8997,9 @@
                 ],
                 "travel_time": 21.17
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_GUEST6": {
         "name": "Mausoleum",
@@ -8713,7 +9011,9 @@
             11,
             23
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_H3": {
         "name": "Outskirts of Barloque",
@@ -8808,7 +9108,9 @@
                 ],
                 "travel_time": 5.03
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_H5": {
         "name": "The border of the Badlands",
@@ -8849,7 +9151,9 @@
                 ],
                 "travel_time": 11.08
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_H6": {
         "name": "Main gate to the city of Tos",
@@ -8917,7 +9221,9 @@
                 ],
                 "travel_time": 4.12
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_H7": {
         "name": "Western border of the Twisted Wood",
@@ -8999,7 +9305,9 @@
                 "object": "SpiderTree",
                 "travel_time": 19.18
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_I3": {
         "name": "Main gate of Barloque-- Royal City of Meridian",
@@ -9094,7 +9402,9 @@
                 ],
                 "travel_time": 5.04
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_I6": {
         "name": "Outskirts of Tos",
@@ -9148,7 +9458,9 @@
                 ],
                 "travel_time": 13.15
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_I7": {
         "name": "The Twisted Wood",
@@ -9226,7 +9538,9 @@
                 ],
                 "travel_time": 17.15
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_I8": {
         "name": "The Cragged Mountains",
@@ -9267,7 +9581,9 @@
                 ],
                 "travel_time": 14.15
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_I9": {
         "name": "Ukgoth, Holy Land of Trolls",
@@ -9321,7 +9637,9 @@
                 ],
                 "travel_time": 19.26
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_J3": {
         "name": "The Queen's Way",
@@ -9360,7 +9678,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_SEWER1": {
         "name": "The Sewers of Jasper",
@@ -9398,7 +9718,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_SEWER2": {
         "name": "The Sewers of Jasper",
@@ -9450,7 +9772,9 @@
                     51
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_JAS_SEWER3": {
         "name": "The Sewers of Jasper",
@@ -9502,7 +9826,9 @@
                     19
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KOC_SEWER1": {
         "name": "A foul place to wander",
@@ -9551,7 +9877,9 @@
                     14
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KOC_SEWER2": {
         "name": "Up Chuk Creek without a paddle",
@@ -9588,7 +9916,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_LICH_MAZE": {
         "name": "The Dungeon of Castle Brax",
@@ -9675,7 +10005,9 @@
                     45
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MAR_CRYPT3A": {
         "name": "Affirmation of the Forsaken",
@@ -9712,7 +10044,9 @@
                     27
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MAR_CRYPT1": {
         "name": "The crypt in Marion",
@@ -9761,7 +10095,9 @@
                     27
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MAR_CRYPT2": {
         "name": "Resting place of Marion's ancestors",
@@ -9822,7 +10158,9 @@
                     17
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA3A": {
         "name": "Ancient Building",
@@ -9871,7 +10209,9 @@
                     26
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA3B": {
         "name": "Ancient Building",
@@ -9896,7 +10236,9 @@
                     26
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA1": {
         "name": "Winding Caverns",
@@ -9948,7 +10290,9 @@
                     18
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA2": {
         "name": "Ancient Graveyard of Brax",
@@ -9987,7 +10331,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA3": {
         "name": "Decaying City of Brax",
@@ -10182,7 +10528,9 @@
                     22
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA4": {
         "name": "Within the Walls of Castle Brax",
@@ -10256,7 +10604,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NECROAREA5": {
         "name": "Ruins of Castle Brax",
@@ -10416,7 +10766,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NEST1": {
         "name": "The Spider Nest",
@@ -10455,7 +10807,9 @@
                 ],
                 "travel_time": 12.12
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_OLD_BAR_NORTH": {
         "name": "Historic North Barloque",
@@ -10467,7 +10821,9 @@
             25,
             42
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_OLD_BAR_SOUTH": {
         "name": "Historic South Barloque",
@@ -10479,7 +10835,9 @@
             34,
             43
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_OLD_JASPER": {
         "name": "Historic Jasper",
@@ -10491,7 +10849,9 @@
             46,
             58
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_OLD_MARION": {
         "name": "Historic Marion",
@@ -10503,7 +10863,9 @@
             56,
             39
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE1_EXT": {
         "name": "A Tranquil Place",
@@ -10542,7 +10904,9 @@
                     43
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE5_EXT": {
         "name": "A spring of vitality",
@@ -10581,7 +10945,9 @@
                     3
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE1": {
         "name": "Ugol's Warren Entrance",
@@ -10634,7 +11000,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE2": {
         "name": "An Enigmatic Chamber",
@@ -10686,7 +11054,9 @@
                     14
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE3": {
         "name": "The Archaic Hollows",
@@ -10738,7 +11108,9 @@
                     41
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE4": {
         "name": "Aqueducts of Merb",
@@ -10777,7 +11149,9 @@
                     91
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE5": {
         "name": "Obfal's Sepulchre",
@@ -10829,7 +11203,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_CAVE6": {
         "name": "Konima's Ascension",
@@ -10891,7 +11267,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_PIT_A": {
         "name": "Grog's Antechamber",
@@ -10930,7 +11308,9 @@
                     61
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ORC_PIT_B": {
         "name": "Brog's Antechamber",
@@ -10969,7 +11349,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_THRONE1": {
         "name": "The Throne Room of Victoria Castle",
@@ -11006,7 +11388,9 @@
                     19
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_CRYPT": {
         "name": "The Crypt",
@@ -11031,7 +11415,9 @@
                     29
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_GRAVEYARD": {
         "name": "The Graveyard of Tos",
@@ -11105,7 +11491,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_UNDERWORLD": {
         "name": "The Underworld",
@@ -11117,7 +11505,9 @@
             23,
             19
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_ORC_PIT": {
         "name": "Lair of the Orc Pit Boss",
@@ -11182,7 +11572,9 @@
                     68
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_SEWER_KING": {
         "name": "The Ancient Smuggler's Crossing",
@@ -11221,7 +11613,9 @@
                     3
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_A1": {
         "name": "North Quilicia Wood",
@@ -11247,7 +11641,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_B1": {
         "name": "Elhadrim",
@@ -11286,7 +11682,9 @@
                     45
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_B2": {
         "name": "Lower Elhadrim",
@@ -11325,7 +11723,9 @@
                     40
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_C1": {
         "name": "The Fey's Crossing",
@@ -11390,7 +11790,9 @@
                     68
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_C2": {
         "name": "The Vale of Sorrows",
@@ -11416,7 +11818,9 @@
                     29
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_C3": {
         "name": "Quilicia Wood",
@@ -11468,7 +11872,9 @@
                     42
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_D1": {
         "name": "Dirhadrim",
@@ -11507,7 +11913,9 @@
                     40
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_D2": {
         "name": "Lower Dirhadrim",
@@ -11546,7 +11954,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_NEWB6": {
         "name": "Mausoleum",
@@ -11558,7 +11968,9 @@
             32,
             32
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KA0": {
         "name": "A dark, humid cavern",
@@ -11584,7 +11996,9 @@
                     17
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KA1": {
         "name": "Cliff Hive",
@@ -11623,7 +12037,9 @@
                     62
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KA2": {
         "name": "The Jungle Cliffs",
@@ -11675,7 +12091,9 @@
                     58
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KA3": {
         "name": "A notch in the jungle",
@@ -11738,7 +12156,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KA4": {
         "name": "Into the Jungle",
@@ -11777,7 +12197,9 @@
                     15
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KA5": {
         "name": "Outside the Guard Tower",
@@ -11877,7 +12299,9 @@
                     63
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KB1": {
         "name": "The Cliffs",
@@ -11942,7 +12366,9 @@
                     24
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KB2": {
         "name": "Headquarters for the Avar Warriors",
@@ -11994,7 +12420,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KB3": {
         "name": "Camp of the Warrior Avars",
@@ -12059,7 +12487,9 @@
                     27
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KB4": {
         "name": "Path to the Ruins",
@@ -12111,7 +12541,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KB5": {
         "name": "Into the Jungle",
@@ -12150,7 +12582,9 @@
                     49
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KC1": {
         "name": "The Chasm",
@@ -12189,7 +12623,9 @@
                     71
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KC2": {
         "name": "Turf of the Warrior Avars",
@@ -12241,7 +12677,9 @@
                     18
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KC3": {
         "name": "Ruins of the Riija Temple",
@@ -12332,7 +12770,9 @@
                     69
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KC4": {
         "name": "Origin of the Kriipa",
@@ -12371,7 +12811,9 @@
                     26
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KC5": {
         "name": "Outside the Mad Scientist's Hut",
@@ -12446,7 +12888,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KD1": {
         "name": "Lair of the Bone Priestess",
@@ -12472,7 +12916,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KD2": {
         "name": "Territory of the Noble Avars",
@@ -12534,7 +12980,9 @@
                     39
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KD3": {
         "name": "Deep in the Jungle",
@@ -12586,7 +13034,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KD4": {
         "name": "The Clearing of the Trading Post",
@@ -12745,7 +13195,9 @@
                     65
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_KE2": {
         "name": "Headquarters of the Noble Avars",
@@ -12781,7 +13233,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_KE4": {
         "name": "Avar Village",
@@ -12807,7 +13261,9 @@
                     1
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MAD_SCIENTIST_HUT": {
         "name": "Hut of the Mad Scientist",
@@ -12868,7 +13324,9 @@
                     31
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_B6": {
         "name": "Druid Hills",
@@ -12920,7 +13378,9 @@
                     6
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_BAR_BAR": {
         "name": "The Bhrama & Falcon",
@@ -12946,7 +13406,9 @@
                 ],
                 "travel_time": 16.22
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_SAFELOGOFF"
     },
     "RID_C5": {
         "name": "West Merchant Way through Ilerian Woods",
@@ -13026,7 +13488,9 @@
                 ],
                 "travel_time": 12.14
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_C7": {
         "name": "Faronath, home of the TreeFolk",
@@ -13089,7 +13553,9 @@
                     34
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CANYON1": {
         "name": "The Berdonne Canyons",
@@ -13128,7 +13594,9 @@
                     32
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CANYON2": {
         "name": "Martyr's Battleground",
@@ -13167,7 +13635,9 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_CASTLE1": {
         "name": "Castle Victoria",
@@ -13425,7 +13895,9 @@
                 ],
                 "travel_time": 4.02
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_CAVE2": {
         "name": "A Deep, Dark, Spooky, Icky Cave",
@@ -13478,7 +13950,9 @@
                 ],
                 "travel_time": 10.0
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_DUKE4": {
         "name": "The Duke's Feast Hall",
@@ -13659,7 +14133,9 @@
                     20
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY"
     },
     "RID_DUKE5": {
         "name": "The Duke's Grand Ballroom",
@@ -13780,7 +14256,9 @@
                     18
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY"
     },
     "RID_E6": {
         "name": "Deep Forest of Farol",
@@ -13833,7 +14311,9 @@
                     59
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_FOREST1": {
         "name": "The Forests of Meridian",
@@ -13845,7 +14325,9 @@
             10,
             10
         ],
-        "exits": []
+        "exits": [],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_FOREST5": {
         "name": "The Deep Dark Woods of Marion",
@@ -13894,7 +14376,9 @@
                     31
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_H4": {
         "name": "The Flatlands",
@@ -13963,7 +14447,9 @@
                 ],
                 "travel_time": 10.14
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_H9": {
         "name": "Under the shadow of the Sentinel",
@@ -14003,7 +14489,9 @@
                 ],
                 "travel_time": 12.08
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_ICE_CAVE1": {
         "name": "The Dreaded Caves of Ice",
@@ -14029,7 +14517,9 @@
                     25
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_K5": {
         "name": "The Badlands",
@@ -14054,7 +14544,9 @@
                     80
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MAR_ELDER_HUT": {
         "name": "The home of the elder",
@@ -14079,7 +14571,9 @@
                     28
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_MAR_INN": {
         "name": "The Limping Toad Inn and Tavern",
@@ -14128,7 +14622,9 @@
                     57
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_SAFELOGOFF"
     },
     "RID_MAR_SMITHY": {
         "name": "Ye Olde Slasher Salesman",
@@ -14165,7 +14661,9 @@
                     43
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_TOS_INN": {
         "name": "Familiars",
@@ -14230,7 +14728,9 @@
                 ],
                 "travel_time": 5.07
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SANCTUARY | ROOM_HOMETOWN | ROOM_SAFELOGOFF"
     },
     "RID_EAST_TOS": {
         "name": "East Ende",
@@ -14390,7 +14890,9 @@
                 ],
                 "travel_time": 12.1
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY | ROOM_LAMPS"
     },
     "RID_TOS": {
         "name": "The Streets of Tos",
@@ -14641,7 +15143,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY | ROOM_LAMPS"
     },
     "RID_TOS_APOTH": {
         "name": "Frisconar's Mysticals",
@@ -14667,7 +15171,9 @@
                 ],
                 "travel_time": 7.07
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_TOS_ARENA2": {
         "name": "The Arena of Kraanan",
@@ -14944,7 +15450,9 @@
                     37
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Guild PVP Only",
+        "raw_flags": "ROOM_GUILD_PK_ONLY"
     },
     "RID_TOS_ARENA": {
         "name": "The Arena of Kraanan",
@@ -15101,7 +15609,9 @@
                     35
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Arena (No Death Penalty)",
+        "raw_flags": "ROOM_SAFE_DEATH"
     },
     "RID_TOS_BANK": {
         "name": "First Royal Bank of Tos",
@@ -15126,7 +15636,9 @@
                     3
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_TOS_INN_CELLAR": {
         "name": "The Cellar",
@@ -15178,7 +15690,9 @@
                 ],
                 "travel_time": 10.18
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_TOS_FORGET": {
         "name": "Hall of the Forgotten Heroes",
@@ -15251,7 +15765,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_GREY": {
         "name": "Abandoned Building",
@@ -15372,7 +15888,9 @@
                     13
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_HALL": {
         "name": "The Adventurer's Hall of Tos",
@@ -15397,7 +15915,9 @@
                     4
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT | ROOM_SAFELOGOFF"
     },
     "RID_TOS_SECRET_PASSAGE": {
         "name": "Secret Passage",
@@ -15435,7 +15955,9 @@
                 ],
                 "travel_time": 4.1
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_FORGOTTEN": {
         "name": "Forgotten Lover's Tryst",
@@ -15472,7 +15994,9 @@
                     7
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_SMITHY": {
         "name": "The Freelance Merchant and Menders Shop",
@@ -15509,7 +16033,9 @@
                     12
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     },
     "RID_TOS_TAN": {
         "name": "Abandoned Building",
@@ -15534,7 +16060,9 @@
                     21
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Standard PVP",
+        "raw_flags": ""
     },
     "RID_TOS_OLD_TAVERN": {
         "name": "Abandoned Fountain Tavern",
@@ -15572,6 +16100,8 @@
                     2
                 ]
             }
-        ]
+        ],
+        "pvp_status": "Safe (No PVP)",
+        "raw_flags": "ROOM_NO_COMBAT"
     }
 }

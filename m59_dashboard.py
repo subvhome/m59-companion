@@ -1041,11 +1041,11 @@ class M59Dashboard(tk.Tk):
         
         # 3. PVP Status Placeholder
         self.pvp_status_lbl = tk.Label(
-            self.who_footer, text="PVP | Guild PVP | NO PVP", font=("Segoe UI", 8),
+            self.who_footer, text="Standard PVP", font=("Segoe UI", 8),
             bg=footer_bg, fg="#555555"
         )
         self.pvp_status_lbl.pack(fill="x", pady=(0, 5))
-        self.set_tooltip(self.pvp_status_lbl, "Coming Soon")
+        self.set_tooltip(self.pvp_status_lbl, "Standard PVP")
         
         # 4. GPS Route instruction (No active route)
         self.gps_dock_lbl = tk.Label(
@@ -1316,6 +1316,30 @@ class M59Dashboard(tk.Tk):
         if hasattr(self, "gps_who_loc_lbl") and hasattr(self, "gps_current_loc_lbl"):
             loc_val = self.gps_current_loc_lbl.cget("text")
             self.gps_who_loc_lbl.config(text=loc_val)
+            
+            if hasattr(self, "pvp_status_lbl"):
+                if loc_val == "Unknown Location":
+                    self.pvp_status_lbl.config(text="Unknown Location", fg="#555555")
+                    self.set_tooltip(self.pvp_status_lbl, "Location not known")
+                else:
+                    rid = self.gps_manager.resolve_name_to_rid(loc_val)
+                    pvp_status = self.gps_manager.dataset.get(rid, {}).get("pvp_status", "Standard PVP") if rid else "Standard PVP"
+                    
+                    if pvp_status == "Safe (No PVP)":
+                        color = "#4CAF50" # green
+                    elif pvp_status == "Guild PVP Only":
+                        color = "#2196F3" # blue
+                    elif pvp_status == "Kill Zone (All PVP)":
+                        color = "#f44336" # red
+                    elif pvp_status == "Arena (No Death Penalty)":
+                        color = "#FF9800" # orange
+                    else:
+                        color = "#555555" # grey
+                        
+                    self.pvp_status_lbl.config(text=pvp_status, fg=color)
+                    raw_flags = self.gps_manager.dataset.get(rid, {}).get("raw_flags", "") if rid else ""
+                    tooltip_text = f"Flags: {raw_flags}" if raw_flags else pvp_status
+                    self.set_tooltip(self.pvp_status_lbl, tooltip_text)
 
         # GPS Status
         gps_text = "No active route"
