@@ -1,0 +1,92 @@
+Ant is Monster,ant,ant.bgf
+Avar is Monster,avar,avwar.bgf
+AvarChieftain is Monster,avar chieftain,avchief.bgf
+AvarChieftain is Monster,avar leader of the bone faction,avchief.bgf
+AvarShaman is Monster,avar shaman,avsham.bgf
+SpiderBaby is Monster,baby spider,spdrby.bgf
+battered skeleton,battered skeleton,skelbody.bgf|skelhed3.bgf
+DeathSpider is Monster,black spider,spidmagc.bgf
+OrcPitBossBody is Monster,body of the orc pit boss,OrcPitbX.bgf
+AvarShaman is Monster,bone faction shaman,avsham.bgf
+CaveOrc is Monster,cave orc,OrcCave.bgf
+Centipede is Monster,centipede,centip.bgf
+Avar is Monster,chyup-tewee faction warrior,avwar.bgf
+Council is Monster,Councilor,hermit.bgf
+Cow is Monster,cow,cow.bgf
+daemon skeleton,daemon skeleton,skelbody.bgf|skelhed4.bgf
+DarkAngel is Monster,dark angel,angel.bgf
+EvilEnt is Monster,diseased tree,res0003a.bgf
+DragonFly is Monster,dragonfly,dfly.bgf
+DragonFlyQueen is Monster,dragonfly queen,dflo.bgf
+DuskRat is Monster,dusk rat,rat.bgf
+EvilTwin is Monster,evil twin,btg.bgf|bfg.bgf|blg.bgf|brg.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+FactionTroop is Monster,faction troop,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+EvilFairy is Monster,fey dirhai,faerie-e.bgf
+Fairy is Monster,fey elhai,faerie-g.bgf
+AvarChieftain is Monster,former avar chieftain,avchief.bgf
+Frogman is Monster,frogman,frogman.bgf
+FungusBeast is Monster,fungus beast,fungbst.bgf
+Ghost is Monster,ghost of Far'Nohl,ghost.bgf
+GiantRat is Monster,giant rat,rat.bgf
+Scorpion is Monster,giant scorpion,scorp.bgf
+GroundWorm is Monster,groundworm,wormm.bgf
+groundworm larva,groundworm larva,worms.bgf
+groundworm queen,groundworm queen,worml.bgf
+Guard is Monster,guard cow,cow.bgf
+StoneTroll is Monster,Guardian of Zjiria,Troll.bgf
+OrcPitBossBody is Monster,headless orc pit boss body,OrcPitbX.bgf
+flytrap is Monster,hedged man-eating plant,ent.bgf
+Iceperson is Monster,ice creature,iceper_feet.bgf|iceper_torso.bgf|iceper_rightarm.bgf|iceper_sword.bgf
+Kriipa is Monster,kriipa,kriipa.bgf
+AvarChieftain is Monster,kyip-kyip-kreeet avar chieftain,avchief.bgf
+AvarShaman is Monster,kyip-kyip-kreeet avar shaman,avsham.bgf
+Avar is Monster,kyip-kyip-kreeet avar warrior,avwar.bgf
+LivingStatue is Monster,living statue,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+Ent is Monster,living tree,res0003a.bgf
+Lupogg is Monster,lupogg,lupogg.bgf
+LupoggKing is Monster,lupogg king,lupking.bgf
+flytrap is Monster,Man-eating Plant,ent.bgf
+ma'xeochicatl,ma'xeochicatl,xeo.bgf
+Iceperson is Monster,melting ice,iceperX.bgf
+MolluskMonster is Monster,mollusk creature,mollusk.bgf
+Mummy is Monster,mummy,mummy.bgf
+RedAnt is Monster,mutant ant,antr.bgf
+NarthylWorm is Monster,narthyl worm,darkbeas.bgf
+NecromancerTroop is FactionTroop,necromancer,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+Orc is Monster,orc,orc.bgf
+OrcPitBoss is Monster,orc pit boss,OrcPitB.bgf
+OrcWizard is Monster,orc wizard,orcwiza.bgf
+Brambles is Monster,patch of bramble,wothorns.bgf
+AvarChieftain is Monster,peet-seeeep avar chieftain,avchief.bgf
+AvarShaman is Monster,peet-seeeep avar shaman,avsham.bgf
+Avar is Monster,peet-seeeep avar warrior,avwar.bgf
+DragonFlyPet is Monster,pet dragonfly,dflypet.bgf
+Priestess is Monster,priestess,priestes.bgf
+SpiderQueen is Monster,queen spider,spdrqu.bgf
+Lich is Monster,Queen Venya'cyr,licha.bgf
+RebelTroop is FactionTroop,rebel soldier,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+Reflection is Monster,reflection,btg.bgf
+Revenant is Monster,revenant,zombie.bgf
+ro'xeochicatl,ro'xeochicatl,xeo.bgf
+shadow mummy,shadow mummy,mummy.bgf
+Shadowbeast is Monster,shadowbeast,shadow.bgf
+Skeleton is Monster,skeleton,skelbody.bgf|skelhed2.bgf
+Slime is Monster,slime,amoeba.bgf
+SnowRat is Monster,snow rat,srat.bgf
+DukeTroop is FactionTroop,soldier of the Duke's army,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+PrincessTroop is FactionTroop,soldier of the Princess' army,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+SpectralMummy is Monster,spectral mummy,mummy.bgf
+Spider is Monster,spider,spider.bgf
+LivingStatue is Monster,statue,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+StoneTroll is Monster,stone troll,Troll.bgf
+Lich is Monster,The ghost of Queen Venya'cyr,licha.bgf
+Brambles is Monster,the ruins of some bramble,wothorns.bgf
+the town guard,the town guard,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+Thief is Monster,Thief,thiefT.bgf
+Thrasher is Monster,thrasher,res0001a.bgf
+town guard,town guard,bta.bgf|bfa.bgf|bla.bgf|bra.bgf|phax.bgf|peax.bgf|pmax.bgf|pnax.bgf|ptac.bgf
+Troll is Monster,troll,troll.bgf
+tusked skeleton,tusked skeleton,skelbody.bgf|skelhed1.bgf
+ve'xeochicatl,ve'xeochicatl,xeo.bgf
+Yeti is Monster,yeti,yeti.bgf
+Zombie is Monster,zombie,zombie.bgf
