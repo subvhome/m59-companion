@@ -2,6 +2,11 @@
 logs/
 prev-code/
 __pycache__/
+settings/*_vault_*.json
+settings/*_bank.json
+settings/*_chat.log
+settings/*_kills*
+settings/
 debugscripts/
 *.spec
 build/
