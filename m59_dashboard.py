@@ -148,8 +148,47 @@ class PKFrame(tk.Toplevel):
         for b in self.bars:
             b.withdraw()
 
+def ensure_default_sounds():
+    """Generates default sound files if they don't exist."""
+    import wave
+    import struct
+    import math
+    import os
+    
+    filename = os.path.join(os.getcwd(), "sound", "alert.wav")
+    if os.path.exists(filename):
+        return
+        
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
+    sample_rate = 44100
+    duration = 0.5 # seconds
+    freq1 = 880.0 # A5
+    freq2 = 1108.73 # C#6
+    
+    try:
+        with wave.open(filename, 'w') as f:
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(sample_rate)
+            
+            for i in range(int(sample_rate * duration)):
+                t = i / sample_rate
+                # Envelope: fast attack, exponential decay
+                envelope = math.exp(-6 * t)
+                
+                # Two frequencies
+                val = math.sin(2 * math.pi * freq1 * t) + math.sin(2 * math.pi * freq2 * t)
+                val = val * 0.5 * envelope
+                
+                data = struct.pack('<h', int(val * 32767))
+                f.writeframesraw(data)
+    except Exception as e:
+        logger.error(f"Failed to generate default sound: {e}")
+
 class M59Dashboard(tk.Tk):
     def __init__(self):
+        ensure_default_sounds()
         super().__init__()
         
         try:
@@ -193,9 +232,9 @@ class M59Dashboard(tk.Tk):
         self.pk_alert_enabled = tk.BooleanVar(value=True)
         self.pk_sound_enabled = tk.BooleanVar(value=True)
         self.pk_frame_enabled = tk.BooleanVar(value=True)
-        self.pk_sound_path = tk.StringVar(value="SystemExclamation")
+        self.pk_sound_path = tk.StringVar(value="sound/alert.wav")
         self.tell_sound_enabled = tk.BooleanVar(value=True)
-        self.tell_sound_path = tk.StringVar(value="sound/dm_chime.wav")
+        self.tell_sound_path = tk.StringVar(value="sound/dm_chime.mp3")
         self.elusion_phrase = tk.StringVar(value='say "I wish to travel to {loc}."')
         self.elusion_geometry = tk.StringVar(value="320x35+100+100")
         self.guildhall_name = tk.StringVar(value="")
@@ -864,9 +903,9 @@ class M59Dashboard(tk.Tk):
                     self.pk_alert_enabled.set(s.get("pk_alert_enabled", True))
                     self.pk_sound_enabled.set(s.get("pk_sound_enabled", True))
                     self.pk_frame_enabled.set(s.get("pk_frame_enabled", True))
-                    self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
+                    self.pk_sound_path.set(s.get("pk_sound_path", "sound/alert.wav"))
                     self.tell_sound_enabled.set(s.get("tell_sound_enabled", True))
-                    self.tell_sound_path.set(s.get("tell_sound_path", "sound/dm_chime.wav"))
+                    self.tell_sound_path.set(s.get("tell_sound_path", "sound/dm_chime.mp3"))
                     self.elusion_phrase.set(s.get("elusion_phrase", 'say "I wish to travel to {loc}."'))
                     self.elusion_geometry.set(s.get("elusion_geometry", "320x35+100+100"))
                     self.guildhall_name.set(s.get("guildhall_name", ""))
@@ -2068,7 +2107,7 @@ class M59Dashboard(tk.Tk):
         pk_frame.pack(fill="x", pady=(0, 5))
         tk.Checkbutton(pk_frame, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(side="left")
         tk.Label(pk_frame, text="Sound:", bg="#f0f0f0").pack(side="left", padx=(10, 2))
-        ttk.Combobox(pk_frame, textvariable=self.pk_sound_path, values=["SystemExclamation", "SystemAsterisk", "SystemHand", "SystemQuestion"], width=20).pack(side="left")
+        ttk.Combobox(pk_frame, textvariable=self.pk_sound_path, values=["sound/alert.wav", "SystemExclamation", "SystemAsterisk", "SystemHand", "SystemQuestion"], width=20).pack(side="left")
         tk.Button(pk_frame, text="Browse...", command=self.browse_pk_sound, padx=5).pack(side="left", padx=5)
         tk.Button(pk_frame, text="Test", command=self.test_pk_sound, padx=5).pack(side="left")
         
@@ -2077,7 +2116,7 @@ class M59Dashboard(tk.Tk):
         tell_frame.pack(fill="x")
         tk.Checkbutton(tell_frame, text="Enable Direct Message (Tell) Alerts", variable=self.tell_sound_enabled, bg="#f0f0f0").pack(side="left")
         tk.Label(tell_frame, text="Sound:", bg="#f0f0f0").pack(side="left", padx=(10, 2))
-        ttk.Combobox(tell_frame, textvariable=self.tell_sound_path, values=["SystemAsterisk", "SystemExclamation", "SystemHand", "SystemQuestion", "sound/dm_chime.wav"], width=20).pack(side="left")
+        ttk.Combobox(tell_frame, textvariable=self.tell_sound_path, values=["sound/dm_chime.mp3", "SystemAsterisk", "SystemExclamation", "SystemHand", "SystemQuestion"], width=20).pack(side="left")
         tk.Button(tell_frame, text="Browse...", command=self.browse_tell_sound, padx=5).pack(side="left", padx=5)
         tk.Button(tell_frame, text="Test", command=self.test_tell_sound, padx=5).pack(side="left")
         
@@ -2175,39 +2214,22 @@ class M59Dashboard(tk.Tk):
         
         tk.Button(c, text="Save Settings", command=self.save_settings, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"), pady=10).pack(side="bottom", fill="x")
 
+
     def trigger_pk_alert(self):
         if not self.pk_alert_enabled.get():
             return
         self.alert_active = True
         self.debug_log("ALERT", "PVP Alert Triggered!")
         if self.pk_sound_enabled.get():
-            p = self.pk_sound_path.get()
-            try:
-                if p.startswith("System"):
-                    winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
-                else:
-                    # Resolve path if relative
-                    if not os.path.isabs(p):
-                        p = resource_path(p)
-                    winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
-            except Exception as e:
-                self.debug_log("ALERT", f"Sound error: {e}")
+            self.play_audio_file(self.pk_sound_path.get())
         if self.pk_frame_enabled.get() and self.pk_frame:
             self.pk_frame.flash()
         self.after(5000, self.reset_pk_alert)
 
+
     def play_tell_alert(self):
         if not self.tell_sound_enabled.get(): return
-        p = self.tell_sound_path.get()
-        try:
-            if p.startswith("System"):
-                winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
-            else:
-                if not os.path.isabs(p):
-                    p = resource_path(p)
-                winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
-        except Exception as e:
-            logger.debug(f"Tell sound error: {e}")
+        self.play_audio_file(self.tell_sound_path.get())
 
     def reset_pk_alert(self):
         self.alert_active = False
@@ -3230,7 +3252,7 @@ class M59Dashboard(tk.Tk):
         return insts
 
     def browse_pk_sound(self):
-        p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
+        p = filedialog.askopenfilename(filetypes=[("Audio files", "*.wav *.mp3"), ("Wave files", "*.wav"), ("MP3 files", "*.mp3"), ("All files", "*.*")])
         if p:
             # If the path is within the current working directory, make it relative
             try:
@@ -3241,21 +3263,13 @@ class M59Dashboard(tk.Tk):
                 pass
             self.pk_sound_path.set(p)
 
+
     def test_pk_sound(self):
         p = self.pk_sound_path.get()
-        try:
-            if p.startswith("System"):
-                winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
-            else:
-                # Resolve path if relative
-                if not os.path.isabs(p):
-                    p = resource_path(p)
-                winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
-        except:
-            pass
+        self.play_audio_file(p)
 
     def browse_tell_sound(self):
-        p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
+        p = filedialog.askopenfilename(filetypes=[("Audio files", "*.wav *.mp3"), ("Wave files", "*.wav"), ("MP3 files", "*.mp3"), ("All files", "*.*")])
         if p:
             try:
                 rel_p = os.path.relpath(p, os.getcwd())
@@ -3265,17 +3279,35 @@ class M59Dashboard(tk.Tk):
                 pass
             self.tell_sound_path.set(p)
 
+
     def test_tell_sound(self):
         p = self.tell_sound_path.get()
+        self.play_audio_file(p)
+
+
+    def play_audio_file(self, filepath):
         try:
-            if p.startswith("System"):
-                winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
+            if filepath.startswith("System"):
+                winsound.PlaySound(filepath, winsound.SND_ALIAS | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
             else:
-                if not os.path.isabs(p):
-                    p = resource_path(p)
-                winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
-        except:
-            pass
+                original_filepath = filepath
+                if not os.path.isabs(filepath):
+                    # Prioritize the current working directory for custom sounds
+                    cwd_path = os.path.join(os.getcwd(), filepath)
+                    if os.path.exists(cwd_path):
+                        filepath = cwd_path
+                    else:
+                        filepath = resource_path(filepath)
+                
+                if filepath.lower().endswith(".mp3"):
+                    import ctypes
+                    ctypes.windll.winmm.mciSendStringW(f'close m59_audio', None, 0, None)
+                    ctypes.windll.winmm.mciSendStringW(f'open "{filepath}" type mpegvideo alias m59_audio', None, 0, None)
+                    ctypes.windll.winmm.mciSendStringW(f'play m59_audio', None, 0, None)
+                else:
+                    winsound.PlaySound(filepath, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+        except Exception as e:
+            logger.debug(f"Audio playback error: {e}")
 
     def show_waiting_overlay(self, mode="searching"):
         """Displays a splash screen and keeps the main UI hidden until initialization is complete."""
