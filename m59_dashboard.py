@@ -194,6 +194,8 @@ class M59Dashboard(tk.Tk):
         self.pk_sound_enabled = tk.BooleanVar(value=True)
         self.pk_frame_enabled = tk.BooleanVar(value=True)
         self.pk_sound_path = tk.StringVar(value="SystemExclamation")
+        self.tell_sound_enabled = tk.BooleanVar(value=True)
+        self.tell_sound_path = tk.StringVar(value="sound/dm_chime.wav")
         self.elusion_phrase = tk.StringVar(value='say "I wish to travel to {loc}."')
         self.elusion_geometry = tk.StringVar(value="320x35+100+100")
         self.guildhall_name = tk.StringVar(value="")
@@ -863,6 +865,8 @@ class M59Dashboard(tk.Tk):
                     self.pk_sound_enabled.set(s.get("pk_sound_enabled", True))
                     self.pk_frame_enabled.set(s.get("pk_frame_enabled", True))
                     self.pk_sound_path.set(s.get("pk_sound_path", "SystemExclamation"))
+                    self.tell_sound_enabled.set(s.get("tell_sound_enabled", True))
+                    self.tell_sound_path.set(s.get("tell_sound_path", "sound/dm_chime.wav"))
                     self.elusion_phrase.set(s.get("elusion_phrase", 'say "I wish to travel to {loc}."'))
                     self.elusion_geometry.set(s.get("elusion_geometry", "320x35+100+100"))
                     self.guildhall_name.set(s.get("guildhall_name", ""))
@@ -898,6 +902,8 @@ class M59Dashboard(tk.Tk):
                     "pk_sound_enabled": self.pk_sound_enabled.get(),
                     "pk_frame_enabled": self.pk_frame_enabled.get(),
                     "pk_sound_path": self.pk_sound_path.get(),
+                    "tell_sound_enabled": self.tell_sound_enabled.get(),
+                    "tell_sound_path": self.tell_sound_path.get(),
                     "elusion_phrase": self.elusion_phrase.get(),
                     "elusion_geometry": self.elusion_geometry.get(),
                     "guildhall_name": self.guildhall_name.get(),
@@ -1327,17 +1333,18 @@ class M59Dashboard(tk.Tk):
                     
                     if pvp_status == "Safe (No PVP)":
                         color = "#4CAF50" # green
-                    elif pvp_status == "Guild PVP Only":
-                        color = "#2196F3" # blue
-                    elif pvp_status == "Kill Zone (All PVP)":
-                        color = "#f44336" # red
                     elif pvp_status == "Arena (No Death Penalty)":
                         color = "#FF9800" # orange
                     else:
-                        color = "#555555" # grey
+                        color = "#f44336" # red
                         
-                    self.pvp_status_lbl.config(text=pvp_status, fg=color)
                     raw_flags = self.gps_manager.dataset.get(rid, {}).get("raw_flags", "") if rid else ""
+                    if "ROOM_SAFELOGOFF" in raw_flags:
+                        display_text = f"{pvp_status} (Safe Logoff)"
+                    else:
+                        display_text = f"{pvp_status} (Unsafe Logoff)"
+                        
+                    self.pvp_status_lbl.config(text=display_text, fg=color)
                     tooltip_text = f"Flags: {raw_flags}" if raw_flags else pvp_status
                     self.set_tooltip(self.pvp_status_lbl, tooltip_text)
 
@@ -1440,6 +1447,12 @@ class M59Dashboard(tk.Tk):
                                 for line in new_data.splitlines():
                                     if self.is_line_filtered(line):
                                         self.comms_view.insert(tk.END, line + "\n")
+                                        
+                                    # Trigger alert for incoming DMs
+                                    if self.tell_sound_enabled.get():
+                                        if ' tells you, "' in line or ' sends, "' in line:
+                                            self.play_tell_alert()
+                                            
                                 self.comms_view.see(tk.END)
                                 self.comms_view.config(state="disabled")
                                 self._log_ptr = f.tell()
@@ -2049,7 +2062,24 @@ class M59Dashboard(tk.Tk):
         
         pg = tk.LabelFrame(c, text=" Alerts ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         pg.pack(fill="x")
-        tk.Checkbutton(pg, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(anchor="w")
+        
+        # PK Alerts
+        pk_frame = tk.Frame(pg, bg="#f0f0f0")
+        pk_frame.pack(fill="x", pady=(0, 5))
+        tk.Checkbutton(pk_frame, text="Enable PK Alerts", variable=self.pk_alert_enabled, bg="#f0f0f0").pack(side="left")
+        tk.Label(pk_frame, text="Sound:", bg="#f0f0f0").pack(side="left", padx=(10, 2))
+        ttk.Combobox(pk_frame, textvariable=self.pk_sound_path, values=["SystemExclamation", "SystemAsterisk", "SystemHand", "SystemQuestion"], width=20).pack(side="left")
+        tk.Button(pk_frame, text="Browse...", command=self.browse_pk_sound, padx=5).pack(side="left", padx=5)
+        tk.Button(pk_frame, text="Test", command=self.test_pk_sound, padx=5).pack(side="left")
+        
+        # Tell Alerts
+        tell_frame = tk.Frame(pg, bg="#f0f0f0")
+        tell_frame.pack(fill="x")
+        tk.Checkbutton(tell_frame, text="Enable Direct Message (Tell) Alerts", variable=self.tell_sound_enabled, bg="#f0f0f0").pack(side="left")
+        tk.Label(tell_frame, text="Sound:", bg="#f0f0f0").pack(side="left", padx=(10, 2))
+        ttk.Combobox(tell_frame, textvariable=self.tell_sound_path, values=["SystemAsterisk", "SystemExclamation", "SystemHand", "SystemQuestion", "sound/dm_chime.wav"], width=20).pack(side="left")
+        tk.Button(tell_frame, text="Browse...", command=self.browse_tell_sound, padx=5).pack(side="left", padx=5)
+        tk.Button(tell_frame, text="Test", command=self.test_tell_sound, padx=5).pack(side="left")
         
         elude_g = tk.LabelFrame(c, text=" Elusion Settings ", bg="#f0f0f0", font=("Arial", 10, "bold"), padx=15, pady=15)
         elude_g.pack(fill="x", pady=10)
@@ -2153,8 +2183,8 @@ class M59Dashboard(tk.Tk):
         if self.pk_sound_enabled.get():
             p = self.pk_sound_path.get()
             try:
-                if p == "SystemExclamation":
-                    winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
+                if p.startswith("System"):
+                    winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
                 else:
                     # Resolve path if relative
                     if not os.path.isabs(p):
@@ -2165,6 +2195,19 @@ class M59Dashboard(tk.Tk):
         if self.pk_frame_enabled.get() and self.pk_frame:
             self.pk_frame.flash()
         self.after(5000, self.reset_pk_alert)
+
+    def play_tell_alert(self):
+        if not self.tell_sound_enabled.get(): return
+        p = self.tell_sound_path.get()
+        try:
+            if p.startswith("System"):
+                winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
+            else:
+                if not os.path.isabs(p):
+                    p = resource_path(p)
+                winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        except Exception as e:
+            logger.debug(f"Tell sound error: {e}")
 
     def reset_pk_alert(self):
         self.alert_active = False
@@ -2629,6 +2672,9 @@ class M59Dashboard(tk.Tk):
                 if hasattr(self, "gps_who_loc_lbl") and self.gps_who_loc_lbl:
                     self.gps_who_loc_lbl.config(text=room)
                 self.monitor_gps_navigation(room)
+                
+                # Refresh footer to ensure PVP status and GPS labels update correctly on room change
+                self.refresh_who_footer()
                 
                 # Always track travel times in background (Weighted Pathfinding)
                 was_t, msg = self.gps_manager.process_room_update(room)
@@ -3183,7 +3229,7 @@ class M59Dashboard(tk.Tk):
         win32gui.EnumWindows(cb, None)
         return insts
 
-    def browse_sound(self):
+    def browse_pk_sound(self):
         p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
         if p:
             # If the path is within the current working directory, make it relative
@@ -3195,13 +3241,36 @@ class M59Dashboard(tk.Tk):
                 pass
             self.pk_sound_path.set(p)
 
-    def test_sound(self):
+    def test_pk_sound(self):
         p = self.pk_sound_path.get()
         try:
-            if p == "SystemExclamation":
-                winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS | winsound.SND_ASYNC)
+            if p.startswith("System"):
+                winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
             else:
                 # Resolve path if relative
+                if not os.path.isabs(p):
+                    p = resource_path(p)
+                winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        except:
+            pass
+
+    def browse_tell_sound(self):
+        p = filedialog.askopenfilename(filetypes=[("Wave files", "*.wav")])
+        if p:
+            try:
+                rel_p = os.path.relpath(p, os.getcwd())
+                if not rel_p.startswith(".."):
+                    p = rel_p
+            except:
+                pass
+            self.tell_sound_path.set(p)
+
+    def test_tell_sound(self):
+        p = self.tell_sound_path.get()
+        try:
+            if p.startswith("System"):
+                winsound.PlaySound(p, winsound.SND_ALIAS | winsound.SND_ASYNC)
+            else:
                 if not os.path.isabs(p):
                     p = resource_path(p)
                 winsound.PlaySound(p, winsound.SND_FILENAME | winsound.SND_ASYNC)

@@ -238,13 +238,12 @@ class GPSManager:
         if not matches: return None
         
         resolved_rid = matches[0]
-        if len(matches) > 1 and self.last_known_rid:
-            for exit_info in self.dataset.get(self.last_known_rid, {}).get('exits', []):
+        if len(matches) > 1 and self.last_known_from_rid:
+            for exit_info in self.dataset.get(self.last_known_from_rid, {}).get('exits', []):
                 if exit_info['to_rid'] in matches:
                     resolved_rid = exit_info['to_rid']
                     break
                     
-        self.last_known_rid = resolved_rid
         return resolved_rid
 
     def record_transition(self, from_rid, to_rid, duration):
