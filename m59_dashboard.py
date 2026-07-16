@@ -220,12 +220,26 @@ class M59Dashboard(tk.Tk):
         
         self.title(f"M59 Companion v{self.version}")
         
+        # Load and set application icon
+        try:
+            icon_path = resource_path(os.path.join("imgs", "m59comp.jpg"))
+            if os.path.exists(icon_path):
+                from PIL import Image, ImageTk
+                img = Image.open(icon_path)
+                self.app_icon = ImageTk.PhotoImage(img) # Keep a reference
+                self.iconphoto(True, self.app_icon)
+            else:
+                logger.debug(f"App icon not found at {icon_path}")
+        except Exception as e:
+            logger.error(f"Failed to load application icon: {e}")
+        
         # Scale initial window geometry
         base_w, base_h = 1100, 850
         self.geometry(f"{int(base_w * self.scaling_factor)}x{int(base_h * self.scaling_factor)}")
         
         # Initialize styles
         self.style = ttk.Style()
+        self.load_pvp_icons()
         self.apply_ui_scaling()
 
         # --- Settings ---
@@ -378,6 +392,45 @@ class M59Dashboard(tk.Tk):
         self.after(100, self.background_update_check)
         self.after(100, self.update_game_time)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+
+    def load_pvp_icons(self):
+        self.pvp_icons = {}
+        try:
+            from PIL import Image, ImageTk
+            import os
+            
+            # For older PIL versions
+            resample_filter = getattr(Image, 'Resampling', Image).LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+
+            icon_files = {
+                "Standard PVP": "open_pvp.jpg",
+                "Guild PVP Only": "guild_combat.jpg",
+                "Safe (No PVP)": "no_pvp.jpg",
+                "Safe Logoff": "safe_to_log.jpg"
+            }
+            size = int(24 * self.scaling_factor)
+            
+            for key, filename in icon_files.items():
+                path = resource_path(os.path.join("imgs", filename))
+                if os.path.exists(path):
+                    img = Image.open(path).convert("RGBA")
+                    # Crop to center square to avoid stretching
+                    w, h = img.size
+                    min_dim = min(w, h)
+                    left = (w - min_dim) / 2
+                    top = (h - min_dim) / 2
+                    right = (w + min_dim) / 2
+                    bottom = (h + min_dim) / 2
+                    img = img.crop((left, top, right, bottom))
+                    img = img.resize((size, size), resample_filter)
+                    self.pvp_icons[key] = ImageTk.PhotoImage(img)
+                else:
+                    logger.debug(f"PVP Icon not found: {path}")
+        except Exception as e:
+            import traceback
+            logger.error(f"Failed to load PVP icons: {e}")
+            traceback.print_exc()
 
     def scale_px(self, px):
         """Helper to scale pixel values by the current scaling factor."""
@@ -1084,13 +1137,17 @@ class M59Dashboard(tk.Tk):
         )
         self.gps_who_loc_lbl.pack(fill="x", pady=(0, 2))
         
-        # 3. PVP Status Placeholder
-        self.pvp_status_lbl = tk.Label(
-            self.who_footer, text="Standard PVP", font=("Segoe UI", 8),
-            bg=footer_bg, fg="#555555"
-        )
-        self.pvp_status_lbl.pack(fill="x", pady=(0, 5))
-        self.set_tooltip(self.pvp_status_lbl, "Standard PVP")
+
+        # 3. PVP Status Icons Placeholder
+        self.pvp_status_frame = tk.Frame(self.who_footer, bg=footer_bg)
+        self.pvp_status_frame.pack(fill="x", pady=(0, 5))
+        
+        self.pvp_icon_1 = tk.Label(self.pvp_status_frame, bg=footer_bg)
+        self.pvp_icon_2 = tk.Label(self.pvp_status_frame, bg=footer_bg)
+        
+        self.pvp_icon_1.pack(side="left", expand=True, anchor="e", padx=(0, 2))
+        self.pvp_icon_2.pack(side="left", expand=True, anchor="w", padx=(2, 0))
+
         
         # 4. GPS Route instruction (No active route)
         self.gps_dock_lbl = tk.Label(
@@ -1160,10 +1217,9 @@ class M59Dashboard(tk.Tk):
         
         if self.who_list_players:
             self.refresh_who_list_ui()
-        
-        # If we have players, populate the UI immediately
-        if self.who_list_players:
-            self.refresh_who_list_ui()
+        else:
+            # Even if no players, ensure the footer is updated (for GPS and PVP icons)
+            self.refresh_who_footer()
 
     def update_who_list_visibility(self):
         if hasattr(self, "who_list_outer"):
@@ -1362,10 +1418,12 @@ class M59Dashboard(tk.Tk):
             loc_val = self.gps_current_loc_lbl.cget("text")
             self.gps_who_loc_lbl.config(text=loc_val)
             
-            if hasattr(self, "pvp_status_lbl"):
+            if hasattr(self, "pvp_status_frame"):
                 if loc_val == "Unknown Location":
-                    self.pvp_status_lbl.config(text="Unknown Location", fg="#555555")
-                    self.set_tooltip(self.pvp_status_lbl, "Location not known")
+                    self.pvp_icon_1.config(image='', text="Unknown Location", fg="#555555")
+                    self.pvp_icon_2.config(image='', text="")
+                    self.set_tooltip(self.pvp_icon_1, "Location not known")
+                    self.set_tooltip(self.pvp_icon_2, "")
                 else:
                     rid = self.gps_manager.resolve_name_to_rid(loc_val)
                     pvp_status = self.gps_manager.dataset.get(rid, {}).get("pvp_status", "Standard PVP") if rid else "Standard PVP"
@@ -1378,14 +1436,31 @@ class M59Dashboard(tk.Tk):
                         color = "#f44336" # red
                         
                     raw_flags = self.gps_manager.dataset.get(rid, {}).get("raw_flags", "") if rid else ""
-                    if "ROOM_SAFELOGOFF" in raw_flags:
-                        display_text = f"{pvp_status} (Safe Logoff)"
-                    else:
-                        display_text = f"{pvp_status} (Unsafe Logoff)"
+                    
+                    if hasattr(self, "pvp_icons") and self.pvp_icons:
+                        # use icons
+                        icon_1 = self.pvp_icons.get(pvp_status, self.pvp_icons.get("Standard PVP"))
+                        self.pvp_icon_1.config(image=icon_1, text="", bg="#1e1f22")
+                        self.set_tooltip(self.pvp_icon_1, f"{pvp_status}")
                         
-                    self.pvp_status_lbl.config(text=display_text, fg=color)
-                    tooltip_text = f"Flags: {raw_flags}" if raw_flags else pvp_status
-                    self.set_tooltip(self.pvp_status_lbl, tooltip_text)
+                        if "ROOM_SAFELOGOFF" in raw_flags:
+                            icon_2 = self.pvp_icons.get("Safe Logoff")
+                            if icon_2:
+                                self.pvp_icon_2.config(image=icon_2, text="", bg="#1e1f22")
+                                self.set_tooltip(self.pvp_icon_2, "Safe to Logoff")
+                            else:
+                                self.pvp_icon_2.config(image='', text="")
+                        else:
+                            self.pvp_icon_2.config(image='', text="")
+                    else:
+                        # fallback to text
+                        if "ROOM_SAFELOGOFF" in raw_flags:
+                            display_text = f"{pvp_status} (Safe Logoff)"
+                        else:
+                            display_text = f"{pvp_status} (Unsafe Logoff)"
+                        self.pvp_icon_1.config(image='', text=display_text, fg=color)
+                        self.pvp_icon_2.config(image='', text="")
+                        self.set_tooltip(self.pvp_icon_1, f"Flags: {raw_flags}" if raw_flags else pvp_status)
 
         # GPS Status
         gps_text = "No active route"
@@ -3285,6 +3360,8 @@ class M59Dashboard(tk.Tk):
         self.play_audio_file(p)
 
 
+
+
     def play_audio_file(self, filepath):
         try:
             if filepath.startswith("System"):
@@ -3292,32 +3369,31 @@ class M59Dashboard(tk.Tk):
             else:
                 original_filepath = filepath
                 if not os.path.isabs(filepath):
-                    # Prioritize the current working directory for custom sounds
                     cwd_path = os.path.join(os.getcwd(), filepath)
                     if os.path.exists(cwd_path):
                         filepath = cwd_path
                     else:
                         filepath = resource_path(filepath)
                 
-                if filepath.lower().endswith(".mp3"):
-                    import ctypes
-                    ctypes.windll.winmm.mciSendStringW(f'close m59_audio', None, 0, None)
-                    ctypes.windll.winmm.mciSendStringW(f'open "{filepath}" type mpegvideo alias m59_audio', None, 0, None)
-                    ctypes.windll.winmm.mciSendStringW(f'play m59_audio', None, 0, None)
+                import ctypes
+                ctypes.windll.winmm.mciSendStringW(f'close m59_audio', None, 0, None)
+                res = ctypes.windll.winmm.mciSendStringW(f'open "{filepath}" alias m59_audio', None, 0, None)
+                if res != 0:
+                    # Fallback to winsound if MCI fails to open it (e.g. some wav formats)
+                    if filepath.lower().endswith(".wav"):
+                        winsound.PlaySound(filepath, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
                 else:
-                    winsound.PlaySound(filepath, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+                    ctypes.windll.winmm.mciSendStringW(f'play m59_audio', None, 0, None)
         except Exception as e:
             logger.debug(f"Audio playback error: {e}")
 
     def show_waiting_overlay(self, mode="searching"):
         """Displays a splash screen and keeps the main UI hidden until initialization is complete."""
         try:
-            # Keep main window completely invisible during initialization
             self.attributes("-alpha", 0.0)
         except: pass
 
         if self.waiting_overlay and self.waiting_overlay.winfo_exists():
-            # Update existing overlay text
             if mode == "login":
                 self.waiting_title_lbl.config(text=" ↻  WAITING FOR LOGIN ", fg="#64B5F6")
                 self.waiting_msg_lbl.config(text="Please select a character and enter the world")
@@ -3335,9 +3411,8 @@ class M59Dashboard(tk.Tk):
         overlay = tk.Toplevel(self)
         overlay.title("M59 Companion - Connecting...")
         
-        # Center the splash screen on the screen
         window_width = 580
-        window_height = 260
+        window_height = 420
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         center_x = int(screen_width/2 - window_width / 2)
@@ -3353,11 +3428,27 @@ class M59Dashboard(tk.Tk):
             
         overlay.configure(bg="#0F0F0F")
         
-        # Inner padding frame
         inner = tk.Frame(overlay, bg="#181818", highlightthickness=1, highlightbackground="#333333")
         inner.pack(expand=True, fill="both", padx=2, pady=2)
         
-        tk.Label(inner, text="M59 COMPANION", font=("Segoe UI", 22, "bold"), fg="#FFFFFF", bg="#181818").pack(pady=(35, 10))
+        # Try to load splash image
+        try:
+            from PIL import Image, ImageTk
+            import os
+            icon_path = resource_path(os.path.join("imgs", "m59comp.jpg"))
+            if os.path.exists(icon_path):
+                # For older PIL versions
+                resample_filter = getattr(Image, 'Resampling', Image).LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+                img = Image.open(icon_path).convert("RGBA")
+                img = img.resize((200, 200), resample_filter)
+                self.splash_photo = ImageTk.PhotoImage(img)
+                img_lbl = tk.Label(inner, image=self.splash_photo, bg="#181818")
+                img_lbl.pack(pady=(25, 5))
+            else:
+                tk.Label(inner, text="M59 COMPANION", font=("Segoe UI", 22, "bold"), fg="#FFFFFF", bg="#181818").pack(pady=(35, 10))
+        except Exception as e:
+            logger.error(f"Failed to load splash image: {e}")
+            tk.Label(inner, text="M59 COMPANION", font=("Segoe UI", 22, "bold"), fg="#FFFFFF", bg="#181818").pack(pady=(35, 10))
         
         if mode == "initializing":
             title_text = " ↻  INITIALIZING "
@@ -3373,7 +3464,7 @@ class M59Dashboard(tk.Tk):
             msg_text = "Please launch Meridian 59 to continue"
         
         self.waiting_title_lbl = tk.Label(inner, text=title_text, font=("Segoe UI", 12, "bold"), fg=title_color, bg="#181818", pady=5)
-        self.waiting_title_lbl.pack()
+        self.waiting_title_lbl.pack(pady=(15, 5) if hasattr(self, 'splash_photo') else 5)
         
         self.waiting_msg_lbl = tk.Label(inner, text=msg_text, font=("Segoe UI", 10), fg="#B0B0B0", bg="#181818")
         self.waiting_msg_lbl.pack(pady=(5, 15))
