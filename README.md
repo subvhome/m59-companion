@@ -1,90 +1,71 @@
 # M59 Companion
 
-The **M59 Companion** is a modern assistant and digital "heads-up display" (HUD) designed specifically for Meridian 59. It acts as a professional interface layer for the game, automating tedious tasks—like calculating progression goals or managing inventory logistics—so you can focus on the adventure. You can execute the python code or download the compiled eye linked below. This exe will trigger a SmartScreen. You will have to click more info and then run anyway.
+Welcome to the **M59 Companion**! This is a friendly, easy-to-use digital assistant designed to make your adventures in Meridian 59 more enjoyable. It runs alongside your game and handles the math, tracking, and organization for you, so you can focus entirely on playing and exploring.
+
+You can run the Python code yourself, or simply grab the ready-to-use application below. 
+*(Note: When launching the .exe file, Windows SmartScreen might appear. Just click "More info" and then "Run anyway" to open it.)*
 
 [**Download Latest Release (EXE)**](https://github.com/subvhome/m59-companion/raw/main/dist/M59Companion.exe)
 
 ---
 
-## Screen Showcases
+## See It In Action
 
 ### Main Dashboard
-![Main Dashboard Interface](demo/main.gif)
-*Overview of the primary tactical HUD, including vital monitoring and session statistics.*
+![Main Dashboard Interface](https://raw.githubusercontent.com/subvhome/m59-companion/main/demo/main.gif)
+*A clear, simple overview of your character's health, current stats, and the progress you've made during your play session.*
 
 ### Live Tracker
-![Live Tracker](demo/tracker.gif)
-*Real-time tracking of skill improvements and session progress.*
+![Live Tracker](https://raw.githubusercontent.com/subvhome/m59-companion/main/demo/tracker.gif)
+*Watch your skills grow in real-time as you use them.*
 
-### PK Alert System
-![PK Alert](demo/PVP%20alert.gif)
-*Visual and audio alerts that trigger when you are attacked by other players. Can be useful if you play without sound. (This test was done on a rat)*
+### Player Attack Alerts
+![PK Alert](https://raw.githubusercontent.com/subvhome/m59-companion/main/demo/PVP%20alert.gif)
+*Helpful visual and sound warnings if another player attacks you—especially great if you prefer playing with the game volume turned down.*
 
 ### Vault Manager
-![Vault Manager](demo/Vault%20Management.gif)
-*High-density searchable view for tracking your remote storage.*
+![Vault Manager](https://raw.githubusercontent.com/subvhome/m59-companion/main/demo/Vault%20Management.gif)
+*A handy tool to easily search and keep track of everything you have stored in your bank.*
 
 ---
 
-## Core Capabilities
+## What Can It Do?
 
-The Companion is organized into specialized tabs, each designed to handle a different aspect of your Meridian 59 experience.
+Here are some of the ways the Companion helps you during your journey:
 
-### 1. The Tactical Dashboard
-Your primary HUD for high-stakes gameplay.
-*   **Vital Monitoring:** Live tracking of your Health, Mana, and Vigor.
-*   **Attribute Tracking:** Real-time display of your Might, Intellect, and other core stats.
-*   **Session Gains:** An instant overview of every skill improvement and kill earned during your current play session.
+### 1. Essential Character Stats
+Keep a close eye on your Health, Mana, and Vigor without having to squint at the game window. You can also view your core attributes (like Might and Intellect) and get a quick summary of what you've leveled up and defeated today.
 
-### 2. Inventory & Logistics
-Intelligent monitoring to keep you moving at full speed.
-*   **Dual Metrics:** Simultaneously tracks your **Weight Load** and **Bulk Volume**.
-*   **Saturation Meter:** A high-visibility meter warns you as you approach your carry limits, changing color from green to red before you become overburdened.
-*   **Dynamic Scaling:** Automatically adjusts your capacity limits in real-time as your character's strength changes.
+### 2. Bag Space & Carrying Capacity
+Never get caught moving slowly because your bags are too heavy! The Companion watches your weight and item bulk, letting you know when you're getting close to your carrying limit. It automatically adjusts if your character's strength changes.
 
-### 3. Smart GPS & World Navigation
-Comprehensive navigation through the realm of Meridian.
-*   **Live Location:** The Companion always knows exactly which room you are in.
-*   **Turn-by-Turn Directions:** Search for any destination to receive specific, coordinate-perfect instructions.
-*   **Automatic Recalculation:** If you take a wrong turn or find a shortcut, the GPS instantly finds the new best path to your target.
+### 3. Built-in GPS & Directions
+Getting lost is a thing of the past. The Companion knows where you are and gives you step-by-step directions to almost any location in the game. If you take a detour, it quickly figures out a new path for you.
 
-### 4. School Progression & Goals
-Plan your character's growth with mathematical precision.
-*   **Skill Targets:** Calculates the exact percentages needed to reach the next level in your chosen fighter or magic schools.
-*   **One-Click Sync:** Automatically synchronizes your entire knowledge list from the game in seconds.
+### 4. Skill Planning
+Trying to reach the next level in your favorite magic or combat school? The Companion calculates exactly how close you are to your next goal and updates your skill list instantly.
 
-### 5. Smart Communications & History
-A massive upgrade to the standard game chat.
-*   **The Filter Ribbon:** Sort chat into categories like "Tells," "Shouts," or "System" with a single click.
-*   **Searchable Archives:** Every conversation is saved to a local, searchable log so you can reference past events or trades.
+### 5. Better Chat Logging
+It neatly organizes your chat, separating whispers, shouts, and system messages so you don't miss anything important. It also saves your conversations locally so you can look back at past trades or group plans.
 
-### 6. Vault & Wealth Management
-Professional tracking for your gold and gear.
-*   **Vault Scanning:** Instantly records every item in your remote storage for easy searching later.
-*   **Bank Ledger:** Remembers your mainland and island bank balances and updates them the moment you make a transaction.
+### 6. Wealth and Bank Tracking
+The tool remembers what you have in the bank and your overall gold balance, updating immediately whenever you make a deposit or withdrawal. You can easily search through your remote storage items to find exactly what you need.
 
-### 7. The Kill Book
-A permanent trophy room and database for your character's career.
-*   **Monster & Player Tracking:** Records every victory, comparing your session performance against your character's all-time career totals.
+### 7. Your Personal Trophy Room
+Keep a running tally of every monster and player you defeat. It's a great way to look back at your character's history and see how much you've accomplished over time.
 
 ---
 
-## The Status Dock
-A high-visibility sidebar that can be used inside the app or "popped out" to the desktop.
-*   **Live Population:** A real-time list of online players, color-coded by their status (Innocent, Outlaw, Murderer, or Staff).
-*   **Desktop Docking:** Register the dock as a Windows AppBar to have it physically stick to the side of your monitor, automatically resizing other windows to stay in view.
-*   **Information Footer:** Keeps your GPS turns, total improvements, wealth, and **Bag Space** visible at all times.
+## Handy Sidebar
+You can pull out a convenient sidebar that sticks to the side of your desktop screen. It shows you who is currently playing online (color-coded so you know who is friendly or dangerous). It also keeps your current GPS directions, gold amount, and available bag space visible at all times. 
+
+## Extra Details
+*   **Multiple Characters:** If you play more than one character at once, the Companion lets you easily switch between them.
+*   **Automatic Updates:** The app will check for the newest version when you open it, ensuring you always have the latest features.
+*   **Move Things Around:** You can rearrange the tabs however you like to fit your personal play style.
+
+## Feedback & Ideas
+I'd love to hear what you think! If you have suggestions or run into any issues, please [Report an Issue on GitHub](https://github.com/subvhome/m59-companion/issues) or send an in-game mail to **MF DOOM (Server 101)**.
 
 ---
-
-## Advanced Features
-*   **Multi-Instance Support:** Running multiple characters? The Companion detects all active game windows and lets you choose which one to monitor.
-*   **Auto-Update System:** The Companion checks for new releases on startup, ensuring you always have the latest improvements.
-*   **UI Customization:** Drag and drop tabs to fit your workflow and enjoy a UI that scales perfectly to any screen resolution.
-
----
-
-## Feedback & Suggestions
-We are always looking for ways to improve the Companion. If you have ideas or bug reports, please [Report an Issue on GitHub](https://github.com/subvhome/m59-companion/issues) or mail **MF DOOM (Server 101)** in-game.
-
 *Created for the Meridian 59 community.*
